@@ -1,15 +1,13 @@
 import { useState } from 'react'
 import type { Qupt } from '../lib/types'
+import { formatDate, formatRelativeTime, getSourceColor } from '../lib/formatting'
 
 interface QuptItemProps {
   qupt: Qupt
-  formatRelativeTime: (timestamp: number) => string
-  formatDate: (timestamp: number) => string
-  getSourceColor: (source: string) => string
   showVolitionName?: boolean
 }
 
-export default function QuptItem({ qupt, formatRelativeTime, formatDate, getSourceColor, showVolitionName = false }: QuptItemProps) {
+export default function QuptItem({ qupt, showVolitionName = false }: QuptItemProps) {
   const [expanded, setExpanded] = useState(false)
 
   const metadata = qupt.metadata

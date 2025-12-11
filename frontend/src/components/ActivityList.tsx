@@ -31,27 +31,6 @@ export default function ActivityList({ onBack }: ActivityListProps) {
     enabled: volitions.length > 0
   })
 
-  const formatDate = (timestamp: number) => {
-    return new Date(timestamp * 1000).toLocaleString()
-  }
-
-  const formatRelativeTime = (timestamp: number) => {
-    const seconds = Math.floor(Date.now() / 1000 - timestamp)
-    if (seconds < 60) return 'just now'
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
-    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
-    return `${Math.floor(seconds / 86400)}d ago`
-  }
-
-  const getSourceColor = (source: string) => {
-    const colors: Record<string, string> = {
-      github: 'bg-purple-500/20 text-purple-300',
-      zammad: 'bg-blue-500/20 text-blue-300',
-      gdrive: 'bg-green-500/20 text-green-300',
-      mcp: 'bg-gray-500/20 text-gray-300'
-    }
-    return colors[source] || 'bg-gray-500/20 text-gray-300'
-  }
 
   // Get unique source types from qupts
   const uniqueSources = Array.from(new Set(allQupts.map(q => q.source)))
@@ -121,9 +100,6 @@ export default function ActivityList({ onBack }: ActivityListProps) {
               <QuptItem
                 key={qupt.id}
                 qupt={qupt}
-                formatRelativeTime={formatRelativeTime}
-                formatDate={formatDate}
-                getSourceColor={getSourceColor}
                 showVolitionName={true}
               />
             ))}
