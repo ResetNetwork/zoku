@@ -93,7 +93,7 @@ export default function Dashboard({
           onClick={onShowActivityList}
           className="card hover:bg-gray-200 dark:hover:bg-quantum-700/70 transition-colors cursor-pointer text-left"
         >
-          <div className="text-sm text-gray-400 mb-1">Recent Activity</div>
+          <div className="text-sm text-gray-400 mb-1">Recent Qupts</div>
           <div className="text-3xl font-bold text-quantum-400">{recentQupts.length}</div>
         </button>
         <button
@@ -131,7 +131,7 @@ export default function Dashboard({
 
       {/* Recent Activity */}
       <div className="card">
-        <h2 className="text-xl font-bold mb-4">Activity</h2>
+        <h2 className="text-xl font-bold mb-4">Qupts</h2>
         {quptsLoading ? (
           <div className="text-gray-400 text-center py-8">Loading activity...</div>
         ) : recentQupts.length === 0 ? (
@@ -151,7 +151,7 @@ export default function Dashboard({
               onClick={onShowActivityList}
               className="w-full mt-4 text-center text-quantum-500 hover:text-quantum-400 text-sm font-medium transition-colors"
             >
-              View all activity →
+              View all qupts →
             </button>
           </>
         )}

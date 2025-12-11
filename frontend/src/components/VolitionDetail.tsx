@@ -246,7 +246,7 @@ export default function VolitionDetail({ volitionId, onBack }: VolitionDetailPro
 
       {/* Activity Feed */}
       <div className="card">
-        <h2 className="text-xl font-bold mb-4">Activity</h2>
+        <h2 className="text-xl font-bold mb-4">Qupts</h2>
         {quptsLoading ? (
           <div className="text-gray-400 text-center py-8">Loading activity...</div>
         ) : qupts.length === 0 ? (

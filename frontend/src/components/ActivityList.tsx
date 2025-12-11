@@ -46,8 +46,8 @@ export default function ActivityList({ onBack }: ActivityListProps) {
     <div className="space-y-6">
       {/* Header */}
       <div className="card">
-        <h1 className="text-3xl font-bold text-quantum-400 mb-2">Activity</h1>
-        <p className="text-gray-400">All activity across volitions</p>
+        <h1 className="text-3xl font-bold text-quantum-400 mb-2">Qupts</h1>
+        <p className="text-gray-400">Activity across all volitions</p>
       </div>
 
       {/* Filters */}
@@ -86,7 +86,7 @@ export default function ActivityList({ onBack }: ActivityListProps) {
       {/* Activity Stream */}
       <div className="card">
         <h2 className="text-xl font-bold mb-4">
-          Activity ({filteredQupts.length})
+          Qupts ({filteredQupts.length})
         </h2>
         {isLoading ? (
           <div className="text-gray-400 text-center py-8">Loading activity...</div>
