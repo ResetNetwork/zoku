@@ -9,8 +9,6 @@ interface VolitionDetailProps {
 }
 
 export default function VolitionDetail({ volitionId, onBack }: VolitionDetailProps) {
-  const queryClient = useQueryClient()
-  const [syncingSource, setSyncingSource] = useState<string | null>(null)
 
   const { data: volition, isLoading } = useQuery({
     queryKey: ['volition', volitionId],
@@ -34,21 +32,6 @@ export default function VolitionDetail({ volitionId, onBack }: VolitionDetailPro
 
   const formatDate = (timestamp: number) => {
     return new Date(timestamp * 1000).toLocaleString()
-  }
-
-  const handleSyncSource = async (sourceId: string) => {
-    setSyncingSource(sourceId)
-    try {
-      await api.syncSource(sourceId)
-      // Invalidate queries to refresh data
-      queryClient.invalidateQueries({ queryKey: ['qupts', volitionId] })
-      queryClient.invalidateQueries({ queryKey: ['sources', volitionId] })
-      queryClient.invalidateQueries({ queryKey: ['recent-qupts'] })
-    } catch (error) {
-      console.error('Sync failed:', error)
-    } finally {
-      setSyncingSource(null)
-    }
   }
 
   const formatRelativeTime = (timestamp: number) => {
@@ -163,16 +146,7 @@ export default function VolitionDetail({ volitionId, onBack }: VolitionDetailPro
                         </div>
                       )}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleSyncSource(source.id)}
-                        disabled={syncingSource === source.id}
-                        className="px-3 py-1 text-xs bg-quantum-500 hover:bg-quantum-400 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md transition-colors"
-                      >
-                        {syncingSource === source.id ? 'Syncing...' : 'Sync Now'}
-                      </button>
-                      <div className={`w-2 h-2 rounded-full ${source.enabled ? 'bg-green-500' : 'bg-gray-600'}`} />
-                    </div>
+                    <div className={`w-2 h-2 rounded-full ${source.enabled ? 'bg-green-500' : 'bg-gray-600'}`} />
                   </div>
                 </div>
               )

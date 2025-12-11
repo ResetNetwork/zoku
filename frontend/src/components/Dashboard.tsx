@@ -9,9 +9,6 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ onSelectVolition }: DashboardProps) {
-  const [syncing, setSyncing] = useState(false)
-  const queryClient = useQueryClient()
-
   const { data: volitions = [], isLoading: volitionsLoading } = useQuery({
     queryKey: ['volitions'],
     queryFn: () => api.listVolitions({ root_only: true, limit: 50 })
@@ -43,32 +40,6 @@ export default function Dashboard({ onSelectVolition }: DashboardProps) {
     return `${Math.floor(seconds / 86400)}d ago`
   }
 
-  const handleSyncAll = async () => {
-    setSyncing(true)
-    try {
-      // Get all sources from all volitions
-      const allSources = await Promise.all(
-        volitions.map(v => api.listSources(v.id))
-      )
-      const sources = allSources.flat()
-
-      // Sync each source
-      await Promise.all(
-        sources.map(s => api.syncSource(s.id))
-      )
-
-      // Refresh all data
-      queryClient.invalidateQueries({ queryKey: ['qupts'] })
-      queryClient.invalidateQueries({ queryKey: ['recent-qupts'] })
-      queryClient.invalidateQueries({ queryKey: ['sources'] })
-      queryClient.invalidateQueries({ queryKey: ['volitions'] })
-    } catch (error) {
-      console.error('Sync all failed:', error)
-    } finally {
-      setSyncing(false)
-    }
-  }
-
   const getSourceColor = (source: string) => {
     const colors: Record<string, string> = {
       github: 'bg-purple-500/20 text-purple-300',
@@ -85,32 +56,6 @@ export default function Dashboard({ onSelectVolition }: DashboardProps) {
 
   return (
     <div className="space-y-8">
-      {/* Sync All Button */}
-      <div className="flex justify-end">
-        <button
-          onClick={handleSyncAll}
-          disabled={syncing || volitions.length === 0}
-          className="btn btn-primary flex items-center gap-2"
-        >
-          {syncing ? (
-            <>
-              <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-              </svg>
-              Syncing All...
-            </>
-          ) : (
-            <>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              Sync All Sources
-            </>
-          )}
-        </button>
-      </div>
-
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="card">
