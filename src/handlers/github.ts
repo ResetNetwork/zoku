@@ -43,6 +43,8 @@ export const githubHandler: SourceHandler = {
         let commitMessage = undefined;
         let issueBody = undefined;
         let commentBody = undefined;
+        let prTitle = undefined;
+        let prBody = undefined;
 
         if (event.type === 'PushEvent' && event.payload.head) {
           try {
@@ -68,6 +70,10 @@ export const githubHandler: SourceHandler = {
           issueBody = event.payload.issue?.body;
         } else if (event.type === 'IssueCommentEvent') {
           commentBody = event.payload.comment?.body;
+        } else if (event.type === 'PullRequestEvent') {
+          // PR title from event or fetch if needed
+          prTitle = event.payload.pull_request?.title;
+          prBody = event.payload.pull_request?.body;
         }
 
         // For commits, enhance the content with commit message title
@@ -93,8 +99,11 @@ export const githubHandler: SourceHandler = {
             commit_message: commitMessage,
             issue_body: issueBody,
             comment_body: commentBody,
+            pr_title: prTitle,
+            pr_body: prBody,
             action: event.payload.action,
-            issue_number: event.payload.issue?.number || event.payload.pull_request?.number
+            issue_number: event.payload.issue?.number,
+            pr_number: event.payload.pull_request?.number
           },
           created_at: Math.floor(eventTime)
         });
@@ -135,7 +144,9 @@ function formatEventContent(event: any): string {
     }
 
     case 'PullRequestEvent':
-      return `#${event.payload.pull_request.number}: ${event.payload.pull_request.title} [${event.payload.action}]`;
+      const prNumber = event.payload.pull_request?.number || 'PR';
+      const prTitle = event.payload.pull_request?.title || 'Pull Request';
+      return `#${prNumber}: ${prTitle} [${event.payload.action}]`;
 
     case 'IssuesEvent':
       return `#${event.payload.issue.number}: ${event.payload.issue.title} [${event.payload.action}]`;
