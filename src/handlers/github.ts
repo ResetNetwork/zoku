@@ -70,9 +70,18 @@ export const githubHandler: SourceHandler = {
           commentBody = event.payload.comment?.body;
         }
 
+        // For commits, enhance the content with commit message title
+        let content = formatEventContent(event);
+        if (event.type === 'PushEvent' && commitMessage) {
+          const messageTitle = commitMessage.split('\n')[0];
+          const branch = event.payload.ref?.replace('refs/heads/', '') || 'unknown';
+          const sha = event.payload.head?.substring(0, 7) || '';
+          content = `${branch} ← ${sha}: ${messageTitle}`;
+        }
+
         qupts.push({
           volition_id: source.volition_id,
-          content: formatEventContent(event),
+          content,
           source: 'github',
           external_id: `github:${event.id}`,
           metadata: {
@@ -121,11 +130,12 @@ function formatEventContent(event: any): string {
     case 'PushEvent': {
       const branch = event.payload.ref?.replace('refs/heads/', '') || 'unknown';
       const sha = event.payload.head?.substring(0, 7) || '';
-      return `Pushed to ${branch} (${sha}) by @${event.actor.login}`;
+      // Will be updated with commit message title after fetch
+      return `${branch} ← ${sha}`;
     }
 
     case 'PullRequestEvent':
-      return `PR #${event.payload.pull_request.number} ${event.payload.action} by @${event.actor.login}: ${event.payload.pull_request.title}`;
+      return `#${event.payload.pull_request.number}: ${event.payload.pull_request.title} [${event.payload.action}]`;
 
     case 'IssuesEvent':
       return `#${event.payload.issue.number}: ${event.payload.issue.title} [${event.payload.action}]`;
