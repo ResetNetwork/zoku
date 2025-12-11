@@ -47,7 +47,7 @@ export default function VolitionsList({ onSelectVolition }: VolitionsListProps) 
     <div className="space-y-6">
       {/* Header */}
       <div className="card">
-        <h1 className="text-3xl font-bold text-quantum-400 mb-2">All Volitions</h1>
+        <h1 className="text-3xl font-bold text-quantum-400 mb-2">Volitions</h1>
         <p className="text-gray-400">Projects and initiatives</p>
       </div>
 
@@ -104,7 +104,7 @@ export default function VolitionsList({ onSelectVolition }: VolitionsListProps) 
 
       {/* Volitions List */}
       <div className="card">
-        <h2 className="text-xl font-bold mb-4">All Volitions ({sortedVolitions.length})</h2>
+        <h2 className="text-xl font-bold mb-4">Volitions ({sortedVolitions.length})</h2>
         {volitions.length === 0 ? (
           <div className="text-gray-400 text-center py-8">No volitions yet</div>
         ) : (

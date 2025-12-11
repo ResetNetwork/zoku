@@ -86,7 +86,7 @@ export default function AttributeEditor({ volitionId }: AttributeEditorProps) {
     return (
       <div className="card">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold">Categories</h2>
+          <h2 className="text-xl font-bold">Dimensions</h2>
           <button
             onClick={() => setEditing(true)}
             className="btn btn-secondary text-sm"
@@ -96,7 +96,7 @@ export default function AttributeEditor({ volitionId }: AttributeEditorProps) {
         </div>
 
         {!hasAttributes ? (
-          <div className="text-gray-400 text-sm">No categories set</div>
+          <div className="text-gray-400 text-sm">No dimensions set</div>
         ) : (
           <div className="flex flex-wrap gap-2">
             {Object.entries(currentAttributes.attributes).map(([key, value]: [string, any]) => (
@@ -123,7 +123,7 @@ export default function AttributeEditor({ volitionId }: AttributeEditorProps) {
   // Edit mode
   return (
     <div className="card">
-      <h2 className="text-xl font-bold mb-4">Edit Categories</h2>
+      <h2 className="text-xl font-bold mb-4">Edit Dimensions</h2>
 
       <div className="space-y-4">
         {dimensions.dimensions?.map((dim: any) => {
@@ -168,7 +168,7 @@ export default function AttributeEditor({ volitionId }: AttributeEditorProps) {
           disabled={saving}
           className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed flex-1"
         >
-          {saving ? 'Saving...' : 'Save Categories'}
+          {saving ? 'Saving...' : 'Save Dimensions'}
         </button>
         <button
           onClick={() => setEditing(false)}

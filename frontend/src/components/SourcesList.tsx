@@ -88,7 +88,7 @@ export default function SourcesList({ onBack }: SourcesListProps) {
 
       {/* Sources List */}
       <div className="card">
-        <h2 className="text-xl font-bold mb-4">All Sources</h2>
+        <h2 className="text-xl font-bold mb-4">Sources</h2>
         {isLoading ? (
           <div className="text-gray-400 text-center py-8">Loading sources...</div>
         ) : allSources.length === 0 ? (
