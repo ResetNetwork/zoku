@@ -76,6 +76,26 @@ export default function QuptItem({ qupt, formatRelativeTime, formatDate, getSour
     }
   }
 
+  const getGoogleDriveIcon = (type: string) => {
+    switch (type) {
+      case 'revision':
+        return '📝' // Edit/revision
+      case 'comment':
+        return '💬' // Comment bubble
+      default:
+        return '📄' // Generic document
+    }
+  }
+
+  const formatGoogleDriveContent = (metadata: any) => {
+    if (metadata.type === 'comment') {
+      const quotedText = metadata.quoted_content ? `"${metadata.quoted_content}"` : '';
+      const commentText = qupt.content.split(': ')[1] || '';
+      return quotedText ? `${quotedText} - ${commentText}` : commentText;
+    }
+    return qupt.content;
+  }
+
   return (
     <div className="bg-gray-100 dark:bg-quantum-700/30 rounded-lg border border-gray-300 dark:border-quantum-600 overflow-hidden">
       <button
@@ -85,7 +105,16 @@ export default function QuptItem({ qupt, formatRelativeTime, formatDate, getSour
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1">
             <div className="flex items-center gap-2">
-              <p className="text-gray-900 dark:text-gray-200 flex-1">{qupt.content}</p>
+              {/* Google Drive icon */}
+              {qupt.source === 'gdrive' && metadata?.type && (
+                <span className="text-lg flex-shrink-0">
+                  {getGoogleDriveIcon(metadata.type)}
+                </span>
+              )}
+
+              <p className="text-gray-900 dark:text-gray-200 flex-1">
+                {qupt.source === 'gdrive' && metadata ? formatGoogleDriveContent(metadata) : qupt.content}
+              </p>
               {metadata?.url && (
                 <a
                   href={metadata.url}
@@ -222,6 +251,51 @@ export default function QuptItem({ qupt, formatRelativeTime, formatDate, getSour
               </div>
             )}
 
+            {/* Google Drive-specific metadata */}
+            {qupt.source === 'gdrive' && (
+              <div className="space-y-2">
+                {metadata.type === 'comment' && (
+                  <>
+                    {/* Quoted/highlighted text */}
+                    {metadata.quoted_content && (
+                      <div className="p-3 bg-yellow-500/10 dark:bg-yellow-500/5 rounded border-l-2 border-yellow-500">
+                        <div className="text-xs font-semibold text-yellow-600 dark:text-yellow-400 mb-1">
+                          Highlighted text:
+                        </div>
+                        <div className="text-sm text-gray-700 dark:text-gray-300">
+                          "{metadata.quoted_content}"
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Full comment */}
+                    <div className="p-3 bg-gray-100 dark:bg-quantum-900/30 rounded border-l-2 border-quantum-500">
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+                          Comment by {metadata.author || 'Unknown'}
+                        </div>
+                        {metadata.resolved && (
+                          <span className="px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 text-xs">
+                            Resolved
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                        {qupt.content.split(': ').slice(1).join(': ')}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {metadata.type === 'revision' && metadata.modified_by && (
+                  <div className="text-gray-600 dark:text-gray-400 text-sm">
+                    <span className="font-semibold">Edited by:</span> {metadata.modified_by}
+                    {metadata.modified_by_email && ` (${metadata.modified_by_email})`}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Zammad-specific metadata */}
             {qupt.source === 'zammad' && (
               <div className="space-y-2">
@@ -275,7 +349,7 @@ export default function QuptItem({ qupt, formatRelativeTime, formatDate, getSour
             )}
 
             {/* Fallback for other sources */}
-            {!['github', 'zammad'].includes(qupt.source) && (
+            {!['github', 'zammad', 'gdrive'].includes(qupt.source) && (
               <pre className="p-2 bg-gray-200 dark:bg-quantum-900/50 rounded text-xs overflow-x-auto">
                 {JSON.stringify(metadata, null, 2)}
               </pre>

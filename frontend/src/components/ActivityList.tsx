@@ -47,7 +47,7 @@ export default function ActivityList({ onBack }: ActivityListProps) {
     const colors: Record<string, string> = {
       github: 'bg-purple-500/20 text-purple-300',
       zammad: 'bg-blue-500/20 text-blue-300',
-      gdocs: 'bg-green-500/20 text-green-300',
+      gdrive: 'bg-green-500/20 text-green-300',
       mcp: 'bg-gray-500/20 text-gray-300'
     }
     return colors[source] || 'bg-gray-500/20 text-gray-300'
