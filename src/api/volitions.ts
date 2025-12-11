@@ -20,30 +20,19 @@ app.get('/', async (c) => {
     offset
   });
 
-  // Enrich with counts
+  // Fetch all attributes in batch (single query)
+  const attributesMap = await db.getVolitionsAttributes(volitions.map(v => v.id));
+
+  // Enrich with counts and attributes
   const enrichedVolitions = await Promise.all(
-    volitions.map(async (v) => {
-      // Get attributes
-      const attributesResult = await db.getVolitionAttributes(v.id);
-      const attributes: Record<string, string> = {};
-
-      if (attributesResult && attributesResult.attributes) {
-        Object.entries(attributesResult.attributes).forEach(([key, value]: [string, any]) => {
-          if (value.values && value.values.length > 0) {
-            attributes[key] = value.values[0].label; // Use label for display
-          }
-        });
-      }
-
-      return {
-        ...v,
-        children_count: await db.getVolitionChildrenCount(v.id),
-        qupts_count: await db.getVolitionQuptsCount(v.id, true),
-        sources_count: await db.getVolitionSourcesCount(v.id),
-        entangled_count: await db.getVolitionEntangledCount(v.id),
-        attributes: Object.keys(attributes).length > 0 ? attributes : null
-      };
-    })
+    volitions.map(async (v) => ({
+      ...v,
+      children_count: await db.getVolitionChildrenCount(v.id),
+      qupts_count: await db.getVolitionQuptsCount(v.id, true),
+      sources_count: await db.getVolitionSourcesCount(v.id),
+      entangled_count: await db.getVolitionEntangledCount(v.id),
+      attributes: attributesMap.get(v.id) || null
+    }))
   );
 
   return c.json({ volitions: enrichedVolitions });
