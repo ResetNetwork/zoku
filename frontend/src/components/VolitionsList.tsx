@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import VolitionCard from './VolitionCard'
-import InfoTooltip from './InfoTooltip'
 
 interface VolitionsListProps {
   onSelectVolition: (id: string) => void
@@ -48,10 +47,7 @@ export default function VolitionsList({ onSelectVolition }: VolitionsListProps) 
     <div className="space-y-6">
       {/* Header */}
       <div className="card">
-        <h1 className="text-3xl font-bold text-quantum-400 mb-2 flex items-center">
-          Volitions
-          <InfoTooltip text="A project or initiative — an act of collective will" />
-        </h1>
+        <h1 className="text-3xl font-bold text-quantum-400 mb-2">Volitions</h1>
         <p className="text-gray-400">Projects and initiatives</p>
       </div>
 
