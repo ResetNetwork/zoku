@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import type { Volition, Qupt } from '../lib/types'
 import QuptItem from './QuptItem'
+import VolitionCard from './VolitionCard'
 
 interface DashboardProps {
   onSelectVolition: (id: string) => void
