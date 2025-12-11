@@ -34,13 +34,15 @@ export default function QuptItem({ qupt, formatRelativeTime, formatDate, getSour
   const getZammadIcon = (type: string) => {
     switch (type) {
       case 'ticket':
-        return '📋' // Clipboard for ticket
+        return '◆' // Diamond for ticket (matches GitHub issues)
       case 'phone':
         return '📞' // Phone
       case 'email':
         return '📧' // Email
       case 'note':
         return '📝' // Note
+      case 'article':
+        return '💬' // Comment/article (matches GitHub comments)
       default:
         return '💬' // Generic communication
     }
