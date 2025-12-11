@@ -98,7 +98,9 @@ export default function QuptItem({ qupt, formatRelativeTime, formatDate, getSour
       if (metadata.event_type === 'PushEvent') {
         const branch = metadata.payload?.ref?.replace('refs/heads/', '') || 'main';
         const sha = metadata.payload?.head?.substring(0, 7) || '???????';
-        const message = metadata.commit_message || 'Commit';
+        // Use only first line of commit message
+        const fullMessage = metadata.commit_message || 'Commit';
+        const message = fullMessage.split('\n')[0];
         return `${branch} ← ${sha}: ${message}`;
       }
       if (metadata.event_type === 'PullRequestEvent') {
