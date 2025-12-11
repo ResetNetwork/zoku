@@ -3,17 +3,17 @@
 ## Project Overview
 Zoku is a project/initiative tracking system inspired by the Quantum Thief trilogy. Built as a Cloudflare Worker with D1 database, MCP interface, and web frontend.
 
-## Current Status: ✅ Backend Complete + Credential Store
+## Current Status: ✅ Full-Stack Application Complete
 
-### Completed Phases (0-4)
+### Completed Phases (0-5)
 - **Phase 0**: Infrastructure setup (GitHub, D1, encryption)
 - **Phase 1**: Dependencies and database schema
 - **Phase 2**: Full REST API with CRUD operations
 - **Phase 3**: Source handlers (GitHub, Zammad, Google Docs)
 - **Phase 4**: MCP Server with 29 tools (includes credential store)
+- **Phase 5**: React frontend with light/dark mode ✅ NEW
 
 ### Remaining Phases
-- **Phase 5**: React frontend (pending)
 - **Phase 6**: Production deployment to zoku.205.dev (pending)
 
 ## Architecture
@@ -29,6 +29,7 @@ Zoku is a project/initiative tracking system inspired by the Quantum Thief trilo
 ### Tech Stack
 - **Backend**: Cloudflare Worker (Hono framework)
 - **Database**: Cloudflare D1 (SQLite)
+- **Frontend**: React + Vite + Tailwind + TanStack Query
 - **MCP**: Official @modelcontextprotocol/sdk
 - **Cron**: 5-minute scheduled source collection
 - **Domain**: zoku.205.dev
@@ -85,7 +86,20 @@ Zoku is a project/initiative tracking system inspired by the Quantum Thief trilo
 - `src/db.ts` - Database query helpers (DB class)
 - `src/types.ts` - TypeScript type definitions
 - `src/scheduled.ts` - Cron handler for source collection
-- `src/mcp/server.ts` - MCP server implementation (23 tools)
+- `src/mcp/server.ts` - MCP server implementation (29 tools)
+
+### Frontend
+- `frontend/src/App.tsx` - Main app with URL routing and view management
+- `frontend/src/components/Dashboard.tsx` - Home with clickable metrics, top 5 volitions, recent activity
+- `frontend/src/components/VolitionsList.tsx` - All volitions with stats
+- `frontend/src/components/VolitionDetail.tsx` - Individual volition with responsibilities, sources, activity
+- `frontend/src/components/EntangledList.tsx` - All entangled with PASCI responsibility matrix
+- `frontend/src/components/EntangledDetail.tsx` - Individual entangled with editable metadata
+- `frontend/src/components/ActivityList.tsx` - All activity across volitions
+- `frontend/src/components/SourcesList.tsx` - All configured sources
+- `frontend/src/components/QuptItem.tsx` - Expandable activity items with type-specific formatting
+- `frontend/src/lib/api.ts` - API client with TypeScript types
+- `frontend/src/lib/theme.ts` - Theme management (light/dark mode)
 
 ### API Routes
 - `src/api/volitions.ts` - Volition CRUD + matrix + attributes + sources
@@ -106,13 +120,17 @@ Zoku is a project/initiative tracking system inspired by the Quantum Thief trilo
 ### Database
 - `schema.sql` - Full schema with all tables
 - `seed.sql` - Initial taxonomy data
-- `migrations/002_add_credentials.sql` - Credential store migration (NEW)
+- `migrations/002_add_credentials.sql` - Credential store migration
+- `migrations/003_add_entangled_description.sql` - Entangled description field (NEW)
 
 ## Development Commands
 
 ```bash
-# Start dev server
-npm run dev
+# Backend dev server
+npm run dev              # Starts on :8787
+
+# Frontend dev server
+cd frontend && npm run dev  # Starts on :5173
 
 # Database operations
 npm run db:migrate        # Local migration
@@ -124,6 +142,54 @@ npm run db:seed:remote   # Production seed
 # Deployment
 npm run deploy           # Deploy to Cloudflare
 ```
+
+## Frontend Features
+
+- **Dashboard View**:
+  - Clickable metrics for navigation (7 volitions, 13 entangled, activity, sources)
+  - Top 5 volitions sorted by recent activity
+  - Recent 10 qupts with volition badges
+  - "View all" links to dedicated pages
+  - Sync all sources button
+
+- **Volition Pages**:
+  - All Volitions: Complete list with stats
+  - Volition Detail: Responsibilities, sources, activity stream
+  - Shows entangled, qupts, and sources counts
+
+- **Entangled Pages**:
+  - All Entangled: List with stats and PASCI responsibility matrix
+  - Entangled Detail: Metadata fields, assigned volitions with roles
+  - Editable fields: description, GitHub username, email, role, org, timezone, deal_id
+  - Deal ID links to deals.reset.tech
+
+- **Activity & Sources Pages**:
+  - Activity List: All qupts across volitions with source badges
+  - Sources List: All configured sources with sync status
+
+- **Responsibility Matrix** (on Entangled page):
+  - Volitions as rows, PASCI roles as columns
+  - Shows first 5, expandable to all
+  - Sorted alphabetically
+  - Clickable entangled badges
+
+- **Activity Display**:
+  - Type-specific icons for different event types
+  - GitHub: Commit SHA, branch, PR titles, issue links
+  - Zammad: Ticket state, article bodies, type indicators
+  - Expandable details on click
+  - External link icons for URLs
+  - Volition badges on cross-volition views
+
+- **Theme Support**:
+  - Light/dark mode toggle
+  - Persistent theme preference
+  - Quantum-themed color palette
+
+- **URL Routing**:
+  - Direct links to any page or entity
+  - Browser back/forward support
+  - Shareable URLs
 
 ## Source Configuration
 
@@ -266,10 +332,12 @@ add_source({
 
 ## Next Steps
 
-1. **Test MCP Integration** - Use tools through Claude Desktop
-2. **Add Real Sources** - Configure GitHub/Zammad/Google Docs sources with actual credentials
-3. **Phase 5** (Optional) - Build React frontend with OAuth flow
-4. **Phase 6** - Deploy to production at zoku.205.dev
+1. **Phase 6** - Deploy to production at zoku.205.dev
+   - Build frontend assets
+   - Deploy worker with assets
+   - Run production migrations
+   - Configure Cloudflare Access
+   - Test full stack in production
 
 ## Notes for Future Claude Sessions
 
@@ -286,3 +354,12 @@ add_source({
 - **Simplified Responses**: All tools support optional `detailed` parameter for verbose output
 - **Zammad**: Tag-based filtering required - `tag` field mandatory in config
 - **Response Size**: 60-80% reduction with default (non-detailed) responses
+- **Frontend Complete**: Full app with 7 pages (Dashboard, Volitions, Entangled, Activity, Sources, + detail pages)
+- **Theme**: Light/dark mode with localStorage persistence
+- **Activity Formatting**: Type-specific icons and expandable details for GitHub/Zammad events
+- **Dev Setup**: Backend on :8787, frontend on :5173, run in separate terminals
+- **Entangled Metadata**: Description, GitHub username, email, role, org, timezone, deal_id
+- **Responsibility Matrix**: Volitions × PASCI roles grid view on Entangled page
+- **Navigation**: Clickable metrics, URL routing, direct links to any entity
+- **Counts**: All views show entangled_count, qupts_count, sources_count, children_count
+- **Example Data**: 12 entangled (8 humans, 4 AI agents) + 6 volitions with PASCI assignments

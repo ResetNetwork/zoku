@@ -17,6 +17,7 @@ export interface Volition {
 export interface Entangled {
   id: string;
   name: string;
+  description?: string | null;
   type: 'human' | 'agent';
   metadata: string | null;
   created_at: number;

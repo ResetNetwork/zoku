@@ -26,7 +26,13 @@ app.get('/:id', async (c) => {
     return c.json({ error: { code: 'NOT_FOUND', message: 'Entangled entity not found' } }, 404);
   }
 
-  return c.json(entangled);
+  // Get their volitions and roles
+  const volitions = await db.getEntangledVolitions(id);
+
+  return c.json({
+    ...entangled,
+    volitions
+  });
 });
 
 // Create entangled
@@ -44,6 +50,7 @@ app.post('/', async (c) => {
 
   const entangled = await db.createEntangled({
     name: body.name,
+    description: body.description,
     type: body.type,
     metadata: body.metadata
   });
@@ -64,6 +71,7 @@ app.patch('/:id', async (c) => {
 
   await db.updateEntangled(id, {
     name: body.name,
+    description: body.description,
     metadata: body.metadata
   });
 

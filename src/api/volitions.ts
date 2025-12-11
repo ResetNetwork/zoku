@@ -20,7 +20,18 @@ app.get('/', async (c) => {
     offset
   });
 
-  return c.json({ volitions });
+  // Enrich with counts
+  const enrichedVolitions = await Promise.all(
+    volitions.map(async (v) => ({
+      ...v,
+      children_count: await db.getVolitionChildrenCount(v.id),
+      qupts_count: await db.getVolitionQuptsCount(v.id, true),
+      sources_count: await db.getVolitionSourcesCount(v.id),
+      entangled_count: await db.getVolitionEntangledCount(v.id)
+    }))
+  );
+
+  return c.json({ volitions: enrichedVolitions });
 });
 
 // Get volition details
@@ -75,6 +86,12 @@ app.get('/:id', async (c) => {
     limit: quptsLimit
   });
 
+  // Get counts
+  const children_count = await db.getVolitionChildrenCount(id);
+  const qupts_count = await db.getVolitionQuptsCount(id, true);
+  const sources_count = await db.getVolitionSourcesCount(id);
+  const entangled_count = await db.getVolitionEntangledCount(id);
+
   return c.json({
     ...volition,
     attributes: attributesMap,
@@ -84,7 +101,11 @@ app.get('/:id', async (c) => {
       name: child.name,
       created_at: child.created_at
     })),
-    qupts
+    qupts,
+    children_count,
+    qupts_count,
+    sources_count,
+    entangled_count
   });
 });
 

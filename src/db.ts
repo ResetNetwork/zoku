@@ -131,6 +131,54 @@ export class DB {
     return result.results || [];
   }
 
+  async getVolitionChildrenCount(volitionId: string): Promise<number> {
+    const result = await this.d1
+      .prepare('SELECT COUNT(*) as count FROM volitions WHERE parent_id = ?')
+      .bind(volitionId)
+      .first<{ count: number }>();
+    return result?.count || 0;
+  }
+
+  async getVolitionQuptsCount(volitionId: string, recursive = true): Promise<number> {
+    if (!recursive) {
+      const result = await this.d1
+        .prepare('SELECT COUNT(*) as count FROM qupts WHERE volition_id = ?')
+        .bind(volitionId)
+        .first<{ count: number }>();
+      return result?.count || 0;
+    }
+
+    // Recursive count including descendants
+    const query = `
+      WITH RECURSIVE descendants AS (
+        SELECT id FROM volitions WHERE id = ?
+        UNION ALL
+        SELECT v.id FROM volitions v
+        JOIN descendants d ON v.parent_id = d.id
+      )
+      SELECT COUNT(*) as count FROM qupts q
+      JOIN descendants d ON q.volition_id = d.id
+    `;
+    const result = await this.d1.prepare(query).bind(volitionId).first<{ count: number }>();
+    return result?.count || 0;
+  }
+
+  async getVolitionSourcesCount(volitionId: string): Promise<number> {
+    const result = await this.d1
+      .prepare('SELECT COUNT(*) as count FROM sources WHERE volition_id = ?')
+      .bind(volitionId)
+      .first<{ count: number }>();
+    return result?.count || 0;
+  }
+
+  async getVolitionEntangledCount(volitionId: string): Promise<number> {
+    const result = await this.d1
+      .prepare('SELECT COUNT(DISTINCT entangled_id) as count FROM volition_entangled WHERE volition_id = ?')
+      .bind(volitionId)
+      .first<{ count: number }>();
+    return result?.count || 0;
+  }
+
   // Entangled
   async getEntangled(id: string): Promise<Entangled | null> {
     const result = await this.d1
@@ -167,21 +215,22 @@ export class DB {
 
   async createEntangled(data: {
     name: string;
+    description?: string;
     type: 'human' | 'agent';
     metadata?: Record<string, any>;
   }): Promise<Entangled> {
     const id = crypto.randomUUID();
     const metadata = data.metadata ? JSON.stringify(data.metadata) : null;
     await this.d1
-      .prepare('INSERT INTO entangled (id, name, type, metadata) VALUES (?, ?, ?, ?)')
-      .bind(id, data.name, data.type, metadata)
+      .prepare('INSERT INTO entangled (id, name, description, type, metadata) VALUES (?, ?, ?, ?, ?)')
+      .bind(id, data.name, data.description || null, data.type, metadata)
       .run();
     return (await this.getEntangled(id))!;
   }
 
   async updateEntangled(
     id: string,
-    data: { name?: string; metadata?: Record<string, any> }
+    data: { name?: string; description?: string; metadata?: Record<string, any> }
   ): Promise<void> {
     const updates: string[] = [];
     const params: any[] = [];
@@ -189,6 +238,10 @@ export class DB {
     if (data.name !== undefined) {
       updates.push('name = ?');
       params.push(data.name);
+    }
+    if (data.description !== undefined) {
+      updates.push('description = ?');
+      params.push(data.description);
     }
     if (data.metadata !== undefined) {
       updates.push('metadata = ?');
@@ -206,6 +259,26 @@ export class DB {
 
   async deleteEntangled(id: string): Promise<void> {
     await this.d1.prepare('DELETE FROM entangled WHERE id = ?').bind(id).run();
+  }
+
+  async getEntangledVolitions(entangledId: string): Promise<any[]> {
+    const query = `
+      SELECT DISTINCT v.id, v.name, v.created_at,
+        GROUP_CONCAT(ve.role) as roles
+      FROM volition_entangled ve
+      JOIN volitions v ON ve.volition_id = v.id
+      WHERE ve.entangled_id = ?
+      GROUP BY v.id, v.name, v.created_at
+      ORDER BY v.name
+    `;
+    const result = await this.d1.prepare(query).bind(entangledId).all<any>();
+
+    return (result.results || []).map(row => ({
+      id: row.id,
+      name: row.name,
+      created_at: row.created_at,
+      roles: row.roles ? row.roles.split(',') : []
+    }));
   }
 
   // PASCI Matrix
@@ -288,12 +361,13 @@ export class DB {
           SELECT v.id FROM volitions v
           JOIN descendants d ON v.parent_id = d.id
         )
-        SELECT q.* FROM qupts q
+        SELECT q.*, v.name as volition_name FROM qupts q
         JOIN descendants d ON q.volition_id = d.id
+        JOIN volitions v ON q.volition_id = v.id
       `;
       params.push(filters.volition_id);
     } else {
-      query = 'SELECT * FROM qupts';
+      query = 'SELECT q.*, v.name as volition_name FROM qupts q JOIN volitions v ON q.volition_id = v.id';
       const conditions: string[] = [];
 
       if (filters.volition_id) {

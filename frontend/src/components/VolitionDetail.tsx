@@ -79,6 +79,8 @@ export default function VolitionDetail({ volitionId, onBack }: VolitionDetailPro
         <div className="flex gap-6 mt-4 text-sm text-gray-500">
           <div>Created {formatDate(volition.created_at)}</div>
           <div>•</div>
+          <div>{volition.entangled_count || 0} entangled</div>
+          <div>•</div>
           <div>{volition.qupts_count || 0} qupts</div>
           <div>•</div>
           <div>{volition.sources_count || 0} sources</div>
@@ -88,7 +90,7 @@ export default function VolitionDetail({ volitionId, onBack }: VolitionDetailPro
       {/* PASCI Matrix */}
       {matrix && (
         <div className="card">
-          <h2 className="text-xl font-bold mb-4">PASCI Responsibility Matrix</h2>
+          <h2 className="text-xl font-bold mb-4">Responsibilities</h2>
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             {pasciRoles.map(({ key, label, color }) => {
               const entities = matrix[key as keyof typeof matrix] || []

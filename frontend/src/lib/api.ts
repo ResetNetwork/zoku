@@ -39,6 +39,11 @@ export const api = {
     return data.entangled as Entangled[]
   },
 
+  async getEntangled(id: string) {
+    const res = await fetch(`${API_BASE}/entangled/${id}`)
+    return await res.json() as Entangled
+  },
+
   async createEntangled(data: { name: string; type: 'human' | 'agent' }) {
     const res = await fetch(`${API_BASE}/entangled`, {
       method: 'POST',
@@ -46,6 +51,15 @@ export const api = {
       body: JSON.stringify(data)
     })
     return await res.json() as Entangled
+  },
+
+  async updateEntangled(id: string, data: { name?: string; description?: string; metadata?: any }) {
+    const res = await fetch(`${API_BASE}/entangled/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    })
+    return await res.json()
   },
 
   // Matrix

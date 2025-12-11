@@ -6,7 +6,7 @@ A project/initiative tracking system inspired by the Quantum Thief trilogy. Stat
 
 - **Backend**: Cloudflare Worker (Hono framework)
 - **Database**: Cloudflare D1 (SQLite)
-- **Frontend**: React + Vite + Tailwind (coming soon)
+- **Frontend**: React + Vite + Tailwind + TanStack Query ✅
 - **MCP Server**: HTTP-based at `/mcp` endpoint
 - **Domain**: `zoku.205.dev`
 
@@ -18,21 +18,57 @@ A project/initiative tracking system inspired by the Quantum Thief trilogy. Stat
 - **PASCI Matrix**: Responsibility assignment (Perform, Accountable, Control, Support, Informed)
 - **Dimensions**: Taxonomy for categorizing volitions (status, function, pillar, service area)
 
+## Features
+
+### Web Frontend ✅
+
+**7 Pages:**
+1. **Dashboard** - Clickable metrics, top 5 volitions, recent activity
+2. **All Volitions** - Complete list sorted by activity
+3. **All Entangled** - Team members with PASCI responsibility matrix
+4. **All Activity** - Complete activity stream across volitions
+5. **All Sources** - Configured sources with sync status
+6. **Volition Detail** - Individual project view
+7. **Entangled Detail** - Individual team member with editable metadata
+
+**Key Features:**
+- **Clickable Metrics**: Navigate to detail pages from dashboard stats
+- **Responsibility Matrix**: Volitions × PASCI roles grid (first 5, expandable)
+- **Entangled Metadata**: GitHub username, email, role, org, timezone, deal_id (editable)
+- **Deal Integration**: Deal IDs link to deals.reset.tech
+- **Activity Display**: Type-specific icons, expandable details, volition badges
+- **Light/Dark Mode**: Theme switching with persistent preference
+- **URL Routing**: Direct links to any page or entity
+- **Smart Sorting**: Volitions by activity, entangled alphabetically
+- **Source Management**: Configure and sync GitHub/Zammad/Google Docs sources
+- **Responsive Design**: Mobile and desktop optimized
+
 ## Development
 
 ### Setup
 
 ```bash
-# Install dependencies
+# Install backend dependencies
 npm install
+
+# Install frontend dependencies
+cd frontend && npm install && cd ..
 
 # Run database migrations
 npm run db:migrate
 npm run db:seed
 
-# Start development server
-npm run dev
+# Start development servers (in separate terminals)
+npm run dev              # Backend on :8787
+cd frontend && npm run dev  # Frontend on :5173
 ```
+
+### Local Development
+
+- **Backend**: http://localhost:8787
+- **Frontend**: http://localhost:5173
+- **MCP Endpoint**: http://localhost:8787/mcp
+- **API**: http://localhost:8787/api/*
 
 ### Testing MCP Server
 
@@ -79,7 +115,14 @@ Full API documentation in `zoku-spec.md`.
 Qupts are automatically collected from:
 
 - **GitHub**: Repository events (push, PR, issues, comments) ✅ Tested & Working
+  - Commit messages with branch and SHA
+  - PR titles fetched and displayed
+  - Issue links and details
+  - External link icons
 - **Zammad**: Ticket updates and articles (tag-based filtering) ✅ Tested & Working
+  - Ticket state and priority
+  - Article bodies with formatting
+  - Type indicators (email, note, phone)
 - **Google Docs**: Document revisions (ready, not tested)
 
 Sources are configured per-volition and run on a 5-minute cron schedule.
@@ -184,7 +227,16 @@ zoku/
 │   │   └── google-auth.ts
 │   └── mcp/
 │       └── server.ts         # MCP implementation
-├── frontend/                 # React app (coming soon)
+├── frontend/                 # React app ✅
+│   ├── src/
+│   │   ├── App.tsx          # Main app with routing
+│   │   ├── components/
+│   │   │   ├── Dashboard.tsx      # Root volitions + recent activity
+│   │   │   ├── VolitionDetail.tsx # Nested view with sources
+│   │   │   └── QuptItem.tsx       # Expandable activity items
+│   │   └── lib/
+│   │       ├── api.ts       # API client
+│   │       └── theme.ts     # Theme management
 ├── schema.sql               # Database schema
 ├── seed.sql                 # Initial data
 └── wrangler.toml           # Cloudflare config

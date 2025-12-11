@@ -6,26 +6,49 @@ import QuptItem from './QuptItem'
 
 interface DashboardProps {
   onSelectVolition: (id: string) => void
+  onShowVolitionsList?: () => void
+  onShowEntangledList?: () => void
+  onShowActivityList?: () => void
+  onShowSourcesList?: () => void
 }
 
-export default function Dashboard({ onSelectVolition }: DashboardProps) {
+export default function Dashboard({
+  onSelectVolition,
+  onShowVolitionsList,
+  onShowEntangledList,
+  onShowActivityList,
+  onShowSourcesList
+}: DashboardProps) {
   const { data: volitions = [], isLoading: volitionsLoading } = useQuery({
     queryKey: ['volitions'],
     queryFn: () => api.listVolitions({ root_only: true, limit: 50 })
   })
 
+  const { data: entangled = [] } = useQuery({
+    queryKey: ['entangled'],
+    queryFn: () => api.listEntangled()
+  })
+
   const { data: recentQupts = [], isLoading: quptsLoading } = useQuery({
-    queryKey: ['recent-qupts'],
+    queryKey: ['recent-qupts', volitions.map(v => v.id).join(',')],
     queryFn: async () => {
       if (volitions.length === 0) return []
       const allQupts: Qupt[] = []
-      for (const vol of volitions.slice(0, 3)) {
+      for (const vol of volitions) {
         const qupts = await api.listQupts(vol.id, { limit: 10, detailed: true })
         allQupts.push(...qupts)
       }
-      return allQupts.sort((a, b) => b.created_at - a.created_at).slice(0, 20)
+      return allQupts.sort((a, b) => b.created_at - a.created_at).slice(0, 10)
     },
     enabled: volitions.length > 0
+  })
+
+  // Sort volitions by most recent activity or creation
+  const sortedVolitions = [...volitions].sort((a, b) => {
+    // Prioritize by most recent qupt activity, then by creation date
+    const aActivity = a.updated_at || a.created_at
+    const bActivity = b.updated_at || b.created_at
+    return bActivity - aActivity
   })
 
   const formatDate = (timestamp: number) => {
@@ -57,29 +80,44 @@ export default function Dashboard({ onSelectVolition }: DashboardProps) {
   return (
     <div className="space-y-8">
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="card">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <button
+          onClick={onShowVolitionsList}
+          className="card hover:bg-gray-200 dark:hover:bg-quantum-700/70 transition-colors cursor-pointer text-left"
+        >
           <div className="text-sm text-gray-400 mb-1">Active Volitions</div>
           <div className="text-3xl font-bold text-quantum-400">{volitions.length}</div>
-        </div>
-        <div className="card">
+        </button>
+        <button
+          onClick={onShowEntangledList}
+          className="card hover:bg-gray-200 dark:hover:bg-quantum-700/70 transition-colors cursor-pointer text-left"
+        >
+          <div className="text-sm text-gray-400 mb-1">Total Entangled</div>
+          <div className="text-3xl font-bold text-quantum-400">{entangled.length}</div>
+        </button>
+        <button
+          onClick={onShowActivityList}
+          className="card hover:bg-gray-200 dark:hover:bg-quantum-700/70 transition-colors cursor-pointer text-left"
+        >
           <div className="text-sm text-gray-400 mb-1">Recent Activity</div>
           <div className="text-3xl font-bold text-quantum-400">{recentQupts.length}</div>
-          <div className="text-xs text-gray-500 mt-1">qupts collected</div>
-        </div>
-        <div className="card">
+        </button>
+        <button
+          onClick={onShowSourcesList}
+          className="card hover:bg-gray-200 dark:hover:bg-quantum-700/70 transition-colors cursor-pointer text-left"
+        >
           <div className="text-sm text-gray-400 mb-1">Sources Active</div>
           <div className="text-3xl font-bold text-quantum-400">
             {volitions.reduce((acc, v) => acc + (v.sources_count || 0), 0)}
           </div>
-        </div>
+        </button>
       </div>
 
       {/* Volitions List */}
       <div className="card">
         <h2 className="text-xl font-bold mb-4">Volitions</h2>
         <div className="space-y-2">
-          {volitions.map(vol => (
+          {sortedVolitions.slice(0, 5).map(vol => (
             <button
               key={vol.id}
               onClick={() => onSelectVolition(vol.id)}
@@ -93,6 +131,10 @@ export default function Dashboard({ onSelectVolition }: DashboardProps) {
                   )}
                 </div>
                 <div className="flex items-center gap-4 text-sm text-gray-400">
+                  <div className="text-center">
+                    <div className="text-quantum-400 font-semibold">{vol.entangled_count || 0}</div>
+                    <div className="text-xs">entangled</div>
+                  </div>
                   <div className="text-center">
                     <div className="text-quantum-400 font-semibold">{vol.qupts_count || 0}</div>
                     <div className="text-xs">qupts</div>
@@ -109,27 +151,44 @@ export default function Dashboard({ onSelectVolition }: DashboardProps) {
             </button>
           ))}
         </div>
+        {volitions.length > 5 && (
+          <button
+            onClick={onShowVolitionsList}
+            className="w-full mt-4 text-center text-quantum-500 hover:text-quantum-400 text-sm font-medium transition-colors"
+          >
+            View all {volitions.length} volitions →
+          </button>
+        )}
       </div>
 
       {/* Recent Activity */}
       <div className="card">
-        <h2 className="text-xl font-bold mb-4">Recent Activity</h2>
+        <h2 className="text-xl font-bold mb-4">Activity</h2>
         {quptsLoading ? (
           <div className="text-gray-400 text-center py-8">Loading activity...</div>
         ) : recentQupts.length === 0 ? (
           <div className="text-gray-400 text-center py-8">No activity yet</div>
         ) : (
-          <div className="space-y-3">
-            {recentQupts.map(qupt => (
-              <QuptItem
-                key={qupt.id}
-                qupt={qupt}
-                formatRelativeTime={formatRelativeTime}
-                formatDate={formatDate}
-                getSourceColor={getSourceColor}
-              />
-            ))}
-          </div>
+          <>
+            <div className="space-y-3">
+              {recentQupts.map(qupt => (
+                <QuptItem
+                  key={qupt.id}
+                  qupt={qupt}
+                  formatRelativeTime={formatRelativeTime}
+                  formatDate={formatDate}
+                  getSourceColor={getSourceColor}
+                  showVolitionName={true}
+                />
+              ))}
+            </div>
+            <button
+              onClick={onShowActivityList}
+              className="w-full mt-4 text-center text-quantum-500 hover:text-quantum-400 text-sm font-medium transition-colors"
+            >
+              View all activity →
+            </button>
+          </>
         )}
       </div>
     </div>

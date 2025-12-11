@@ -6,9 +6,10 @@ interface QuptItemProps {
   formatRelativeTime: (timestamp: number) => string
   formatDate: (timestamp: number) => string
   getSourceColor: (source: string) => string
+  showVolitionName?: boolean
 }
 
-export default function QuptItem({ qupt, formatRelativeTime, formatDate, getSourceColor }: QuptItemProps) {
+export default function QuptItem({ qupt, formatRelativeTime, formatDate, getSourceColor, showVolitionName = false }: QuptItemProps) {
   const [expanded, setExpanded] = useState(false)
 
   const metadata = qupt.metadata
@@ -102,6 +103,11 @@ export default function QuptItem({ qupt, formatRelativeTime, formatDate, getSour
             </div>
             <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
               <div className="flex items-center gap-1">
+                {showVolitionName && qupt.volition_name && (
+                  <span className="px-2 py-0.5 rounded-full bg-quantum-500/20 text-quantum-300 font-medium">
+                    {qupt.volition_name}
+                  </span>
+                )}
                 <span className={`px-2 py-0.5 rounded-full ${getSourceColor(qupt.source)}`}>
                   {qupt.source}
                 </span>

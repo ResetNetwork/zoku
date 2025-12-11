@@ -118,6 +118,7 @@ export const zammadHandler: SourceHandler = {
                     from: article.from,
                     to: article.to,
                     subject: article.subject,
+                    body: article.body,
                     article_type: article.type,
                     internal: article.internal,
                     sender: article.sender,

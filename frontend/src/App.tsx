@@ -1,15 +1,115 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Dashboard from './components/Dashboard'
+import VolitionsList from './components/VolitionsList'
 import VolitionDetail from './components/VolitionDetail'
+import EntangledList from './components/EntangledList'
+import EntangledDetail from './components/EntangledDetail'
+import ActivityList from './components/ActivityList'
+import SourcesList from './components/SourcesList'
 import { useTheme } from './lib/theme'
 import { api } from './lib/api'
 
+type View = 'dashboard' | 'volitions' | 'entangled' | 'activity' | 'sources'
+
 export default function App() {
-  const [selectedVolitionId, setSelectedVolitionId] = useState<string | null>(null)
+  const [currentView, setCurrentView] = useState<View>(() => {
+    const params = new URLSearchParams(window.location.search)
+    const view = params.get('view')
+    if (view === 'volitions' || view === 'entangled' || view === 'activity' || view === 'sources') {
+      return view
+    }
+    return 'dashboard'
+  })
+  const [selectedVolitionId, setSelectedVolitionId] = useState<string | null>(() => {
+    const params = new URLSearchParams(window.location.search)
+    return params.get('volition')
+  })
+  const [selectedEntangledId, setSelectedEntangledId] = useState<string | null>(() => {
+    const params = new URLSearchParams(window.location.search)
+    return params.get('entangled')
+  })
   const [syncing, setSyncing] = useState(false)
   const { theme, toggleTheme } = useTheme()
   const queryClient = useQueryClient()
+
+  // Sync URL with current state
+  useEffect(() => {
+    const params = new URLSearchParams()
+    if (selectedVolitionId) {
+      params.set('volition', selectedVolitionId)
+    } else if (selectedEntangledId) {
+      params.set('entangled', selectedEntangledId)
+    } else if (currentView !== 'dashboard') {
+      params.set('view', currentView)
+    }
+    const newUrl = params.toString() ? `?${params}` : window.location.pathname
+    window.history.pushState({}, '', newUrl)
+  }, [selectedVolitionId, selectedEntangledId, currentView])
+
+  // Handle browser back/forward buttons
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search)
+      setSelectedVolitionId(params.get('volition'))
+      setSelectedEntangledId(params.get('entangled'))
+      const view = params.get('view')
+      if (view === 'volitions' || view === 'entangled' || view === 'activity' || view === 'sources') {
+        setCurrentView(view)
+      } else {
+        setCurrentView('dashboard')
+      }
+    }
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
+
+  const handleSelectVolition = (id: string) => {
+    setSelectedVolitionId(id)
+    setSelectedEntangledId(null)
+    setCurrentView('dashboard')
+  }
+
+  const handleSelectEntangled = (id: string) => {
+    setSelectedEntangledId(id)
+    setSelectedVolitionId(null)
+    setCurrentView('entangled')
+  }
+
+  const handleBack = () => {
+    setSelectedVolitionId(null)
+    setSelectedEntangledId(null)
+  }
+
+  const handleShowEntangledList = () => {
+    setCurrentView('entangled')
+    setSelectedVolitionId(null)
+    setSelectedEntangledId(null)
+  }
+
+  const handleShowDashboard = () => {
+    setCurrentView('dashboard')
+    setSelectedVolitionId(null)
+    setSelectedEntangledId(null)
+  }
+
+  const handleShowVolitionsList = () => {
+    setCurrentView('volitions')
+    setSelectedVolitionId(null)
+    setSelectedEntangledId(null)
+  }
+
+  const handleShowActivityList = () => {
+    setCurrentView('activity')
+    setSelectedVolitionId(null)
+    setSelectedEntangledId(null)
+  }
+
+  const handleShowSourcesList = () => {
+    setCurrentView('sources')
+    setSelectedVolitionId(null)
+    setSelectedEntangledId(null)
+  }
 
   const { data: volitions = [] } = useQuery({
     queryKey: ['volitions'],
@@ -41,10 +141,10 @@ export default function App() {
       <header className="bg-gray-100 dark:bg-quantum-800 border-b border-gray-200 dark:border-quantum-700">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div>
+            <button onClick={handleShowDashboard} className="text-left hover:opacity-80 transition-opacity">
               <h1 className="text-2xl font-bold text-quantum-500 dark:text-quantum-400">Zoku</h1>
               <p className="text-sm text-gray-600 dark:text-gray-400">Project Tracking System</p>
-            </div>
+            </button>
             <div className="flex items-center gap-2">
               <button
                 onClick={handleSyncAll}
@@ -70,12 +170,12 @@ export default function App() {
               >
                 {theme === 'dark' ? '☀️' : '🌙'}
               </button>
-              {selectedVolitionId && (
+              {(selectedVolitionId || selectedEntangledId) && (
                 <button
-                  onClick={() => setSelectedVolitionId(null)}
+                  onClick={handleBack}
                   className="btn btn-secondary"
                 >
-                  ← Back to Dashboard
+                  ← Back
                 </button>
               )}
             </div>
@@ -87,10 +187,30 @@ export default function App() {
         {selectedVolitionId ? (
           <VolitionDetail
             volitionId={selectedVolitionId}
-            onBack={() => setSelectedVolitionId(null)}
+            onBack={handleBack}
           />
+        ) : selectedEntangledId ? (
+          <EntangledDetail
+            entangledId={selectedEntangledId}
+            onBack={handleBack}
+            onSelectVolition={handleSelectVolition}
+          />
+        ) : currentView === 'volitions' ? (
+          <VolitionsList onSelectVolition={handleSelectVolition} />
+        ) : currentView === 'entangled' ? (
+          <EntangledList onSelectEntangled={handleSelectEntangled} />
+        ) : currentView === 'activity' ? (
+          <ActivityList onBack={handleShowDashboard} />
+        ) : currentView === 'sources' ? (
+          <SourcesList onBack={handleShowDashboard} />
         ) : (
-          <Dashboard onSelectVolition={setSelectedVolitionId} />
+          <Dashboard
+            onSelectVolition={handleSelectVolition}
+            onShowVolitionsList={handleShowVolitionsList}
+            onShowEntangledList={handleShowEntangledList}
+            onShowActivityList={handleShowActivityList}
+            onShowSourcesList={handleShowSourcesList}
+          />
         )}
       </main>
     </div>

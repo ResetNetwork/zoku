@@ -8,6 +8,7 @@ export interface Volition {
   children_count?: number
   qupts_count?: number
   sources_count?: number
+  entangled_count?: number
   children?: Volition[]
   matrix?: PASCIMatrix
   attributes?: Record<string, any>
@@ -17,6 +18,7 @@ export interface Volition {
 export interface Qupt {
   id: string
   volition_id: string
+  volition_name?: string | null
   entangled_id?: string | null
   content: string
   source: string
@@ -28,9 +30,24 @@ export interface Qupt {
 export interface Entangled {
   id: string
   name: string
+  description?: string | null
   type: 'human' | 'agent'
-  metadata?: any
+  metadata?: {
+    github_username?: string
+    email?: string
+    role?: string
+    timezone?: string
+    org?: string
+    deal_id?: string
+    [key: string]: any
+  }
   created_at: number
+  volitions?: Array<{
+    id: string
+    name: string
+    created_at: number
+    roles: string[]
+  }>
 }
 
 export interface PASCIMatrix {
