@@ -88,11 +88,7 @@ export default function QuptItem({ qupt, formatRelativeTime, formatDate, getSour
   }
 
   const formatGoogleDriveContent = (metadata: any) => {
-    if (metadata.type === 'comment') {
-      const quotedText = metadata.quoted_content ? `"${metadata.quoted_content}"` : '';
-      const commentText = qupt.content.split(': ')[1] || '';
-      return quotedText ? `${quotedText} - ${commentText}` : commentText;
-    }
+    // Use the content as-is from the handler (already well-formatted)
     return qupt.content;
   }
 
@@ -105,16 +101,7 @@ export default function QuptItem({ qupt, formatRelativeTime, formatDate, getSour
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1">
             <div className="flex items-center gap-2">
-              {/* Google Drive icon */}
-              {qupt.source === 'gdrive' && metadata?.type && (
-                <span className="text-lg flex-shrink-0">
-                  {getGoogleDriveIcon(metadata.type)}
-                </span>
-              )}
-
-              <p className="text-gray-900 dark:text-gray-200 flex-1">
-                {qupt.source === 'gdrive' && metadata ? formatGoogleDriveContent(metadata) : qupt.content}
-              </p>
+              <p className="text-gray-900 dark:text-gray-200 flex-1">{qupt.content}</p>
               {metadata?.url && (
                 <a
                   href={metadata.url}
@@ -154,6 +141,16 @@ export default function QuptItem({ qupt, formatRelativeTime, formatDate, getSour
                     title={metadata.type}
                   >
                     {getZammadIcon(metadata.type)}
+                  </span>
+                )}
+                {metadata?.type && qupt.source === 'gdrive' && (
+                  <span
+                    className={`text-sm font-semibold ${
+                      metadata.type === 'revision' ? 'text-purple-400' : 'text-yellow-400'
+                    }`}
+                    title={metadata.type}
+                  >
+                    {metadata.type === 'revision' ? '←' : '💬'}
                   </span>
                 )}
               </div>

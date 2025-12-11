@@ -138,11 +138,19 @@ export const gdriveHandler: SourceHandler = {
 
 function formatRevisionContent(revision: any, docTitle: string): string {
   const user = revision.lastModifyingUser?.displayName || 'Someone';
-  return `${user} edited "${docTitle}"`;
+  // Format like GitHub commit: "Document Title" ← user edited
+  return `"${docTitle}" ← ${user} edited`;
 }
 
 function formatCommentContent(comment: any, docTitle: string): string {
   const author = comment.author?.displayName || 'Someone';
-  const preview = comment.content.substring(0, 100) + (comment.content.length > 100 ? '...' : '');
-  return `${author} commented on "${docTitle}": ${preview}`;
+  const quotedText = comment.quotedFileContent?.value;
+  const commentText = comment.content.substring(0, 80) + (comment.content.length > 80 ? '...' : '');
+
+  // Format like GitHub issue: "quoted text" - comment preview
+  if (quotedText) {
+    const truncatedQuote = quotedText.substring(0, 40) + (quotedText.length > 40 ? '...' : '');
+    return `"${truncatedQuote}": ${commentText}`;
+  }
+  return `Comment on "${docTitle}": ${commentText}`;
 }
