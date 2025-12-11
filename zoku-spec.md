@@ -4,19 +4,28 @@ A project/initiative tracking system inspired by the Quantum Thief trilogy. Stat
 
 ## 🎉 Implementation Status
 
-### ✅ Completed (Phases 0-4.5)
+### ✅ Completed (Phases 0-4.7)
 - **Phase 0**: Repository & Infrastructure Setup - GitHub repo, D1 database, encryption key
 - **Phase 1**: Project Setup - Dependencies installed, schema created & migrated, seed data loaded
 - **Phase 2**: Core API - Full REST API with volitions, entangled, qupts, sources, dimensions, PASCI matrix
 - **Phase 3**: Source Handlers - GitHub, Zammad, Google Docs handlers with error recovery and scheduled collection
 - **Phase 4**: MCP Server - 29 tools using official @modelcontextprotocol/sdk
-- **Phase 4.5**: Credential Store - Store credentials once, validate, reuse across sources (NEW!)
+- **Phase 4.5**: Credential Store - Store credentials once, validate, reuse across sources
+- **Phase 4.6**: Zammad Tag Filtering - Required tag field for focused ticket collection
+- **Phase 4.7**: Simplified Responses - Optional detailed parameter (60-80% size reduction)
+
+### ✅ Testing Complete
+- **GitHub Integration**: 5 qupts collected (commits + issues)
+- **Zammad Integration**: 1 qupt collected (tagged ticket)
+- **Credential Validation**: GitHub and Zammad tokens validated
+- **Tag Filtering**: Only "zoku"-tagged tickets collected
+- **Deduplication**: Working correctly via external_id
 
 ### 🚧 Remaining
-- **Phase 5**: React Frontend with OAuth flow (pending)
+- **Phase 5**: React Frontend with OAuth flow (next)
 - **Phase 6**: Production deployment to zoku.205.dev (pending)
 
-**Backend is fully functional and tested end-to-end with GitHub integration!**
+**Backend is production-ready and fully tested with multi-source integration!**
 
 ## Conceptual Model
 

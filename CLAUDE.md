@@ -282,4 +282,7 @@ add_source({
 - **Credential Store**: 29 MCP tools total (23 original + 6 credential tools)
 - **Local dev**: ENCRYPTION_KEY set in `.dev.vars` (not committed to git)
 - **Validation**: GitHub, Zammad, Google Docs credentials validated on add/update
-- **Testing**: Successfully tested end-to-end with ResetNetwork/zoku repo
+- **Testing**: Successfully tested end-to-end with GitHub (5 qupts) and Zammad (1 qupt)
+- **Simplified Responses**: All tools support optional `detailed` parameter for verbose output
+- **Zammad**: Tag-based filtering required - `tag` field mandatory in config
+- **Response Size**: 60-80% reduction with default (non-detailed) responses

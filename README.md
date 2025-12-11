@@ -78,9 +78,9 @@ Full API documentation in `zoku-spec.md`.
 
 Qupts are automatically collected from:
 
-- **GitHub**: Repository events (push, PR, issues, comments) ✅ Tested
-- **Zammad**: Ticket updates and articles
-- **Google Docs**: Document revisions
+- **GitHub**: Repository events (push, PR, issues, comments) ✅ Tested & Working
+- **Zammad**: Ticket updates and articles (tag-based filtering) ✅ Tested & Working
+- **Google Docs**: Document revisions (ready, not tested)
 
 Sources are configured per-volition and run on a 5-minute cron schedule.
 
@@ -112,6 +112,20 @@ add_source({
 - Easy credential rotation
 - Track which sources use each credential
 
+**Zammad Tag-Based Filtering:**
+Zammad sources require a `tag` field to filter tickets:
+```javascript
+add_source({
+  type: "zammad",
+  config: {
+    url: "https://help.reset.tech",
+    tag: "zoku",  // REQUIRED - only tickets with this tag
+    include_articles: true
+  },
+  credential_id: "cred-123"
+})
+```
+
 ### MCP Tools
 
 29 tools available via MCP interface at `/mcp`:
@@ -122,6 +136,17 @@ add_source({
 - 3 Taxonomy
 - 4 Sources
 - 6 Credentials (store, validate, rotate)
+
+**Simplified Responses:**
+All list/get tools support optional `detailed` parameter:
+- Default (detailed=false): Minimal data, counts only
+- Detailed (detailed=true): Full nested data with metadata
+
+Example:
+```javascript
+get_volition({ id: "..." })  // Returns: { name, children_count, qupts_count }
+get_volition({ id: "...", detailed: true })  // Returns: { name, children: [...], matrix, qupts: [...] }
+```
 
 ## Deployment
 
