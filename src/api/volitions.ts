@@ -22,13 +22,28 @@ app.get('/', async (c) => {
 
   // Enrich with counts
   const enrichedVolitions = await Promise.all(
-    volitions.map(async (v) => ({
-      ...v,
-      children_count: await db.getVolitionChildrenCount(v.id),
-      qupts_count: await db.getVolitionQuptsCount(v.id, true),
-      sources_count: await db.getVolitionSourcesCount(v.id),
-      entangled_count: await db.getVolitionEntangledCount(v.id)
-    }))
+    volitions.map(async (v) => {
+      // Get attributes
+      const attributesResult = await db.getVolitionAttributes(v.id);
+      const attributes: Record<string, string> = {};
+
+      if (attributesResult && attributesResult.attributes) {
+        Object.entries(attributesResult.attributes).forEach(([key, value]: [string, any]) => {
+          if (value.values && value.values.length > 0) {
+            attributes[key] = value.values[0].label; // Use label for display
+          }
+        });
+      }
+
+      return {
+        ...v,
+        children_count: await db.getVolitionChildrenCount(v.id),
+        qupts_count: await db.getVolitionQuptsCount(v.id, true),
+        sources_count: await db.getVolitionSourcesCount(v.id),
+        entangled_count: await db.getVolitionEntangledCount(v.id),
+        attributes: Object.keys(attributes).length > 0 ? attributes : null
+      };
+    })
   );
 
   return c.json({ volitions: enrichedVolitions });
