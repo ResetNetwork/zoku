@@ -169,9 +169,6 @@ export default function Dashboard({
                 <QuptItem
                   key={qupt.id}
                   qupt={qupt}
-                  formatRelativeTime={formatRelativeTime}
-                  formatDate={formatDate}
-                  getSourceColor={getSourceColor}
                   showVolitionName={true}
                 />
               ))}
