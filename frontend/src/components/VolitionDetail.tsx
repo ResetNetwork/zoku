@@ -5,6 +5,7 @@ import { useNotifications } from '../lib/notifications'
 import QuptItem from './QuptItem'
 import AddSourceForm from './AddSourceForm'
 import EditSourceForm from './EditSourceForm'
+import AttributeEditor from './AttributeEditor'
 
 interface VolitionDetailProps {
   volitionId: string
@@ -93,6 +94,9 @@ export default function VolitionDetail({ volitionId, onBack }: VolitionDetailPro
           <div>{volition.sources_count || 0} sources</div>
         </div>
       </div>
+
+      {/* Categories/Attributes */}
+      <AttributeEditor volitionId={volitionId} />
 
       {/* PASCI Matrix */}
       {matrix && (
