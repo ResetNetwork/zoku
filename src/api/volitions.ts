@@ -400,6 +400,62 @@ app.post('/:id/sources', async (c) => {
     return c.json({ error: { code: 'NOT_FOUND', message: 'Volition not found' } }, 404);
   }
 
+  // Validate source configuration if credentials are provided
+  const warnings: string[] = [];
+  let validationMetadata: Record<string, any> = {};
+
+  // If credential_id is provided, verify it exists and matches type
+  if (body.credential_id) {
+    const credential = await db.getCredential(body.credential_id);
+    if (!credential) {
+      return c.json({
+        error: { code: 'NOT_FOUND', message: 'Credential not found' }
+      }, 404);
+    }
+    if (credential.type !== body.type) {
+      return c.json({
+        error: {
+          code: 'TYPE_MISMATCH',
+          message: `Credential type mismatch: credential is ${credential.type}, source is ${body.type}`
+        }
+      }, 400);
+    }
+  } else if (body.credentials) {
+    const { validateGitHubSource, validateZammadSource, validateGoogleDocsSource } = await import('../handlers/validate');
+
+    let validationResult;
+    switch (body.type) {
+      case 'github':
+        validationResult = await validateGitHubSource(body.config, body.credentials);
+        break;
+      case 'zammad':
+        validationResult = await validateZammadSource(body.config, body.credentials);
+        break;
+      case 'gdocs':
+        validationResult = await validateGoogleDocsSource(body.config, body.credentials);
+        break;
+      default:
+        // Other source types don't have validation yet
+        break;
+    }
+
+    if (validationResult) {
+      if (!validationResult.valid) {
+        return c.json({
+          error: {
+            code: 'VALIDATION_FAILED',
+            message: 'Source validation failed',
+            errors: validationResult.errors,
+            warnings: validationResult.warnings
+          }
+        }, 400);
+      }
+
+      warnings.push(...validationResult.warnings);
+      validationMetadata = validationResult.metadata || {};
+    }
+  }
+
   // If credentials provided, encrypt them
   let credentials = body.credentials;
   if (credentials && c.env.ENCRYPTION_KEY) {
@@ -411,18 +467,29 @@ app.post('/:id/sources', async (c) => {
     volition_id: volitionId,
     type: body.type,
     config: body.config,
-    credentials: credentials ? { encrypted: credentials } : undefined
+    credentials: credentials ? { encrypted: credentials } : undefined,
+    credential_id: body.credential_id
   });
 
-  // Don't return encrypted credentials
-  return c.json({
+  // Return response with validation warnings if any
+  const response: any = {
     id: source.id,
     volition_id: source.volition_id,
     type: source.type,
     config: source.config,
     enabled: source.enabled,
     created_at: source.created_at
-  }, 201);
+  };
+
+  if (warnings.length > 0) {
+    response.warnings = warnings;
+  }
+
+  if (Object.keys(validationMetadata).length > 0) {
+    response.validation = validationMetadata;
+  }
+
+  return c.json(response, 201);
 });
 
 export default app;

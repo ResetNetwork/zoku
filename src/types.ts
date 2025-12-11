@@ -33,12 +33,24 @@ export interface Qupt {
   created_at: number;
 }
 
+export interface Credential {
+  id: string;
+  name: string;
+  type: string;
+  data: string;  // Encrypted JSON
+  last_validated: number | null;
+  validation_metadata: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
 export interface Source {
   id: string;
   volition_id: string;
   type: string;
   config: string;
-  credentials: string | null;
+  credentials: string | null;  // Inline credentials (backward compat)
+  credential_id: string | null;  // Reference to credentials table
   enabled: number;
   last_sync: number | null;
   sync_cursor: string | null;

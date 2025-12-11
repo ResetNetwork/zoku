@@ -78,31 +78,50 @@ Full API documentation in `zoku-spec.md`.
 
 Qupts are automatically collected from:
 
-- **GitHub**: Repository events (push, PR, issues)
+- **GitHub**: Repository events (push, PR, issues, comments) ✅ Tested
 - **Zammad**: Ticket updates and articles
 - **Google Docs**: Document revisions
 
 Sources are configured per-volition and run on a 5-minute cron schedule.
 
-### Adding a Source
+### Credential Store (Recommended)
 
-```bash
-curl -X POST http://localhost:8787/api/volitions/{volition_id}/sources \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "github",
-    "config": {
-      "owner": "ResetNetwork",
-      "repo": "zoku",
-      "events": ["push", "pull_request", "issues"]
-    },
-    "credentials": {
-      "token": "ghp_your_github_token"
-    }
-  }'
+Store credentials once, reuse across multiple sources:
+
+```javascript
+// 1. Store credential with validation
+add_credential({
+  name: "GitHub - Personal",
+  type: "github",
+  data: { token: "ghp_xxx" }
+})
+// Returns: { id: "cred-123", validation: { authenticated_as: "user", scopes: [...] } }
+
+// 2. Create source using stored credential
+add_source({
+  volition_id: "vol-1",
+  type: "github",
+  config: { owner: "ResetNetwork", repo: "zoku", events: ["push", "pull_request"] },
+  credential_id: "cred-123"
+})
 ```
 
-Credentials are automatically encrypted using the `ENCRYPTION_KEY` secret.
+**Benefits:**
+- Validate credentials before storage
+- Reuse across multiple repos/sources
+- Easy credential rotation
+- Track which sources use each credential
+
+### MCP Tools
+
+29 tools available via MCP interface at `/mcp`:
+- 7 Volition management
+- 3 Activity (qupts)
+- 3 Entangled entities
+- 3 PASCI matrix
+- 3 Taxonomy
+- 4 Sources
+- 6 Credentials (store, validate, rotate)
 
 ## Deployment
 

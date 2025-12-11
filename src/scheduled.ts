@@ -31,10 +31,18 @@ export async function handleScheduled(
         try {
           const config = JSON.parse(source.config);
 
-          // Decrypt credentials before use
-          const credentials = source.credentials
-            ? JSON.parse(await decryptCredentials(source.credentials, env.ENCRYPTION_KEY))
-            : {};
+          // Get credentials - either from credential_id or inline
+          let credentials = {};
+          if (source.credential_id) {
+            const credential = await db.getCredential(source.credential_id);
+            if (!credential) {
+              console.error(`Credential ${source.credential_id} not found for source ${source.id}`);
+              return { source_id: source.id, error: 'Credential not found', success: false };
+            }
+            credentials = JSON.parse(await decryptCredentials(credential.data, env.ENCRYPTION_KEY));
+          } else if (source.credentials) {
+            credentials = JSON.parse(await decryptCredentials(source.credentials, env.ENCRYPTION_KEY));
+          }
 
           // Fetch new activity
           const { qupts, cursor } = await handler.collect({

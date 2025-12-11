@@ -7,9 +7,12 @@ export async function encryptCredentials(
   const encoder = new TextEncoder();
   const iv = crypto.getRandomValues(new Uint8Array(12));
 
+  // Decode base64 key to raw bytes
+  const keyBytes = Uint8Array.from(atob(key), c => c.charCodeAt(0));
+
   const cryptoKey = await crypto.subtle.importKey(
     'raw',
-    encoder.encode(key),
+    keyBytes,
     'AES-GCM',
     false,
     ['encrypt']
@@ -40,9 +43,12 @@ export async function decryptCredentials(
   const iv = combined.slice(0, 12);
   const ciphertext = combined.slice(12);
 
+  // Decode base64 key to raw bytes
+  const keyBytes = Uint8Array.from(atob(key), c => c.charCodeAt(0));
+
   const cryptoKey = await crypto.subtle.importKey(
     'raw',
-    new TextEncoder().encode(key),
+    keyBytes,
     'AES-GCM',
     false,
     ['decrypt']

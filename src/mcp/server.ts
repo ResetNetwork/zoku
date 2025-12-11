@@ -121,7 +121,9 @@ const schemas = {
   add_source: z.object({
     volition_id: z.string(),
     type: z.enum(['github', 'gmail', 'zammad', 'gdrive', 'gdocs', 'webhook']),
-    config: z.record(z.any())
+    config: z.record(z.any()),
+    credentials: z.record(z.any()).optional(),
+    credential_id: z.string().optional()
   }),
 
   sync_source: z.object({
@@ -135,6 +137,36 @@ const schemas = {
   toggle_source: z.object({
     source_id: z.string(),
     enabled: z.boolean()
+  }),
+
+  // Credentials
+  add_credential: z.object({
+    name: z.string(),
+    type: z.enum(['github', 'gmail', 'zammad', 'gdrive', 'gdocs']),
+    data: z.record(z.any())
+  }),
+
+  list_credentials: z.object({
+    type: z.enum(['github', 'gmail', 'zammad', 'gdrive', 'gdocs']).optional(),
+    limit: z.number().optional()
+  }),
+
+  get_credential: z.object({
+    id: z.string()
+  }),
+
+  update_credential: z.object({
+    id: z.string(),
+    name: z.string().optional(),
+    data: z.record(z.any()).optional()
+  }),
+
+  delete_credential: z.object({
+    id: z.string()
+  }),
+
+  get_credential_usage: z.object({
+    id: z.string()
   })
 };
 
@@ -431,13 +463,15 @@ const tools: Tool[] = [
   },
   {
     name: 'add_source',
-    description: 'Add an activity source to a volition (GitHub repo, Gmail label, Zammad tickets, Google Drive folder, Google Doc, etc.)',
+    description: 'Add an activity source to a volition. Can use stored credentials (via credential_id) or provide inline credentials.',
     inputSchema: {
       type: 'object',
       properties: {
         volition_id: { type: 'string' },
         type: { type: 'string', enum: ['github', 'gmail', 'zammad', 'gdrive', 'gdocs', 'webhook'] },
-        config: { type: 'object' }
+        config: { type: 'object', description: 'Source-specific configuration (e.g., owner, repo for GitHub)' },
+        credentials: { type: 'object', description: 'Inline authentication credentials (will be validated and encrypted). Omit if using credential_id.' },
+        credential_id: { type: 'string', description: 'ID of stored credential to use. Omit if providing inline credentials.' }
       },
       required: ['volition_id', 'type', 'config']
     }
@@ -475,11 +509,81 @@ const tools: Tool[] = [
       },
       required: ['source_id', 'enabled']
     }
+  },
+  {
+    name: 'add_credential',
+    description: 'Store and validate credentials that can be reused across multiple sources',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'User-friendly name (e.g., "GitHub - Personal")' },
+        type: { type: 'string', enum: ['github', 'gmail', 'zammad', 'gdrive', 'gdocs'] },
+        data: { type: 'object', description: 'Authentication credentials (will be validated and encrypted)' }
+      },
+      required: ['name', 'type', 'data']
+    }
+  },
+  {
+    name: 'list_credentials',
+    description: 'List stored credentials (without exposing sensitive data)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        type: { type: 'string', enum: ['github', 'gmail', 'zammad', 'gdrive', 'gdocs'], description: 'Filter by credential type' },
+        limit: { type: 'number', default: 20 }
+      }
+    }
+  },
+  {
+    name: 'get_credential',
+    description: 'Get credential details (without exposing sensitive data)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' }
+      },
+      required: ['id']
+    }
+  },
+  {
+    name: 'update_credential',
+    description: 'Update credential name or data (will re-validate if data is updated)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        name: { type: 'string', description: 'New name for the credential' },
+        data: { type: 'object', description: 'New authentication credentials (will be validated)' }
+      },
+      required: ['id']
+    }
+  },
+  {
+    name: 'delete_credential',
+    description: 'Delete a stored credential (fails if used by any sources)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' }
+      },
+      required: ['id']
+    }
+  },
+  {
+    name: 'get_credential_usage',
+    description: 'See which sources are using a credential',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' }
+      },
+      required: ['id']
+    }
   }
 ];
 
 // Tool handler implementations
-async function handleToolCall(name: string, args: any, db: DB): Promise<any> {
+async function handleToolCall(name: string, args: any, db: DB, encryptionKey: string): Promise<any> {
   switch (name) {
     case 'list_volitions': {
       const input = schemas.list_volitions.parse(args);
@@ -657,18 +761,125 @@ async function handleToolCall(name: string, args: any, db: DB): Promise<any> {
 
     case 'add_source': {
       const input = schemas.add_source.parse(args);
+
+      // Validate source configuration if credentials are provided
+      const warnings: string[] = [];
+      let validationMetadata: Record<string, any> = {};
+
+      // If credential_id is provided, verify it exists and matches type
+      if (input.credential_id) {
+        const credential = await db.getCredential(input.credential_id);
+        if (!credential) {
+          throw new Error('Credential not found');
+        }
+        if (credential.type !== input.type) {
+          throw new Error(`Credential type mismatch: credential is ${credential.type}, source is ${input.type}`);
+        }
+      } else if (input.credentials) {
+        // Validate inline credentials
+        const { validateGitHubSource, validateZammadSource, validateGoogleDocsSource } = await import('../handlers/validate');
+
+        let validationResult;
+        switch (input.type) {
+          case 'github':
+            validationResult = await validateGitHubSource(input.config, input.credentials);
+            break;
+          case 'zammad':
+            validationResult = await validateZammadSource(input.config, input.credentials);
+            break;
+          case 'gdocs':
+            validationResult = await validateGoogleDocsSource(input.config, input.credentials);
+            break;
+          default:
+            // Other source types don't have validation yet
+            break;
+        }
+
+        if (validationResult) {
+          if (!validationResult.valid) {
+            throw new Error(`Source validation failed: ${validationResult.errors.join(', ')}${validationResult.warnings.length > 0 ? '. Warnings: ' + validationResult.warnings.join(', ') : ''}`);
+          }
+
+          warnings.push(...validationResult.warnings);
+          validationMetadata = validationResult.metadata || {};
+        }
+      }
+
       const source = await db.createSource({
         volition_id: input.volition_id,
         type: input.type,
-        config: input.config
+        config: input.config,
+        credentials: input.credentials,
+        credential_id: input.credential_id
       });
-      return { source };
+
+      const response: any = { source };
+      if (warnings.length > 0) {
+        response.warnings = warnings;
+      }
+      if (Object.keys(validationMetadata).length > 0) {
+        response.validation = validationMetadata;
+      }
+
+      return response;
     }
 
     case 'sync_source': {
       const input = schemas.sync_source.parse(args);
-      // TODO: Trigger manual sync
-      return { success: true, message: 'Manual sync not yet implemented' };
+      const { decryptCredentials } = await import('../lib/crypto');
+      const { handlers } = await import('../handlers');
+
+      // Get the source
+      const source = await db.getSource(input.source_id);
+      if (!source) {
+        throw new Error('Source not found');
+      }
+
+      const handler = handlers[source.type];
+      if (!handler) {
+        throw new Error(`No handler for source type: ${source.type}`);
+      }
+
+      const config = JSON.parse(source.config);
+
+      // Get credentials - either from credential_id or inline
+      let credentials = {};
+      if (source.credential_id) {
+        const credential = await db.getCredential(source.credential_id);
+        if (!credential) {
+          throw new Error('Credential not found');
+        }
+        credentials = JSON.parse(await decryptCredentials(credential.data, encryptionKey));
+      } else if (source.credentials) {
+        credentials = JSON.parse(await decryptCredentials(source.credentials, encryptionKey));
+      }
+
+      // Fetch new activity
+      const { qupts, cursor } = await handler.collect({
+        source,
+        config,
+        credentials,
+        since: source.last_sync,
+        cursor: source.sync_cursor
+      });
+
+      // Insert qupts
+      if (qupts.length > 0) {
+        await db.batchCreateQupts(qupts);
+      }
+
+      // Update sync state
+      await db.updateSource(source.id, {
+        last_sync: Math.floor(Date.now() / 1000),
+        sync_cursor: cursor
+      });
+
+      return {
+        success: true,
+        qupts_collected: qupts.length,
+        source_id: source.id,
+        cursor: cursor
+      };
     }
 
     case 'remove_source': {
@@ -683,6 +894,156 @@ async function handleToolCall(name: string, args: any, db: DB): Promise<any> {
       return { success: true };
     }
 
+    // Credential management
+    case 'add_credential': {
+      const input = schemas.add_credential.parse(args);
+      const { encryptCredentials } = await import('../lib/crypto');
+      const { validateGitHubCredential, validateZammadSource, validateGoogleDocsSource } = await import('../handlers/validate');
+
+      const warnings: string[] = [];
+      let validationMetadata: Record<string, any> = {};
+
+      // Validate credentials (credential-only validation, no config needed)
+      let validationResult;
+      switch (input.type) {
+        case 'github':
+          validationResult = await validateGitHubCredential(input.data);
+          break;
+        case 'zammad':
+          validationResult = await validateZammadSource({}, input.data);
+          break;
+        case 'gdocs':
+          // For Google, just validate OAuth credentials work
+          validationResult = await validateGoogleDocsSource({ document_id: input.data.test_document_id || '' }, input.data);
+          break;
+      }
+
+      if (validationResult) {
+        if (!validationResult.valid) {
+          throw new Error(`Credential validation failed: ${validationResult.errors.join(', ')}`);
+        }
+        warnings.push(...validationResult.warnings);
+        validationMetadata = validationResult.metadata || {};
+      }
+
+      // Encrypt and store
+      const encrypted = await encryptCredentials(JSON.stringify(input.data), encryptionKey);
+      const credential = await db.createCredential({
+        name: input.name,
+        type: input.type,
+        data: encrypted,
+        last_validated: Math.floor(Date.now() / 1000),
+        validation_metadata: validationMetadata
+      });
+
+      return {
+        id: credential.id,
+        name: credential.name,
+        type: credential.type,
+        validation: validationMetadata,
+        warnings: warnings.length > 0 ? warnings : undefined
+      };
+    }
+
+    case 'list_credentials': {
+      const input = schemas.list_credentials.parse(args);
+      const credentials = await db.listCredentials({
+        type: input.type,
+        limit: input.limit
+      });
+
+      // Remove encrypted data
+      return {
+        credentials: credentials.map(c => ({
+          id: c.id,
+          name: c.name,
+          type: c.type,
+          last_validated: c.last_validated,
+          validation_metadata: c.validation_metadata ? JSON.parse(c.validation_metadata) : null,
+          created_at: c.created_at,
+          updated_at: c.updated_at
+        }))
+      };
+    }
+
+    case 'get_credential': {
+      const input = schemas.get_credential.parse(args);
+      const credential = await db.getCredential(input.id);
+      if (!credential) throw new Error('Credential not found');
+
+      return {
+        id: credential.id,
+        name: credential.name,
+        type: credential.type,
+        last_validated: credential.last_validated,
+        validation_metadata: credential.validation_metadata ? JSON.parse(credential.validation_metadata) : null,
+        created_at: credential.created_at,
+        updated_at: credential.updated_at
+      };
+    }
+
+    case 'update_credential': {
+      const input = schemas.update_credential.parse(args);
+      const updates: any = {};
+
+      if (input.name) {
+        updates.name = input.name;
+      }
+
+      if (input.data) {
+        const { encryptCredentials } = await import('../lib/crypto');
+        const { validateGitHubCredential, validateZammadSource, validateGoogleDocsSource } = await import('../handlers/validate');
+
+        const credential = await db.getCredential(input.id);
+        if (!credential) throw new Error('Credential not found');
+
+        // Validate new credentials
+        let validationResult;
+        switch (credential.type) {
+          case 'github':
+            validationResult = await validateGitHubCredential(input.data);
+            break;
+          case 'zammad':
+            validationResult = await validateZammadSource({}, input.data);
+            break;
+          case 'gdocs':
+            validationResult = await validateGoogleDocsSource({ document_id: input.data.test_document_id || '' }, input.data);
+            break;
+        }
+
+        if (validationResult && !validationResult.valid) {
+          throw new Error(`Credential validation failed: ${validationResult.errors.join(', ')}`);
+        }
+
+        const encrypted = await encryptCredentials(JSON.stringify(input.data), encryptionKey);
+        updates.data = encrypted;
+        updates.last_validated = Math.floor(Date.now() / 1000);
+        updates.validation_metadata = validationResult?.metadata || {};
+      }
+
+      await db.updateCredential(input.id, updates);
+      return { success: true };
+    }
+
+    case 'delete_credential': {
+      const input = schemas.delete_credential.parse(args);
+
+      // Check if in use
+      const usage = await db.getCredentialUsage(input.id);
+      if (usage.length > 0) {
+        throw new Error(`Cannot delete credential: used by ${usage.length} source(s). Usage: ${usage.map(u => `${u.volition_name} (${u.source_type})`).join(', ')}`);
+      }
+
+      await db.deleteCredential(input.id);
+      return { success: true };
+    }
+
+    case 'get_credential_usage': {
+      const input = schemas.get_credential_usage.parse(args);
+      const usage = await db.getCredentialUsage(input.id);
+      return { usage };
+    }
+
     default:
       throw new Error(`Unknown tool: ${name}`);
   }
@@ -695,10 +1056,32 @@ export async function mcpHandler(c: Context<{ Bindings: Bindings }>) {
   try {
     const request = await c.req.json();
 
+    // Handle initialize
+    if (request.method === 'initialize') {
+      return c.json({
+        jsonrpc: '2.0',
+        id: request.id,
+        result: {
+          protocolVersion: '2024-11-05',
+          capabilities: {
+            tools: {}
+          },
+          serverInfo: {
+            name: 'zoku',
+            version: '1.0.0'
+          }
+        }
+      });
+    }
+
     // Handle list tools
     if (request.method === 'tools/list') {
       return c.json({
-        tools
+        jsonrpc: '2.0',
+        id: request.id,
+        result: {
+          tools
+        }
       });
     }
 
@@ -707,32 +1090,47 @@ export async function mcpHandler(c: Context<{ Bindings: Bindings }>) {
       const { name, arguments: args } = request.params;
 
       try {
-        const result = await handleToolCall(name, args, db);
+        const result = await handleToolCall(name, args, db, c.env.ENCRYPTION_KEY);
         return c.json({
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(result, null, 2)
-            }
-          ]
+          jsonrpc: '2.0',
+          id: request.id,
+          result: {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(result, null, 2)
+              }
+            ]
+          }
         });
       } catch (error) {
         return c.json({
+          jsonrpc: '2.0',
+          id: request.id,
           error: {
-            code: 'TOOL_EXECUTION_ERROR',
+            code: -32603,
             message: error instanceof Error ? error.message : String(error)
           }
-        }, 400);
+        });
       }
     }
 
-    return c.json({ error: 'Unknown method' }, 400);
+    return c.json({
+      jsonrpc: '2.0',
+      id: request.id || null,
+      error: {
+        code: -32601,
+        message: 'Method not found'
+      }
+    });
   } catch (error) {
     return c.json({
+      jsonrpc: '2.0',
+      id: null,
       error: {
-        code: 'INVALID_REQUEST',
-        message: error instanceof Error ? error.message : String(error)
+        code: -32700,
+        message: 'Parse error'
       }
-    }, 400);
+    });
   }
 }

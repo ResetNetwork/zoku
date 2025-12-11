@@ -3,14 +3,14 @@
 ## Project Overview
 Zoku is a project/initiative tracking system inspired by the Quantum Thief trilogy. Built as a Cloudflare Worker with D1 database, MCP interface, and web frontend.
 
-## Current Status: ✅ Backend Complete
+## Current Status: ✅ Backend Complete + Credential Store
 
 ### Completed Phases (0-4)
 - **Phase 0**: Infrastructure setup (GitHub, D1, encryption)
 - **Phase 1**: Dependencies and database schema
 - **Phase 2**: Full REST API with CRUD operations
 - **Phase 3**: Source handlers (GitHub, Zammad, Google Docs)
-- **Phase 4**: MCP Server with 23 tools
+- **Phase 4**: MCP Server with 29 tools (includes credential store)
 
 ### Remaining Phases
 - **Phase 5**: React frontend (pending)
@@ -33,7 +33,7 @@ Zoku is a project/initiative tracking system inspired by the Quantum Thief trilo
 - **Cron**: 5-minute scheduled source collection
 - **Domain**: zoku.205.dev
 
-## MCP Tools Available (23)
+## MCP Tools Available (29)
 
 ### Volitions
 - `list_volitions` - List projects with filters
@@ -65,10 +65,18 @@ Zoku is a project/initiative tracking system inspired by the Quantum Thief trilo
 
 ### Sources
 - `list_sources` - List configured sources
-- `add_source` - Add GitHub/Zammad/Google Docs source
-- `sync_source` - Trigger manual sync
+- `add_source` - Add GitHub/Zammad/Google Docs source (supports credential_id)
+- `sync_source` - Trigger manual sync (fully implemented)
 - `remove_source` - Delete source
 - `toggle_source` - Enable/disable source
+
+### Credentials (NEW)
+- `add_credential` - Store and validate credentials for reuse
+- `list_credentials` - View stored credentials (encrypted data hidden)
+- `get_credential` - Get credential details
+- `update_credential` - Rotate/update credentials
+- `delete_credential` - Remove credential (blocks if in use)
+- `get_credential_usage` - See which sources use a credential
 
 ## Key Files
 
@@ -85,6 +93,7 @@ Zoku is a project/initiative tracking system inspired by the Quantum Thief trilo
 - `src/api/qupts.ts` - Qupt CRUD + batch import
 - `src/api/sources.ts` - Source operations by ID
 - `src/api/dimensions.ts` - Taxonomy read-only
+- `src/api/credentials.ts` - Credential store CRUD (NEW)
 
 ### Source Handlers
 - `src/handlers/index.ts` - Handler registry
@@ -92,10 +101,12 @@ Zoku is a project/initiative tracking system inspired by the Quantum Thief trilo
 - `src/handlers/zammad.ts` - Zammad tickets + articles
 - `src/handlers/gdocs.ts` - Google Docs revisions
 - `src/handlers/google-auth.ts` - OAuth token refresh
+- `src/handlers/validate.ts` - Credential validation (NEW)
 
 ### Database
 - `schema.sql` - Full schema with all tables
 - `seed.sql` - Initial taxonomy data
+- `migrations/002_add_credentials.sql` - Credential store migration (NEW)
 
 ## Development Commands
 
@@ -116,9 +127,28 @@ npm run deploy           # Deploy to Cloudflare
 
 ## Source Configuration
 
-Sources are configured per-volition via API. Credentials are encrypted at rest using ENCRYPTION_KEY.
+Sources can use stored credentials (recommended) or inline credentials. All credentials are encrypted at rest using ENCRYPTION_KEY.
 
-### GitHub Example
+### Credential Store Workflow (Recommended)
+```javascript
+// 1. Store credential once (validates and encrypts)
+add_credential({
+  name: "GitHub - Personal",
+  type: "github",
+  data: { token: "ghp_xxx" }
+})
+// Returns: { id: "cred-123", validation: { authenticated_as: "username", scopes: [...] } }
+
+// 2. Reuse for multiple sources
+add_source({
+  volition_id: "vol-1",
+  type: "github",
+  config: { owner: "ResetNetwork", repo: "zoku", events: ["push", "pull_request", "issues"] },
+  credential_id: "cred-123"  // Reference stored credential
+})
+```
+
+### Inline Credentials (Legacy)
 ```json
 {
   "type": "github",
@@ -247,3 +277,7 @@ Sources are configured per-volition via API. Credentials are encrypted at rest u
 - MCP server is HTTP-based at `/mcp`, not stdio
 - All credentials are AES-GCM encrypted using ENCRYPTION_KEY secret
 - Scheduled handler runs every 5 minutes via Cloudflare Cron
+- **Credential Store**: 29 MCP tools total (23 original + 6 credential tools)
+- **Local dev**: ENCRYPTION_KEY set in `.dev.vars` (not committed to git)
+- **Validation**: GitHub, Zammad, Google Docs credentials validated on add/update
+- **Testing**: Successfully tested end-to-end with ResetNetwork/zoku repo

@@ -423,6 +423,7 @@ export class DB {
     type: string;
     config: Record<string, any>;
     credentials?: Record<string, any>;
+    credential_id?: string;
   }): Promise<Source> {
     const id = crypto.randomUUID();
     const config = JSON.stringify(data.config);
@@ -430,10 +431,10 @@ export class DB {
 
     await this.d1
       .prepare(`
-        INSERT INTO sources (id, volition_id, type, config, credentials)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sources (id, volition_id, type, config, credentials, credential_id)
+        VALUES (?, ?, ?, ?, ?, ?)
       `)
-      .bind(id, data.volition_id, data.type, config, credentials)
+      .bind(id, data.volition_id, data.type, config, credentials, data.credential_id || null)
       .run();
 
     return (await this.getSource(id))!;
@@ -556,5 +557,131 @@ export class DB {
       .prepare('DELETE FROM volition_attributes WHERE volition_id = ? AND dimension_id = ?')
       .bind(volitionId, dimensionId)
       .run();
+  }
+
+  // Credentials management
+  async createCredential(params: {
+    name: string;
+    type: string;
+    data: string;  // Already encrypted
+    last_validated?: number | null;
+    validation_metadata?: Record<string, any> | null;
+  }): Promise<Credential> {
+    const id = crypto.randomUUID();
+    const now = Math.floor(Date.now() / 1000);
+
+    await this.d1
+      .prepare(`
+        INSERT INTO credentials (id, name, type, data, last_validated, validation_metadata, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+      .bind(
+        id,
+        params.name,
+        params.type,
+        params.data,
+        params.last_validated || null,
+        params.validation_metadata ? JSON.stringify(params.validation_metadata) : null,
+        now,
+        now
+      )
+      .run();
+
+    return this.getCredential(id) as Promise<Credential>;
+  }
+
+  async getCredential(id: string): Promise<Credential | null> {
+    const result = await this.d1
+      .prepare('SELECT * FROM credentials WHERE id = ?')
+      .bind(id)
+      .first<Credential>();
+
+    return result || null;
+  }
+
+  async listCredentials(params?: {
+    type?: string;
+    limit?: number;
+  }): Promise<Credential[]> {
+    let query = 'SELECT * FROM credentials';
+    const bindings: any[] = [];
+
+    if (params?.type) {
+      query += ' WHERE type = ?';
+      bindings.push(params.type);
+    }
+
+    query += ' ORDER BY created_at DESC';
+
+    if (params?.limit) {
+      query += ' LIMIT ?';
+      bindings.push(params.limit);
+    }
+
+    const result = await this.d1.prepare(query).bind(...bindings).all<Credential>();
+    return result.results || [];
+  }
+
+  async updateCredential(id: string, params: {
+    name?: string;
+    data?: string;  // Already encrypted
+    last_validated?: number | null;
+    validation_metadata?: Record<string, any> | null;
+  }): Promise<void> {
+    const updates: string[] = [];
+    const bindings: any[] = [];
+
+    if (params.name !== undefined) {
+      updates.push('name = ?');
+      bindings.push(params.name);
+    }
+
+    if (params.data !== undefined) {
+      updates.push('data = ?');
+      bindings.push(params.data);
+    }
+
+    if (params.last_validated !== undefined) {
+      updates.push('last_validated = ?');
+      bindings.push(params.last_validated);
+    }
+
+    if (params.validation_metadata !== undefined) {
+      updates.push('validation_metadata = ?');
+      bindings.push(params.validation_metadata ? JSON.stringify(params.validation_metadata) : null);
+    }
+
+    if (updates.length === 0) return;
+
+    updates.push('updated_at = ?');
+    bindings.push(Math.floor(Date.now() / 1000));
+
+    bindings.push(id);
+
+    await this.d1
+      .prepare(`UPDATE credentials SET ${updates.join(', ')} WHERE id = ?`)
+      .bind(...bindings)
+      .run();
+  }
+
+  async deleteCredential(id: string): Promise<void> {
+    await this.d1
+      .prepare('DELETE FROM credentials WHERE id = ?')
+      .bind(id)
+      .run();
+  }
+
+  async getCredentialUsage(credentialId: string): Promise<{ volition_id: string; volition_name: string; source_type: string; source_id: string }[]> {
+    const result = await this.d1
+      .prepare(`
+        SELECT s.id as source_id, s.volition_id, s.type as source_type, v.name as volition_name
+        FROM sources s
+        JOIN volitions v ON s.volition_id = v.id
+        WHERE s.credential_id = ?
+      `)
+      .bind(credentialId)
+      .all<{ source_id: string; volition_id: string; source_type: string; volition_name: string }>();
+
+    return result.results || [];
   }
 }
