@@ -30,6 +30,21 @@ export default function QuptItem({ qupt, formatRelativeTime, formatDate, getSour
     }
   }
 
+  const getZammadIcon = (type: string) => {
+    switch (type) {
+      case 'ticket':
+        return '📋' // Clipboard for ticket
+      case 'phone':
+        return '📞' // Phone
+      case 'email':
+        return '📧' // Email
+      case 'note':
+        return '📝' // Note
+      default:
+        return '💬' // Generic communication
+    }
+  }
+
   const getEventTypeColor = (eventType: string) => {
     switch (eventType) {
       case 'PushEvent':
@@ -39,6 +54,21 @@ export default function QuptItem({ qupt, formatRelativeTime, formatDate, getSour
       case 'IssuesEvent':
         return 'text-blue-400'
       case 'IssueCommentEvent':
+        return 'text-yellow-400'
+      default:
+        return 'text-gray-400'
+    }
+  }
+
+  const getZammadTypeColor = (type: string) => {
+    switch (type) {
+      case 'ticket':
+        return 'text-blue-400'
+      case 'phone':
+        return 'text-purple-400'
+      case 'email':
+        return 'text-green-400'
+      case 'note':
         return 'text-yellow-400'
       default:
         return 'text-gray-400'
@@ -81,6 +111,14 @@ export default function QuptItem({ qupt, formatRelativeTime, formatDate, getSour
                     title={metadata.event_type}
                   >
                     {getGitHubIcon(metadata.event_type)}
+                  </span>
+                )}
+                {metadata?.type && qupt.source === 'zammad' && (
+                  <span
+                    className={`text-base ${getZammadTypeColor(metadata.type)}`}
+                    title={metadata.type}
+                  >
+                    {getZammadIcon(metadata.type)}
                   </span>
                 )}
               </div>
@@ -207,10 +245,24 @@ export default function QuptItem({ qupt, formatRelativeTime, formatDate, getSour
                   </div>
                 )}
 
-                {(metadata.subject || metadata.body) && metadata.type !== 'ticket' && (
-                  <div className="text-gray-700 dark:text-gray-300 mt-2 p-3 bg-gray-100 dark:bg-quantum-900/30 rounded border-l-2 border-yellow-500">
-                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Article Content:</div>
-                    <div className="text-sm whitespace-pre-wrap">{metadata.subject || metadata.body || 'No content'}</div>
+                {metadata.type !== 'ticket' && (
+                  <div className="space-y-1">
+                    {metadata.from && (
+                      <div className="text-gray-600 dark:text-gray-400 text-sm">
+                        <span className="font-semibold">From:</span> {metadata.from}
+                      </div>
+                    )}
+                    {metadata.subject && (
+                      <div className="text-gray-600 dark:text-gray-400 text-sm">
+                        <span className="font-semibold">Subject:</span> {metadata.subject}
+                      </div>
+                    )}
+                    {metadata.body && (
+                      <div className="text-gray-700 dark:text-gray-300 mt-2 p-3 bg-gray-100 dark:bg-quantum-900/30 rounded border-l-2 border-yellow-500">
+                        <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Article Content:</div>
+                        <div className="text-sm whitespace-pre-wrap">{metadata.body}</div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
