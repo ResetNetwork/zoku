@@ -20,10 +20,9 @@ app.route('/api/qupts', quptsRoutes);
 app.route('/api/sources', sourcesRoutes);
 app.route('/api/dimensions', dimensionsRoutes);
 
-// MCP endpoint (will implement in Phase 4)
-app.all('/mcp', async (c) => {
-  return c.json({ error: 'MCP endpoint not yet implemented' }, 501);
-});
+// MCP endpoint
+import { mcpHandler } from './mcp/server';
+app.all('/mcp', mcpHandler);
 
 // Webhook endpoint (will implement in Phase 3)
 app.post('/webhook/:source_id', async (c) => {

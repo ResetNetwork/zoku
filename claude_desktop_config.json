@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "zoku": {
+      "url": "http://localhost:8787/mcp",
+      "transport": {
+        "type": "http"
+      }
+    }
+  }
+}
