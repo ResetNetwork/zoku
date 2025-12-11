@@ -45,6 +45,7 @@ export const githubHandler: SourceHandler = {
         let commentBody = undefined;
         let prTitle = undefined;
         let prBody = undefined;
+        let prUrl = undefined;
 
         if (event.type === 'PushEvent' && event.payload.head) {
           try {
@@ -88,6 +89,7 @@ export const githubHandler: SourceHandler = {
               const pr = await prResponse.json();
               prTitle = pr.title;
               prBody = pr.body;
+              prUrl = pr.html_url;
             }
           } catch (error) {
             console.warn(`Failed to fetch PR details for #${event.payload.pull_request.number}:`, error);
@@ -120,7 +122,7 @@ export const githubHandler: SourceHandler = {
             actor: event.actor?.login,
             repo: `${owner}/${repo}`,
             payload: event.payload,
-            url: getEventUrl(event, owner, repo),
+            url: prUrl || getEventUrl(event, owner, repo),
             commit_message: commitMessage,
             issue_body: issueBody,
             comment_body: commentBody,
