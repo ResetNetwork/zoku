@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { DB } from '../db';
 import type { Bindings } from '../types';
 import { encryptCredentials, decryptCredentials } from '../lib/crypto';
-import { validateGitHubCredential, validateZammadSource, validateGoogleDocsSource } from '../handlers/validate';
+import { validateGitHubCredential, validateZammadCredential, validateGoogleDocsSource } from '../handlers/validate';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -58,7 +58,7 @@ app.post('/', async (c) => {
         validationResult = await validateGitHubCredential(body.data);
         break;
       case 'zammad':
-        validationResult = await validateZammadSource({}, body.data);
+        validationResult = await validateZammadCredential(body.data);
         break;
       case 'gdocs':
         validationResult = await validateGoogleDocsSource({ document_id: body.data.test_document_id || '' }, body.data);
@@ -169,7 +169,7 @@ app.patch('/:id', async (c) => {
           validationResult = await validateGitHubCredential(body.data);
           break;
         case 'zammad':
-          validationResult = await validateZammadSource({}, body.data);
+          validationResult = await validateZammadCredential(body.data);
           break;
         case 'gdocs':
           validationResult = await validateGoogleDocsSource({ document_id: body.data.test_document_id || '' }, body.data);

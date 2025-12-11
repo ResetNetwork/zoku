@@ -164,11 +164,67 @@ export async function validateGitHubSource(config: any, credentials: any): Promi
 }
 
 /**
+ * Validate Zammad credentials only
+ */
+export async function validateZammadCredential(credentials: any): Promise<ValidationResult> {
+  const { url, token } = credentials;
+
+  const warnings: string[] = [];
+  const errors: string[] = [];
+  const metadata: Record<string, any> = {};
+
+  if (!url || !token) {
+    errors.push('Zammad credentials require both url and token');
+    return { valid: false, warnings, errors };
+  }
+
+  try {
+    // Test connection and authentication
+    const response = await fetch(`${url}/api/v1/users/me`, {
+      headers: {
+        'Authorization': `Token token=${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        errors.push('Zammad token is invalid');
+        return { valid: false, warnings, errors };
+      }
+      errors.push(`Zammad API error: ${response.status} ${response.statusText}`);
+      return { valid: false, warnings, errors };
+    }
+
+    const user = await response.json();
+    metadata.authenticated_as = `${user.firstname} ${user.lastname}`;
+    metadata.email = user.email;
+    metadata.zammad_url = url;
+
+    return {
+      valid: true,
+      warnings,
+      errors,
+      metadata
+    };
+
+  } catch (error) {
+    errors.push(`Validation error: ${error instanceof Error ? error.message : String(error)}`);
+    return { valid: false, warnings, errors };
+  }
+}
+
+/**
  * Validate Zammad source configuration and token
  */
 export async function validateZammadSource(config: any, credentials: any): Promise<ValidationResult> {
   const { url } = config;
   const { token } = credentials;
+
+  // If credentials include URL, use credential validation
+  if (credentials.url) {
+    return validateZammadCredential(credentials);
+  }
 
   const warnings: string[] = [];
   const errors: string[] = [];

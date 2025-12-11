@@ -164,19 +164,21 @@ add_source({
 ```
 
 ### Zammad Example
-```json
-{
-  "type": "zammad",
-  "config": {
-    "url": "https://support.example.com",
-    "query": "state:open OR state:pending",
-    "include_articles": true
+```javascript
+// Using credential_id (recommended)
+add_source({
+  volition_id: "vol-1",
+  type: "zammad",
+  config: {
+    url: "https://help.reset.tech",
+    tag: "zoku",  // REQUIRED - only tickets with this tag
+    include_articles: true
   },
-  "credentials": {
-    "token": "zammad_token"
-  }
-}
+  credential_id: "cred-zammad-123"
+})
 ```
+
+**Note:** The `tag` field is required for Zammad sources. Only tickets tagged with the specified tag will be collected as qupts.
 
 ### Google Docs Example
 ```json

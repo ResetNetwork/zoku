@@ -19,12 +19,14 @@ const schemas = {
     function: z.enum(['tech_innovation', 'info_tech']).optional(),
     parent_id: z.string().optional(),
     root_only: z.boolean().optional(),
-    limit: z.number().optional()
+    limit: z.number().optional(),
+    detailed: z.boolean().optional()
   }),
 
   get_volition: z.object({
     id: z.string(),
-    include_children_qupts: z.boolean().optional()
+    include_children_qupts: z.boolean().optional(),
+    detailed: z.boolean().optional()
   }),
 
   get_children: z.object({
@@ -66,7 +68,8 @@ const schemas = {
     volition_id: z.string(),
     recursive: z.boolean().optional(),
     source: z.string().optional(),
-    limit: z.number().optional()
+    limit: z.number().optional(),
+    detailed: z.boolean().optional()
   }),
 
   list_entangled: z.object({
@@ -207,7 +210,7 @@ const tools: Tool[] = [
   },
   {
     name: 'get_volition',
-    description: 'Get full details of a volition including children, matrix, and aggregated activity from descendants',
+    description: 'Get volition details. By default returns minimal info (counts only). Use detailed=true for full nested data.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -216,6 +219,11 @@ const tools: Tool[] = [
           type: 'boolean',
           description: 'Include qupts from child volitions',
           default: true
+        },
+        detailed: {
+          type: 'boolean',
+          description: 'Return full nested data (children, matrix, attributes, qupts). Default: false (returns counts only)',
+          default: false
         }
       },
       required: ['id']
@@ -311,7 +319,7 @@ const tools: Tool[] = [
   },
   {
     name: 'list_qupts',
-    description: 'List activity for a volition, optionally including child volitions',
+    description: 'List activity for a volition. By default omits metadata for brevity. Use detailed=true for full metadata.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -325,7 +333,12 @@ const tools: Tool[] = [
           type: 'string',
           description: 'Filter by source (github, gmail, zammad, etc.)'
         },
-        limit: { type: 'number', default: 20 }
+        limit: { type: 'number', default: 20 },
+        detailed: {
+          type: 'boolean',
+          description: 'Include full metadata. Default: false (omits metadata for brevity)',
+          default: false
+        }
       },
       required: ['volition_id']
     }
@@ -592,6 +605,22 @@ async function handleToolCall(name: string, args: any, db: DB, encryptionKey: st
         root_only: input.root_only,
         limit: input.limit
       });
+
+      // Default: return minimal info (no description)
+      if (!input.detailed) {
+        return {
+          volitions: volitions.map(v => ({
+            id: v.id,
+            name: v.name,
+            parent_id: v.parent_id,
+            created_at: v.created_at,
+            updated_at: v.updated_at
+            // Omit description by default
+          }))
+        };
+      }
+
+      // Detailed: return full volition data
       return { volitions };
     }
 
@@ -600,6 +629,24 @@ async function handleToolCall(name: string, args: any, db: DB, encryptionKey: st
       const volition = await db.getVolition(input.id);
       if (!volition) throw new Error('Volition not found');
 
+      // Default: return minimal info
+      if (!input.detailed) {
+        const childrenCount = (await db.getVolitionChildren(input.id)).length;
+        const quptsCount = (await db.listQupts({
+          volition_id: input.id,
+          recursive: input.include_children_qupts ?? true,
+          limit: 1000
+        })).length;
+
+        return {
+          ...volition,
+          children_count: childrenCount,
+          qupts_count: quptsCount,
+          sources_count: (await db.listSources(input.id)).length
+        };
+      }
+
+      // Detailed: return full nested data
       const children = await db.getVolitionChildren(input.id);
       const matrix = await db.getMatrix(input.id);
       const attributes = await db.getVolitionAttributes(input.id);
@@ -671,6 +718,23 @@ async function handleToolCall(name: string, args: any, db: DB, encryptionKey: st
         source: input.source,
         limit: input.limit
       });
+
+      // Default: return minimal qupts (no metadata)
+      if (!input.detailed) {
+        return {
+          qupts: qupts.map(q => ({
+            id: q.id,
+            volition_id: q.volition_id,
+            content: q.content,
+            source: q.source,
+            external_id: q.external_id,
+            created_at: q.created_at
+            // Omit metadata by default
+          }))
+        };
+      }
+
+      // Detailed: return full qupts with metadata
       return { qupts };
     }
 
@@ -898,7 +962,7 @@ async function handleToolCall(name: string, args: any, db: DB, encryptionKey: st
     case 'add_credential': {
       const input = schemas.add_credential.parse(args);
       const { encryptCredentials } = await import('../lib/crypto');
-      const { validateGitHubCredential, validateZammadSource, validateGoogleDocsSource } = await import('../handlers/validate');
+      const { validateGitHubCredential, validateZammadCredential, validateGoogleDocsSource } = await import('../handlers/validate');
 
       const warnings: string[] = [];
       let validationMetadata: Record<string, any> = {};
@@ -910,7 +974,7 @@ async function handleToolCall(name: string, args: any, db: DB, encryptionKey: st
           validationResult = await validateGitHubCredential(input.data);
           break;
         case 'zammad':
-          validationResult = await validateZammadSource({}, input.data);
+          validationResult = await validateZammadCredential(input.data);
           break;
         case 'gdocs':
           // For Google, just validate OAuth credentials work
@@ -992,7 +1056,7 @@ async function handleToolCall(name: string, args: any, db: DB, encryptionKey: st
 
       if (input.data) {
         const { encryptCredentials } = await import('../lib/crypto');
-        const { validateGitHubCredential, validateZammadSource, validateGoogleDocsSource } = await import('../handlers/validate');
+        const { validateGitHubCredential, validateZammadCredential, validateGoogleDocsSource } = await import('../handlers/validate');
 
         const credential = await db.getCredential(input.id);
         if (!credential) throw new Error('Credential not found');
@@ -1004,7 +1068,7 @@ async function handleToolCall(name: string, args: any, db: DB, encryptionKey: st
             validationResult = await validateGitHubCredential(input.data);
             break;
           case 'zammad':
-            validationResult = await validateZammadSource({}, input.data);
+            validationResult = await validateZammadCredential(input.data);
             break;
           case 'gdocs':
             validationResult = await validateGoogleDocsSource({ document_id: input.data.test_document_id || '' }, input.data);

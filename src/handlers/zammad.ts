@@ -3,8 +3,12 @@ import type { QuptInput } from '../types';
 
 export const zammadHandler: SourceHandler = {
   async collect({ source, config, credentials, since, cursor }) {
-    const { url, query, include_articles = true } = config;
+    const { url, tag, include_articles = true } = config;
     const { token } = credentials;
+
+    if (!tag) {
+      throw new Error('Zammad source requires a tag to filter tickets');
+    }
 
     const headers = {
       'Authorization': `Token token=${token}`,
@@ -18,18 +22,21 @@ export const zammadHandler: SourceHandler = {
       const page = cursor ? parseInt(cursor) : 1;
       const perPage = 50;
 
-      // Build search query with time filter
-      let searchQuery = query || 'state:open OR state:pending';
-      if (since) {
+      // Build search query with tag (and optional time filter for incremental sync)
+      let searchQuery = `tags:${tag}`;
+      // Only add time filter if we have a cursor (for pagination continuity)
+      // Skip time filter on first sync or when cursor resets to get all tagged tickets
+      if (since && cursor) {
         const sinceDate = new Date(since * 1000).toISOString();
-        searchQuery += ` updated_at:>=${sinceDate}`;
+        searchQuery += ` AND updated_at:>=${sinceDate}`;
       }
 
+      const searchUrl = `${url}/api/v1/tickets/search?query=${encodeURIComponent(searchQuery)}&page=${page}&per_page=${perPage}&sort_by=updated_at&order_by=asc`;
+      console.log(`Zammad search URL: ${searchUrl}`);
+      console.log(`Zammad search query: ${searchQuery}`);
+
       // Search for tickets
-      const searchResponse = await fetch(
-        `${url}/api/v1/tickets/search?query=${encodeURIComponent(searchQuery)}&page=${page}&per_page=${perPage}&sort_by=updated_at&order_by=asc`,
-        { headers }
-      );
+      const searchResponse = await fetch(searchUrl, { headers });
 
       if (!searchResponse.ok) {
         const errorText = await searchResponse.text();
@@ -37,39 +44,52 @@ export const zammadHandler: SourceHandler = {
       }
 
       const searchData = await searchResponse.json() as any;
-      const tickets = searchData.assets?.Ticket || {};
-      const ticketIds = Object.keys(tickets);
 
-      for (const ticketId of ticketIds) {
-        const ticket = tickets[ticketId];
-        const ticketTime = new Date(ticket.updated_at).getTime() / 1000;
+      // Handle both array response and assets response formats
+      let ticketsArray: any[] = [];
+      if (Array.isArray(searchData)) {
+        ticketsArray = searchData;
+      } else if (searchData.assets?.Ticket) {
+        ticketsArray = Object.values(searchData.assets.Ticket);
+      }
 
-        // Create qupt for ticket update
-        qupts.push({
-          volition_id: source.volition_id,
-          content: formatTicketContent(ticket),
-          source: 'zammad',
-          external_id: `zammad:ticket:${ticket.id}:${ticket.updated_at}`,
-          metadata: {
-            type: 'ticket',
-            ticket_id: ticket.id,
-            ticket_number: ticket.number,
-            title: ticket.title,
-            state: ticket.state,
-            priority: ticket.priority,
-            group: ticket.group,
-            owner: ticket.owner,
-            customer: ticket.customer,
-            url: `${url}/#ticket/zoom/${ticket.id}`
-          },
-          created_at: Math.floor(ticketTime)
-        });
+      console.log(`Zammad search found ${ticketsArray.length} tickets`);
+
+      for (const ticket of ticketsArray) {
+        try {
+          console.log(`Processing ticket #${ticket.number || ticket.id}: ${ticket.title}`);
+          const ticketTime = new Date(ticket.updated_at).getTime() / 1000;
+
+          // Create qupt for ticket update
+          qupts.push({
+            volition_id: source.volition_id,
+            content: formatTicketContent(ticket),
+            source: 'zammad',
+            external_id: `zammad:ticket:${ticket.id}:${ticket.updated_at}`,
+            metadata: {
+              type: 'ticket',
+              ticket_id: ticket.id,
+              ticket_number: ticket.number,
+              title: ticket.title,
+              state: ticket.state_id || ticket.state,
+              priority: ticket.priority_id || ticket.priority,
+              group: ticket.group_id || ticket.group,
+              owner: ticket.owner_id || ticket.owner,
+              customer: ticket.customer_id || ticket.customer,
+              url: `${url}/#ticket/zoom/${ticket.id}`
+            },
+            created_at: Math.floor(ticketTime)
+          });
+          console.log(`Created qupt for ticket #${ticket.number}`);
+        } catch (error) {
+          console.error(`Error processing ticket:`, error, ticket);
+        }
 
         // Fetch articles (comments/replies) if configured
         if (include_articles) {
           try {
             const articlesResponse = await fetch(
-              `${url}/api/v1/ticket_articles/by_ticket/${ticketId}`,
+              `${url}/api/v1/ticket_articles/by_ticket/${ticket.id}`,
               { headers }
             );
 
@@ -106,17 +126,17 @@ export const zammadHandler: SourceHandler = {
               }
             }
           } catch (articleError) {
-            console.error(`Error fetching articles for ticket ${ticketId}:`, articleError);
+            console.error(`Error fetching articles for ticket ${ticket.id}:`, articleError);
             // Continue with other tickets
           }
         }
       }
 
       // Determine next cursor
-      const hasMore = ticketIds.length === perPage;
+      const hasMore = ticketsArray.length === perPage;
       const nextCursor = hasMore ? String(page + 1) : null;
 
-      console.log(`Zammad handler collected ${qupts.length} qupts from ${ticketIds.length} tickets`);
+      console.log(`Zammad handler collected ${qupts.length} qupts from ${ticketsArray.length} tickets`);
       return { qupts, cursor: nextCursor };
     } catch (error) {
       console.error(`Zammad handler error for source ${source.id}:`, error);
