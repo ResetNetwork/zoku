@@ -70,10 +70,31 @@ export const githubHandler: SourceHandler = {
           issueBody = event.payload.issue?.body;
         } else if (event.type === 'IssueCommentEvent') {
           commentBody = event.payload.comment?.body;
-        } else if (event.type === 'PullRequestEvent') {
-          // PR title from event or fetch if needed
-          prTitle = event.payload.pull_request?.title;
-          prBody = event.payload.pull_request?.body;
+        } else if (event.type === 'PullRequestEvent' && event.payload.pull_request?.number) {
+          // Fetch full PR details to get title and body
+          try {
+            const prResponse = await fetch(
+              `https://api.github.com/repos/${owner}/${repo}/pulls/${event.payload.pull_request.number}`,
+              {
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Accept': 'application/vnd.github+json',
+                  'User-Agent': 'Zoku/1.0',
+                  'X-GitHub-Api-Version': '2022-11-28'
+                }
+              }
+            );
+            if (prResponse.ok) {
+              const pr = await prResponse.json();
+              prTitle = pr.title;
+              prBody = pr.body;
+            }
+          } catch (error) {
+            console.warn(`Failed to fetch PR details for #${event.payload.pull_request.number}:`, error);
+            // Fallback to payload data
+            prTitle = event.payload.pull_request?.title || 'Pull Request';
+            prBody = event.payload.pull_request?.body;
+          }
         }
 
         // For commits, enhance the content with commit message title
