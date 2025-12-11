@@ -78,6 +78,27 @@ export const api = {
     return await res.json()
   },
 
+  // Dimensions
+  async listDimensions() {
+    const res = await fetch(`${API_BASE}/dimensions`)
+    const data = await res.json()
+    return data
+  },
+
+  async getVolitionAttributes(volitionId: string) {
+    const res = await fetch(`${API_BASE}/volitions/${volitionId}/attributes`)
+    return await res.json()
+  },
+
+  async setVolitionAttributes(volitionId: string, attributes: Array<{ dimension: string; value: string }>) {
+    const res = await fetch(`${API_BASE}/volitions/${volitionId}/attributes`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ attributes })
+    })
+    return await res.json()
+  },
+
   // Sources
   async listSources(volitionId: string) {
     const res = await fetch(`${API_BASE}/volitions/${volitionId}/sources`)
