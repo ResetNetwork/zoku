@@ -62,42 +62,11 @@ export default function VolitionsList({ onSelectVolition }: VolitionsListProps) 
         ) : (
           <div className="space-y-2">
             {sortedVolitions.map(vol => (
-              <button
+              <VolitionCard
                 key={vol.id}
-                onClick={() => onSelectVolition(vol.id)}
-                className="w-full text-left p-4 bg-gray-100 dark:bg-quantum-700/50 hover:bg-gray-200 dark:hover:bg-quantum-700 rounded-lg border border-gray-300 dark:border-quantum-600 transition-colors"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-lg">{vol.name}</h3>
-                    {vol.description && (
-                      <p className="text-sm text-gray-400 mt-1">{vol.description}</p>
-                    )}
-                    {vol.parent_id && (
-                      <span className="inline-block mt-2 px-2 py-0.5 rounded-full bg-gray-500/20 text-gray-400 text-xs">
-                        Nested
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-4 text-sm text-gray-400">
-                    <div className="text-center">
-                      <div className="text-quantum-400 font-semibold">{vol.entangled_count || 0}</div>
-                      <div className="text-xs">entangled</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-quantum-400 font-semibold">{vol.qupts_count || 0}</div>
-                      <div className="text-xs">qupts</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-quantum-400 font-semibold">{vol.sources_count || 0}</div>
-                      <div className="text-xs">sources</div>
-                    </div>
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                </div>
-              </button>
+                volition={vol}
+                onClick={onSelectVolition}
+              />
             ))}
           </div>
         )}
