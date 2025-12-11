@@ -15,6 +15,36 @@ export default function QuptItem({ qupt, formatRelativeTime, formatDate, getSour
     ? (typeof qupt.metadata === 'string' ? JSON.parse(qupt.metadata) : qupt.metadata)
     : null
 
+  const getGitHubIcon = (eventType: string) => {
+    switch (eventType) {
+      case 'PushEvent':
+        return '←' // Commit/push arrow
+      case 'PullRequestEvent':
+        return '⇄' // PR merge/fork symbol
+      case 'IssuesEvent':
+        return '◆' // Issue diamond
+      case 'IssueCommentEvent':
+        return '💬' // Comment bubble
+      default:
+        return null
+    }
+  }
+
+  const getEventTypeColor = (eventType: string) => {
+    switch (eventType) {
+      case 'PushEvent':
+        return 'text-purple-400'
+      case 'PullRequestEvent':
+        return 'text-green-400'
+      case 'IssuesEvent':
+        return 'text-blue-400'
+      case 'IssueCommentEvent':
+        return 'text-yellow-400'
+      default:
+        return 'text-gray-400'
+    }
+  }
+
   return (
     <div className="bg-gray-100 dark:bg-quantum-700/30 rounded-lg border border-gray-300 dark:border-quantum-600 overflow-hidden">
       <button
@@ -41,9 +71,19 @@ export default function QuptItem({ qupt, formatRelativeTime, formatDate, getSour
               )}
             </div>
             <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
-              <span className={`px-2 py-0.5 rounded-full ${getSourceColor(qupt.source)}`}>
-                {qupt.source}
-              </span>
+              <div className="flex items-center gap-1">
+                <span className={`px-2 py-0.5 rounded-full ${getSourceColor(qupt.source)}`}>
+                  {qupt.source}
+                </span>
+                {metadata?.event_type && qupt.source === 'github' && getGitHubIcon(metadata.event_type) && (
+                  <span
+                    className={`font-semibold ${getEventTypeColor(metadata.event_type)}`}
+                    title={metadata.event_type}
+                  >
+                    {getGitHubIcon(metadata.event_type)}
+                  </span>
+                )}
+              </div>
               <span>•</span>
               <span>{formatRelativeTime(qupt.created_at)}</span>
               <span>•</span>
