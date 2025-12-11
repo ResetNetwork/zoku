@@ -35,17 +35,9 @@ app.get('/health', (c) => {
   return c.json({ status: 'ok', service: 'zoku' });
 });
 
-// Scheduled handler (will implement in Phase 3)
-async function scheduled(
-  event: ScheduledEvent,
-  env: Bindings,
-  ctx: ExecutionContext
-): Promise<void> {
-  console.log('Scheduled handler triggered:', event.cron);
-  // Will implement source collection in Phase 3
-}
+import { handleScheduled } from './scheduled';
 
 export default {
   fetch: app.fetch,
-  scheduled
+  scheduled: handleScheduled
 };
