@@ -100,6 +100,7 @@ Zoku is a project/initiative tracking system inspired by the Quantum Thief trilo
 - `frontend/src/components/QuptItem.tsx` - Expandable activity items with type-specific formatting
 - `frontend/src/lib/api.ts` - API client with TypeScript types
 - `frontend/src/lib/theme.ts` - Theme management (light/dark mode)
+- `frontend/src/lib/notifications.tsx` - Toast notification system (NEW)
 
 ### API Routes
 - `src/api/volitions.ts` - Volition CRUD + matrix + attributes + sources
@@ -363,3 +364,4 @@ add_source({
 - **Navigation**: Clickable metrics, URL routing, direct links to any entity
 - **Counts**: All views show entangled_count, qupts_count, sources_count, children_count
 - **Example Data**: 12 entangled (8 humans, 4 AI agents) + 6 volitions with PASCI assignments
+- **Notifications**: Toast notification system in bottom-right for sync results and system events

@@ -29,3 +29,18 @@
     @apply bg-gray-200 dark:bg-quantum-700 hover:bg-gray-300 dark:hover:bg-quantum-600 text-gray-900 dark:text-gray-200;
   }
 }
+
+@keyframes slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in 0.3s ease-out;
+}

@@ -37,10 +37,12 @@ A project/initiative tracking system inspired by the Quantum Thief trilogy. Stat
 - **Entangled Metadata**: GitHub username, email, role, org, timezone, deal_id (editable)
 - **Deal Integration**: Deal IDs link to deals.reset.tech
 - **Activity Display**: Type-specific icons, expandable details, volition badges
+- **Toast Notifications**: Bottom-right notifications for sync results and system events
 - **Light/Dark Mode**: Theme switching with persistent preference
 - **URL Routing**: Direct links to any page or entity
 - **Smart Sorting**: Volitions by activity, entangled alphabetically
 - **Source Management**: Configure and sync GitHub/Zammad/Google Docs sources
+- **Console Logging**: Detailed logs for all operations
 - **Responsive Design**: Mobile and desktop optimized
 
 ## Development

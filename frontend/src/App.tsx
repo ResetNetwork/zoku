@@ -8,6 +8,7 @@ import EntangledDetail from './components/EntangledDetail'
 import ActivityList from './components/ActivityList'
 import SourcesList from './components/SourcesList'
 import { useTheme } from './lib/theme'
+import { useNotifications } from './lib/notifications'
 import { api } from './lib/api'
 
 type View = 'dashboard' | 'volitions' | 'entangled' | 'activity' | 'sources'
@@ -31,6 +32,7 @@ export default function App() {
   })
   const [syncing, setSyncing] = useState(false)
   const { theme, toggleTheme } = useTheme()
+  const { addNotification } = useNotifications()
   const queryClient = useQueryClient()
 
   // Sync URL with current state
@@ -118,19 +120,32 @@ export default function App() {
 
   const handleSyncAll = async () => {
     setSyncing(true)
+    console.log('🔄 Starting sync for all sources...')
+
     try {
       const allSources = await Promise.all(
         volitions.map(v => api.listSources(v.id))
       )
       const sources = allSources.flat()
-      await Promise.all(sources.map(s => api.syncSource(s.id)))
+      console.log(`📊 Found ${sources.length} source(s) to sync`)
 
-      queryClient.invalidateQueries({ queryKey: ['qupts'] })
-      queryClient.invalidateQueries({ queryKey: ['recent-qupts'] })
-      queryClient.invalidateQueries({ queryKey: ['sources'] })
-      queryClient.invalidateQueries({ queryKey: ['volitions'] })
+      const results = await Promise.all(sources.map(s => api.syncSource(s.id)))
+      const totalQupts = results.reduce((sum, r) => sum + (r.qupts_collected || 0), 0)
+
+      console.log(`✅ Sync complete: ${totalQupts} new qupt(s) collected`)
+
+      // Invalidate all queries to refresh data
+      queryClient.invalidateQueries()
+
+      // Show notification
+      if (totalQupts > 0) {
+        addNotification('success', `Collected ${totalQupts} new activity item${totalQupts === 1 ? '' : 's'}`)
+      } else {
+        addNotification('info', 'Sync complete - no new activity')
+      }
     } catch (error) {
-      console.error('Sync failed:', error)
+      console.error('❌ Sync failed:', error)
+      addNotification('error', 'Sync failed')
     } finally {
       setSyncing(false)
     }
