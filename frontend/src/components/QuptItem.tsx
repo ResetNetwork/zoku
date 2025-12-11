@@ -96,16 +96,27 @@ export default function QuptItem({ qupt, formatRelativeTime, formatDate, getSour
     // GitHub formatting
     if (qupt.source === 'github') {
       if (metadata.event_type === 'PushEvent') {
-        return `${metadata.branch || 'main'} ← ${metadata.commit_sha?.substring(0, 7)}: ${metadata.commit_message || metadata.payload?.commits?.[0]?.message || 'Commit'}`;
+        const branch = metadata.payload?.ref?.replace('refs/heads/', '') || 'main';
+        const sha = metadata.payload?.head?.substring(0, 7) || '???????';
+        const message = metadata.commit_message || 'Commit';
+        return `${branch} ← ${sha}: ${message}`;
       }
       if (metadata.event_type === 'PullRequestEvent') {
-        return `#${metadata.pr_number}: ${metadata.pr_title} [${metadata.action || 'unknown'}]`;
+        const prNumber = metadata.pr_number || metadata.payload?.pull_request?.number;
+        const title = metadata.pr_title || metadata.payload?.pull_request?.title;
+        const action = metadata.action || metadata.payload?.action;
+        return `#${prNumber}: ${title} [${action}]`;
       }
       if (metadata.event_type === 'IssuesEvent') {
-        return `#${metadata.issue_number}: ${metadata.issue_title} [${metadata.action || 'unknown'}]`;
+        const issueNumber = metadata.issue_number || metadata.payload?.issue?.number;
+        const title = metadata.issue_title || metadata.payload?.issue?.title;
+        const action = metadata.action || metadata.payload?.action;
+        return `#${issueNumber}: ${title} [${action}]`;
       }
       if (metadata.event_type === 'IssueCommentEvent') {
-        return `Comment on #${metadata.issue_number} by @${metadata.actor}`;
+        const issueNumber = metadata.issue_number || metadata.payload?.issue?.number;
+        const title = metadata.issue_title || metadata.payload?.issue?.title;
+        return `#${issueNumber}: ${title} [comment]`;
       }
     }
 
