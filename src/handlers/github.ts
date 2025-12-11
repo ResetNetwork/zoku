@@ -128,10 +128,10 @@ function formatEventContent(event: any): string {
       return `PR #${event.payload.pull_request.number} ${event.payload.action} by @${event.actor.login}: ${event.payload.pull_request.title}`;
 
     case 'IssuesEvent':
-      return `Issue #${event.payload.issue.number}: ${event.payload.issue.title} [${event.payload.action}]`;
+      return `#${event.payload.issue.number}: ${event.payload.issue.title} [${event.payload.action}]`;
 
     case 'IssueCommentEvent':
-      return `Issue #${event.payload.issue.number} comment by @${event.actor.login}: ${event.payload.issue.title}`;
+      return `#${event.payload.issue.number}: ${event.payload.issue.title} [comment]`;
 
     case 'CreateEvent':
       return `Created ${event.payload.ref_type} ${event.payload.ref || ''} by @${event.actor.login}`;
