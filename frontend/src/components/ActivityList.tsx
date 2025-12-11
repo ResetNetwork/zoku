@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import QuptItem from './QuptItem'
+import InfoTooltip from './InfoTooltip'
 import type { Qupt } from '../lib/types'
 
 interface ActivityListProps {
@@ -46,7 +47,10 @@ export default function ActivityList({ onBack }: ActivityListProps) {
     <div className="space-y-6">
       {/* Header */}
       <div className="card">
-        <h1 className="text-3xl font-bold text-quantum-400 mb-2">Qupts</h1>
+        <h1 className="text-3xl font-bold text-quantum-400 mb-2 flex items-center">
+          Qupts
+          <InfoTooltip text="Activity records — updates flowing from any source" />
+        </h1>
         <p className="text-gray-400">Activity across all volitions</p>
       </div>
 

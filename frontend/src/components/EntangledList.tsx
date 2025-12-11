@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../lib/api'
+import InfoTooltip from './InfoTooltip'
 
 interface EntangledListProps {
   onSelectEntangled: (id: string) => void
@@ -63,7 +64,10 @@ export default function EntangledList({ onSelectEntangled, onSelectVolition }: E
     <div className="space-y-6">
       {/* Header */}
       <div className="card">
-        <h1 className="text-3xl font-bold text-quantum-400 mb-2">Entangled</h1>
+        <h1 className="text-3xl font-bold text-quantum-400 mb-2 flex items-center">
+          Entangled
+          <InfoTooltip text="Partners and entities doing work (humans and AI agents)" />
+        </h1>
         <p className="text-gray-400">People and AI agents working on volitions</p>
       </div>
 

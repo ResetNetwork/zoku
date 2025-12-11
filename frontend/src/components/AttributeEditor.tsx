@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import { useNotifications } from '../lib/notifications'
+import InfoTooltip from './InfoTooltip'
 
 interface AttributeEditorProps {
   volitionId: string
@@ -86,7 +87,10 @@ export default function AttributeEditor({ volitionId }: AttributeEditorProps) {
     return (
       <div className="card">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold">Dimensions</h2>
+          <h2 className="text-xl font-bold flex items-center">
+            Dimensions
+            <InfoTooltip text="Facets for categorizing volitions (status, function, pillar, service area)" />
+          </h2>
           <button
             onClick={() => setEditing(true)}
             className="btn btn-secondary text-sm"
