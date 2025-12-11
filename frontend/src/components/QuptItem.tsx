@@ -89,8 +89,47 @@ export default function QuptItem({ qupt, formatRelativeTime, formatDate, getSour
     }
   }
 
-  const formatGoogleDriveContent = (metadata: any) => {
-    // Use the content as-is from the handler (already well-formatted)
+  // Format content dynamically from metadata for all sources
+  const formatContent = () => {
+    if (!metadata) return qupt.content;
+
+    // GitHub formatting
+    if (qupt.source === 'github') {
+      if (metadata.event_type === 'PushEvent') {
+        return `${metadata.branch || 'main'} ← ${metadata.commit_sha?.substring(0, 7)}: ${metadata.commit_message || metadata.payload?.commits?.[0]?.message || 'Commit'}`;
+      }
+      if (metadata.event_type === 'PullRequestEvent') {
+        return `#${metadata.pr_number}: ${metadata.pr_title} [${metadata.action || 'unknown'}]`;
+      }
+      if (metadata.event_type === 'IssuesEvent') {
+        return `#${metadata.issue_number}: ${metadata.issue_title} [${metadata.action || 'unknown'}]`;
+      }
+      if (metadata.event_type === 'IssueCommentEvent') {
+        return `Comment on #${metadata.issue_number} by @${metadata.actor}`;
+      }
+    }
+
+    // Zammad formatting
+    if (qupt.source === 'zammad') {
+      if (metadata.type === 'ticket') {
+        return `Ticket #${metadata.ticket_number} [${metadata.state || 'unknown'}]: ${metadata.title}`;
+      }
+      if (metadata.type === 'note' || metadata.type === 'email' || metadata.type === 'phone') {
+        return `${metadata.type} on #${metadata.ticket_number} from ${metadata.from || metadata.sender || 'Unknown'}`;
+      }
+    }
+
+    // Google Drive formatting
+    if (qupt.source === 'gdrive') {
+      if (metadata.type === 'revision') {
+        return `${metadata.document_title}: Edited by ${metadata.modified_by || 'Someone'}`;
+      }
+      if (metadata.type === 'comment') {
+        return `${metadata.document_title}: Comment by ${metadata.author || 'Someone'}`;
+      }
+    }
+
+    // Fallback to stored content
     return qupt.content;
   }
 
@@ -103,7 +142,7 @@ export default function QuptItem({ qupt, formatRelativeTime, formatDate, getSour
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1">
             <div className="flex items-center gap-2">
-              <p className="text-gray-900 dark:text-gray-200 flex-1">{qupt.content}</p>
+              <p className="text-gray-900 dark:text-gray-200 flex-1">{formatContent()}</p>
               {metadata?.url && (
                 <a
                   href={metadata.url}
