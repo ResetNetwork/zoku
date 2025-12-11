@@ -180,20 +180,37 @@ export default function QuptItem({ qupt, formatRelativeTime, formatDate, getSour
 
             {/* Zammad-specific metadata */}
             {qupt.source === 'zammad' && (
-              <div className="space-y-1">
-                {metadata.ticket_number && (
-                  <div className="text-gray-600 dark:text-gray-400">
-                    <span className="font-semibold">Ticket:</span> #{metadata.ticket_number}
+              <div className="space-y-2">
+                <div className="flex items-center gap-3 text-sm">
+                  {metadata.type && (
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                      metadata.type === 'ticket' ? 'bg-blue-500/20 text-blue-400' :
+                      metadata.type === 'note' ? 'bg-yellow-500/20 text-yellow-400' :
+                      metadata.type === 'email' ? 'bg-green-500/20 text-green-400' :
+                      metadata.type === 'phone' ? 'bg-purple-500/20 text-purple-400' :
+                      'bg-gray-500/20 text-gray-400'
+                    }`}>
+                      {metadata.type}
+                    </span>
+                  )}
+                  {metadata.ticket_number && (
+                    <span className="text-gray-600 dark:text-gray-400">
+                      <span className="font-semibold">#{metadata.ticket_number}</span>
+                    </span>
+                  )}
+                </div>
+
+                {metadata.title && metadata.type === 'ticket' && (
+                  <div className="text-gray-700 dark:text-gray-300 mt-2 p-3 bg-gray-100 dark:bg-quantum-900/30 rounded border-l-2 border-blue-500">
+                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Ticket Info:</div>
+                    <div className="text-sm">Title: {metadata.title}</div>
                   </div>
                 )}
-                {metadata.title && (
-                  <div className="text-gray-600 dark:text-gray-400">
-                    <span className="font-semibold">Title:</span> {metadata.title}
-                  </div>
-                )}
-                {metadata.type && (
-                  <div className="text-gray-600 dark:text-gray-400">
-                    <span className="font-semibold">Type:</span> {metadata.type}
+
+                {(metadata.subject || metadata.body) && metadata.type !== 'ticket' && (
+                  <div className="text-gray-700 dark:text-gray-300 mt-2 p-3 bg-gray-100 dark:bg-quantum-900/30 rounded border-l-2 border-yellow-500">
+                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Article Content:</div>
+                    <div className="text-sm whitespace-pre-wrap">{metadata.subject || metadata.body || 'No content'}</div>
                   </div>
                 )}
               </div>

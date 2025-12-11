@@ -158,12 +158,11 @@ function formatTicketContent(ticket: any): string {
     7: 'pending close'
   };
   const state = stateMap[ticket.state_id] || ticket.state || 'open';
-  return `Ticket #${ticket.number} [${state}]: ${ticket.title}`;
+  return `#${ticket.number}: ${ticket.title} [${state}]`;
 }
 
 function formatArticleContent(article: any, ticket: any): string {
   const sender = article.from || article.sender || 'Unknown';
   const type = article.type || 'note';
-  const internal = article.internal ? ' (internal)' : '';
-  return `${type}${internal} on #${ticket.number} from ${sender}`;
+  return `#${ticket.number}: ${ticket.title} [${type}]`;
 }
