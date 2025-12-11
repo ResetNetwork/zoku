@@ -2,9 +2,9 @@ import type { SourceHandler } from './index';
 import type { QuptInput } from '../types';
 import { refreshGoogleAccessToken } from './google-auth';
 
-export const gdocsHandler: SourceHandler = {
+export const gdriveHandler: SourceHandler = {
   async collect({ source, config, credentials, since, cursor }) {
-    const { document_id, track_suggestions = false } = config;
+    const { document_id, track_comments = true } = config;
 
     const qupts: QuptInput[] = [];
 
@@ -65,7 +65,7 @@ export const gdocsHandler: SourceHandler = {
           volition_id: source.volition_id,
           content: formatRevisionContent(revision, docTitle),
           source: 'gdrive',
-          external_id: `gdocs:${document_id}:rev:${revision.id}`,
+          external_id: `gdrive:${document_id}:rev:${revision.id}`,
           metadata: {
             type: 'revision',
             document_id,
@@ -79,11 +79,46 @@ export const gdocsHandler: SourceHandler = {
         });
       }
 
-      // Track suggestions if enabled (simplified - full implementation would need document API)
-      if (track_suggestions) {
-        // Note: Suggestions tracking would require parsing document content
-        // For now, we'll just log that it's not fully implemented
-        console.log(`Suggestions tracking requested for ${document_id} but not yet fully implemented`);
+      // Fetch comments if enabled
+      if (track_comments) {
+        console.log(`📝 Fetching comments for ${document_id}...`);
+        const commentsResponse = await fetch(
+          `https://www.googleapis.com/drive/v3/files/${document_id}/comments?fields=comments(id,content,createdTime,author,resolved,quotedFileContent)&pageSize=100`,
+          { headers }
+        );
+
+        if (commentsResponse.ok) {
+          const commentsData = await commentsResponse.json() as { comments?: any[] };
+
+          for (const comment of commentsData.comments || []) {
+            const commentTime = new Date(comment.createdTime).getTime() / 1000;
+
+            // Skip if before last sync time
+            if (since && commentTime <= since) continue;
+
+            qupts.push({
+              volition_id: source.volition_id,
+              content: formatCommentContent(comment, docTitle),
+              source: 'gdrive',
+              external_id: `gdrive:${document_id}:comment:${comment.id}`,
+              metadata: {
+                type: 'comment',
+                document_id,
+                document_title: docTitle,
+                comment_id: comment.id,
+                author: comment.author?.displayName,
+                author_email: comment.author?.emailAddress,
+                resolved: comment.resolved || false,
+                quoted_content: comment.quotedFileContent?.value,
+                url: `https://docs.google.com/document/d/${document_id}/edit`
+              },
+              created_at: Math.floor(commentTime)
+            });
+          }
+          console.log(`📝 Collected ${commentsData.comments?.length || 0} comments`);
+        } else {
+          console.warn(`Could not fetch comments: ${commentsResponse.status}`);
+        }
       }
 
       // Use highest revision ID as cursor
@@ -91,7 +126,7 @@ export const gdocsHandler: SourceHandler = {
         ? Math.max(...revisionsData.revisions.map((r: any) => parseInt(r.id)))
         : lastProcessedId;
 
-      console.log(`Google Docs handler collected ${qupts.length} qupts for document ${document_id}`);
+      console.log(`Google Drive handler collected ${qupts.length} qupts for document ${document_id} (${revisionsData.revisions?.length || 0} revisions, ${track_comments ? 'comments enabled' : 'comments disabled'})`);
       return { qupts, cursor: String(maxRevisionId) };
     } catch (error) {
       console.error(`Google Docs handler error for source ${source.id}:`, error);
@@ -104,4 +139,10 @@ export const gdocsHandler: SourceHandler = {
 function formatRevisionContent(revision: any, docTitle: string): string {
   const user = revision.lastModifyingUser?.displayName || 'Someone';
   return `${user} edited "${docTitle}"`;
+}
+
+function formatCommentContent(comment: any, docTitle: string): string {
+  const author = comment.author?.displayName || 'Someone';
+  const preview = comment.content.substring(0, 100) + (comment.content.length > 100 ? '...' : '');
+  return `${author} commented on "${docTitle}": ${preview}`;
 }
