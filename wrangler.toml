@@ -1,0 +1,15 @@
+name = "zoku"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+account_id = "16c42d94e589cc74c99aed7d51687cbc"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "zoku"
+database_id = "e4024944-fcdc-420c-86ac-9e35f46e310a"
+
+[assets]
+directory = "./frontend/dist"
+
+[triggers]
+crons = ["*/5 * * * *"]  # Every 5 minutes

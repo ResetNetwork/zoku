@@ -1,0 +1,115 @@
+-- Zoku Database Schema
+
+-- Volitions (projects/initiatives)
+CREATE TABLE IF NOT EXISTS volitions (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT,
+  parent_id TEXT REFERENCES volitions(id) ON DELETE CASCADE,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+
+CREATE INDEX IF NOT EXISTS idx_volitions_parent ON volitions(parent_id);
+
+-- Trigger to update updated_at on volition changes
+CREATE TRIGGER IF NOT EXISTS volitions_updated_at
+AFTER UPDATE ON volitions
+BEGIN
+  UPDATE volitions SET updated_at = unixepoch() WHERE id = NEW.id;
+END;
+
+-- Entangled (humans and AI agents)
+CREATE TABLE IF NOT EXISTS entangled (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('human', 'agent')),
+  metadata TEXT,              -- JSON blob
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+
+-- PASCI responsibility matrix
+CREATE TABLE IF NOT EXISTS volition_entangled (
+  volition_id TEXT NOT NULL REFERENCES volitions(id) ON DELETE CASCADE,
+  entangled_id TEXT NOT NULL REFERENCES entangled(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK (role IN ('perform', 'accountable', 'control', 'support', 'informed')),
+  entangled_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  PRIMARY KEY (volition_id, entangled_id, role)
+);
+
+CREATE INDEX IF NOT EXISTS idx_volition_entangled_volition ON volition_entangled(volition_id);
+
+-- Qupts (activity records)
+CREATE TABLE IF NOT EXISTS qupts (
+  id TEXT PRIMARY KEY,
+  volition_id TEXT NOT NULL REFERENCES volitions(id) ON DELETE CASCADE,
+  entangled_id TEXT REFERENCES entangled(id) ON DELETE SET NULL,
+  content TEXT NOT NULL,
+  source TEXT DEFAULT 'manual',  -- 'manual', 'github', 'gmail', 'zammad', 'gdrive', 'gdocs', 'webhook', 'mcp'
+  external_id TEXT,              -- For deduplication: 'github:{id}', 'gmail:{id}', etc.
+  metadata TEXT,                 -- JSON blob
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+
+CREATE INDEX IF NOT EXISTS idx_qupts_volition ON qupts(volition_id);
+CREATE INDEX IF NOT EXISTS idx_qupts_created ON qupts(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_qupts_external ON qupts(source, external_id) WHERE external_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_qupts_unique_external ON qupts(source, external_id) WHERE external_id IS NOT NULL;
+
+-- Taxonomy dimensions
+CREATE TABLE IF NOT EXISTS dimensions (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,        -- 'function', 'pillar', 'service_area'
+  label TEXT NOT NULL,              -- 'Function', 'Pillar', 'Service Area'
+  description TEXT,
+  allow_multiple INTEGER DEFAULT 0, -- Can volition have multiple values?
+  parent_dimension_id TEXT REFERENCES dimensions(id),
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+
+-- Dimension values
+CREATE TABLE IF NOT EXISTS dimension_values (
+  id TEXT PRIMARY KEY,
+  dimension_id TEXT NOT NULL REFERENCES dimensions(id) ON DELETE CASCADE,
+  value TEXT NOT NULL,              -- 'tech_innovation'
+  label TEXT NOT NULL,              -- 'Technology Innovation'
+  description TEXT,
+  parent_value_id TEXT REFERENCES dimension_values(id),
+  depends_on_value_id TEXT REFERENCES dimension_values(id),
+  sort_order INTEGER DEFAULT 0,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  UNIQUE(dimension_id, value)
+);
+
+CREATE INDEX IF NOT EXISTS idx_dimension_values_dimension ON dimension_values(dimension_id);
+CREATE INDEX IF NOT EXISTS idx_dimension_values_parent ON dimension_values(parent_value_id);
+
+-- Volition attributes (taxonomy assignments)
+CREATE TABLE IF NOT EXISTS volition_attributes (
+  volition_id TEXT NOT NULL REFERENCES volitions(id) ON DELETE CASCADE,
+  dimension_id TEXT NOT NULL REFERENCES dimensions(id) ON DELETE CASCADE,
+  value_id TEXT NOT NULL REFERENCES dimension_values(id) ON DELETE CASCADE,
+  assigned_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  PRIMARY KEY (volition_id, dimension_id, value_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_volition_attributes_volition ON volition_attributes(volition_id);
+CREATE INDEX IF NOT EXISTS idx_volition_attributes_dimension ON volition_attributes(dimension_id);
+CREATE INDEX IF NOT EXISTS idx_volition_attributes_value ON volition_attributes(value_id);
+
+-- Sources (external activity sources)
+CREATE TABLE IF NOT EXISTS sources (
+  id TEXT PRIMARY KEY,
+  volition_id TEXT NOT NULL REFERENCES volitions(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,           -- 'github', 'gmail', 'zammad', 'gdrive', 'gdocs', 'webhook'
+  config TEXT NOT NULL,         -- JSON configuration
+  credentials TEXT,             -- JSON encrypted credentials (tokens, etc.)
+  enabled INTEGER DEFAULT 1,
+  last_sync INTEGER,            -- Last successful sync timestamp
+  sync_cursor TEXT,             -- Pagination cursor for incremental sync
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+
+CREATE INDEX IF NOT EXISTS idx_sources_volition ON sources(volition_id);
+CREATE INDEX IF NOT EXISTS idx_sources_type ON sources(type);
+CREATE INDEX IF NOT EXISTS idx_sources_enabled ON sources(enabled);

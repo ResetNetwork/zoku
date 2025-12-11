@@ -1,0 +1,26 @@
+{
+  "name": "zoku",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "wrangler dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "deploy": "wrangler deploy",
+    "db:migrate": "wrangler d1 execute zoku --file=./schema.sql",
+    "db:migrate:remote": "wrangler d1 execute zoku --file=./schema.sql --remote",
+    "db:seed": "wrangler d1 execute zoku --file=./seed.sql",
+    "db:seed:remote": "wrangler d1 execute zoku --file=./seed.sql --remote",
+    "db:reset": "npm run db:migrate && npm run db:seed",
+    "build:frontend": "cd frontend && npm run build",
+    "build": "npm run build:frontend"
+  },
+  "dependencies": {
+    "hono": "^4.6.14",
+    "@modelcontextprotocol/sdk": "^0.5.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241127.0",
+    "typescript": "^5.7.2",
+    "wrangler": "^3.94.0"
+  }
+}
