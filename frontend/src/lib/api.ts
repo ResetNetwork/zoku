@@ -90,5 +90,52 @@ export const api = {
       method: 'POST'
     })
     return await res.json()
+  },
+
+  // Credentials
+  async listCredentials() {
+    const res = await fetch(`${API_BASE}/credentials`)
+    const data = await res.json()
+    return data.credentials || []
+  },
+
+  async createCredential(credential: { name: string; type: string; data: any }) {
+    console.log('📡 API: Creating credential...', { name: credential.name, type: credential.type })
+    const res = await fetch(`${API_BASE}/credentials`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(credential)
+    })
+    console.log('📡 API: Response status:', res.status)
+    const data = await res.json()
+    console.log('📡 API: Response data:', data)
+    if (data.error) {
+      throw new Error(data.error.message || 'Failed to create credential')
+    }
+    return data
+  },
+
+  async updateCredential(id: string, data: { name?: string; data?: any }) {
+    const res = await fetch(`${API_BASE}/credentials/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    })
+    if (!res.ok) {
+      const error = await res.json()
+      throw new Error(error.error?.message || 'Failed to update credential')
+    }
+    return res.json()
+  },
+
+  async deleteCredential(id: string) {
+    const res = await fetch(`${API_BASE}/credentials/${id}`, {
+      method: 'DELETE'
+    })
+    if (!res.ok) {
+      const error = await res.json()
+      throw new Error(error.error?.message || 'Failed to delete credential')
+    }
+    return res.json()
   }
 }

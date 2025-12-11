@@ -522,6 +522,9 @@ export class DB {
       enabled?: boolean;
       last_sync?: number;
       sync_cursor?: string | null;
+      last_error?: string | null;
+      error_count?: number;
+      last_error_at?: number | null;
     }
   ): Promise<void> {
     const updates: string[] = [];
@@ -546,6 +549,18 @@ export class DB {
     if (data.sync_cursor !== undefined) {
       updates.push('sync_cursor = ?');
       params.push(data.sync_cursor);
+    }
+    if (data.last_error !== undefined) {
+      updates.push('last_error = ?');
+      params.push(data.last_error);
+    }
+    if (data.error_count !== undefined) {
+      updates.push('error_count = ?');
+      params.push(data.error_count);
+    }
+    if (data.last_error_at !== undefined) {
+      updates.push('last_error_at = ?');
+      params.push(data.last_error_at);
     }
 
     if (updates.length > 0) {

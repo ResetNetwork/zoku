@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/api'
+import { useNotifications } from '../lib/notifications'
 import QuptItem from './QuptItem'
+import AddSourceForm from './AddSourceForm'
+import EditSourceForm from './EditSourceForm'
 
 interface VolitionDetailProps {
   volitionId: string
@@ -9,6 +12,10 @@ interface VolitionDetailProps {
 }
 
 export default function VolitionDetail({ volitionId, onBack }: VolitionDetailProps) {
+  const [showAddSource, setShowAddSource] = useState(false)
+  const [editingSource, setEditingSource] = useState<any>(null)
+  const queryClient = useQueryClient()
+  const { addNotification } = useNotifications()
 
   const { data: volition, isLoading } = useQuery({
     queryKey: ['volition', volitionId],
@@ -120,7 +127,44 @@ export default function VolitionDetail({ volitionId, onBack }: VolitionDetailPro
 
       {/* Sources */}
       <div className="card">
-        <h2 className="text-xl font-bold mb-4">Sources</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold">Sources</h2>
+          {!showAddSource && (
+            <button
+              onClick={() => setShowAddSource(true)}
+              className="btn btn-primary text-sm"
+            >
+              + Add Source
+            </button>
+          )}
+        </div>
+
+        {showAddSource && (
+          <div className="mb-4">
+            <AddSourceForm
+              volitionId={volitionId}
+              onSuccess={() => {
+                setShowAddSource(false)
+                queryClient.invalidateQueries({ queryKey: ['sources', volitionId] })
+              }}
+              onCancel={() => setShowAddSource(false)}
+            />
+          </div>
+        )}
+
+        {editingSource && (
+          <div className="mb-4">
+            <EditSourceForm
+              source={editingSource}
+              onSuccess={() => {
+                setEditingSource(null)
+                queryClient.invalidateQueries({ queryKey: ['sources', volitionId] })
+              }}
+              onCancel={() => setEditingSource(null)}
+            />
+          </div>
+        )}
+
         {sources.length === 0 ? (
           <div className="text-gray-400 text-center py-4">No sources configured</div>
         ) : (
@@ -141,14 +185,66 @@ export default function VolitionDetail({ volitionId, onBack }: VolitionDetailPro
                         {config.tag && (
                           <span className="text-sm text-gray-600 dark:text-gray-400">tag: {config.tag}</span>
                         )}
+                        {config.document_id && source.credential?.email && (
+                          <span className="text-sm text-gray-600 dark:text-gray-400">
+                            {source.credential.email}
+                          </span>
+                        )}
                       </div>
-                      {source.last_sync && (
-                        <div className="text-xs text-gray-600 dark:text-gray-500 mt-1">
-                          Last sync: {formatRelativeTime(source.last_sync)}
-                        </div>
-                      )}
+                      <div className="text-xs text-gray-600 dark:text-gray-500 mt-1">
+                        {source.last_error ? (
+                          <span className="text-red-400">Error: {source.last_error}</span>
+                        ) : source.last_sync ? (
+                          source.last_sync < Math.floor(Date.now() / 1000) - (7 * 24 * 60 * 60)
+                            ? 'Queued for initial sync'
+                            : `Last checked: ${formatRelativeTime(source.last_sync)}`
+                        ) : (
+                          'Not yet checked'
+                        )}
+                      </div>
                     </div>
-                    <div className={`w-2 h-2 rounded-full ${source.enabled ? 'bg-green-500' : 'bg-gray-600'}`} />
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          setEditingSource(source)
+                          setShowAddSource(false)
+                        }}
+                        className="p-1 rounded-md hover:bg-quantum-500/20 text-quantum-400 hover:text-quantum-300 transition-colors"
+                        title="Edit source"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (!confirm(`Delete this ${source.type} source?`)) return
+                          try {
+                            await fetch(`/api/sources/${source.id}`, { method: 'DELETE' })
+                            addNotification('success', 'Source deleted')
+                            queryClient.invalidateQueries({ queryKey: ['sources', volitionId] })
+                          } catch (error) {
+                            addNotification('error', 'Failed to delete source')
+                          }
+                        }}
+                        className="p-1 rounded-md hover:bg-red-500/20 text-red-400 hover:text-red-300 transition-colors"
+                        title="Delete source"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                      <div
+                        className={`w-2 h-2 rounded-full ${
+                          source.last_error
+                            ? 'bg-red-500'
+                            : source.enabled
+                            ? 'bg-green-500'
+                            : 'bg-gray-600'
+                        }`}
+                        title={source.last_error || (source.enabled ? 'Active' : 'Disabled')}
+                      />
+                    </div>
                   </div>
                 </div>
               )

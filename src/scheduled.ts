@@ -59,19 +59,38 @@ export async function handleScheduled(
             console.log(`Inserted ${qupts.length} qupts for source ${source.id}`);
           }
 
-          // Update sync state
+          // Update sync state - clear errors on success
           await db.updateSource(source.id, {
             last_sync: Math.floor(Date.now() / 1000),
-            sync_cursor: cursor
+            sync_cursor: cursor,
+            last_error: null,
+            error_count: 0,
+            last_error_at: null
           });
 
           return { source_id: source.id, count: qupts.length, success: true };
         } catch (error) {
           console.error(`Error processing source ${source.id} (${source.type}):`, error);
+
+          // Track error with user-friendly message
+          let errorMessage = error instanceof Error ? error.message : String(error);
+          const currentErrorCount = source.error_count || 0;
+
+          // Clean up Google Docs errors
+          if (errorMessage.includes('403') && errorMessage.includes('does not have permission')) {
+            errorMessage = 'Access denied. Grant access to the Google account and re-sync.';
+          }
+
+          await db.updateSource(source.id, {
+            last_error: errorMessage,
+            error_count: currentErrorCount + 1,
+            last_error_at: Math.floor(Date.now() / 1000)
+          });
+
           // Don't update last_sync on error - will retry next time
           return {
             source_id: source.id,
-            error: error instanceof Error ? error.message : String(error),
+            error: errorMessage,
             success: false
           };
         }

@@ -37,7 +37,11 @@ const schemas = {
   create_volition: z.object({
     name: z.string(),
     description: z.string().optional(),
-    parent_id: z.string().optional()
+    parent_id: z.string().optional(),
+    initial_entangled: z.array(z.object({
+      entangled_id: z.string(),
+      role: z.enum(['perform', 'accountable', 'control', 'support', 'informed'])
+    })).optional()
   }),
 
   update_volition: z.object({
@@ -247,13 +251,25 @@ const tools: Tool[] = [
   },
   {
     name: 'create_volition',
-    description: 'Create a new project/initiative, optionally as a child of another volition',
+    description: 'Create a new project/initiative, optionally as a child of another volition with initial team assignments',
     inputSchema: {
       type: 'object',
       properties: {
         name: { type: 'string', description: 'Name of the volition' },
         description: { type: 'string', description: 'Description of the volition' },
-        parent_id: { type: 'string', description: 'Parent volition ID for nesting' }
+        parent_id: { type: 'string', description: 'Parent volition ID for nesting' },
+        initial_entangled: {
+          type: 'array',
+          description: 'Initial PASCI role assignments (e.g., [{ entangled_id: "ent-1", role: "accountable" }])',
+          items: {
+            type: 'object',
+            properties: {
+              entangled_id: { type: 'string' },
+              role: { type: 'string', enum: ['perform', 'accountable', 'control', 'support', 'informed'] }
+            },
+            required: ['entangled_id', 'role']
+          }
+        }
       },
       required: ['name']
     }
@@ -677,7 +693,23 @@ async function handleToolCall(name: string, args: any, db: DB, encryptionKey: st
 
     case 'create_volition': {
       const input = schemas.create_volition.parse(args);
-      const volition = await db.createVolition(input);
+      const volition = await db.createVolition({
+        name: input.name,
+        description: input.description,
+        parent_id: input.parent_id
+      });
+
+      // Add initial entangled assignments if provided
+      if (input.initial_entangled && Array.isArray(input.initial_entangled)) {
+        for (const assignment of input.initial_entangled) {
+          try {
+            await db.assignToMatrix(volition.id, assignment.entangled_id, assignment.role);
+          } catch (error) {
+            console.warn(`Failed to assign ${assignment.entangled_id} to ${assignment.role}:`, error);
+          }
+        }
+      }
+
       return volition;
     }
 
@@ -884,6 +916,15 @@ async function handleToolCall(name: string, args: any, db: DB, encryptionKey: st
         credentials: input.credentials,
         credential_id: input.credential_id
       });
+
+      // Set initial sync window to last 30 days (ensures at least 20 items for active sources)
+      const thirtyDaysAgo = Math.floor(Date.now() / 1000) - (30 * 24 * 60 * 60);
+      try {
+        await db.updateSource(source.id, { last_sync: thirtyDaysAgo });
+        console.log(`Set initial sync window to last 30 days for source ${source.id}`);
+      } catch (error) {
+        console.warn(`Failed to set initial sync window for source ${source.id}:`, error);
+      }
 
       const response: any = { source };
       if (warnings.length > 0) {

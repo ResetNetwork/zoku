@@ -8,6 +8,7 @@ import quptsRoutes from './api/qupts';
 import sourcesRoutes from './api/sources';
 import dimensionsRoutes from './api/dimensions';
 import credentialsRoutes from './api/credentials';
+import oauthRoutes from './api/oauth';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -21,6 +22,7 @@ app.route('/api/qupts', quptsRoutes);
 app.route('/api/sources', sourcesRoutes);
 app.route('/api/dimensions', dimensionsRoutes);
 app.route('/api/credentials', credentialsRoutes);
+app.route('/api/oauth', oauthRoutes);
 
 // MCP endpoint
 import { mcpHandler } from './mcp/server';

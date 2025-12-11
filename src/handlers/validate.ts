@@ -178,6 +178,9 @@ export async function validateZammadCredential(credentials: any): Promise<Valida
     return { valid: false, warnings, errors };
   }
 
+  // Store URL in metadata for display
+  metadata.url = url;
+
   try {
     // Test connection and authentication
     const response = await fetch(`${url}/api/v1/users/me`, {
@@ -218,12 +221,16 @@ export async function validateZammadCredential(credentials: any): Promise<Valida
  * Validate Zammad source configuration and token
  */
 export async function validateZammadSource(config: any, credentials: any): Promise<ValidationResult> {
-  const { url } = config;
-  const { token } = credentials;
+  const { tag } = config;
+  const { token, url } = credentials;  // URL always comes from credentials now
 
-  // If credentials include URL, use credential validation
-  if (credentials.url) {
-    return validateZammadCredential(credentials);
+  if (!url) {
+    return {
+      valid: false,
+      warnings: [],
+      errors: ['Zammad URL must be stored in credential'],
+      metadata: {}
+    };
   }
 
   const warnings: string[] = [];
@@ -268,6 +275,82 @@ export async function validateZammadSource(config: any, credentials: any): Promi
 /**
  * Validate Google Docs source configuration and credentials
  */
+/**
+ * Validate Google Docs/Drive credentials (OAuth refresh token only)
+ * Uses backend's GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET from environment
+ */
+export async function validateGoogleDocsCredential(credentials: any, clientId: string, clientSecret: string): Promise<ValidationResult> {
+  console.log('🔍 validateGoogleDocsCredential called');
+  const { refresh_token } = credentials;
+
+  const warnings: string[] = [];
+  const errors: string[] = [];
+  const metadata: Record<string, any> = {};
+
+  if (!refresh_token) {
+    errors.push('refresh_token is required');
+    return { valid: false, warnings, errors };
+  }
+
+  if (!clientId || !clientSecret) {
+    errors.push('Google OAuth not configured on backend (missing client_id or client_secret)');
+    return { valid: false, warnings, errors };
+  }
+
+  console.log('🔄 Refreshing Google access token...');
+
+  try {
+    // Test token refresh
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token,
+        grant_type: 'refresh_token'
+      })
+    });
+
+    const tokenData = await tokenResponse.json();
+
+    if (!tokenData.access_token) {
+      errors.push(`Token refresh failed: ${tokenData.error_description || tokenData.error}`);
+      return { valid: false, warnings, errors };
+    }
+
+    metadata.token_type = tokenData.token_type;
+    metadata.scope = tokenData.scope;
+    metadata.expires_in = tokenData.expires_in;
+
+    // Get user info (email) from Google Drive API
+    try {
+      const aboutResponse = await fetch('https://www.googleapis.com/drive/v3/about?fields=user', {
+        headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
+      });
+      if (aboutResponse.ok) {
+        const aboutData = await aboutResponse.json();
+        if (aboutData.user) {
+          metadata.email = aboutData.user.emailAddress;
+          metadata.name = aboutData.user.displayName;
+          console.log('✅ Fetched Google account info:', { email: aboutData.user.emailAddress, name: aboutData.user.displayName });
+        }
+      } else {
+        console.warn('Could not fetch Google account info, status:', aboutResponse.status);
+      }
+    } catch (e) {
+      console.warn('Could not fetch Google account info:', e);
+      // User info is optional, don't fail validation
+    }
+
+    return { valid: true, warnings, errors, metadata };
+
+  } catch (error) {
+    errors.push(`Validation error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    return { valid: false, warnings, errors };
+  }
+}
+
 export async function validateGoogleDocsSource(config: any, credentials: any): Promise<ValidationResult> {
   const { document_id } = config;
   const { client_id, client_secret, refresh_token } = credentials;
@@ -298,6 +381,22 @@ export async function validateGoogleDocsSource(config: any, credentials: any): P
     const tokenData = await tokenResponse.json();
     const accessToken = tokenData.access_token;
 
+    // Get user info from Google Drive API
+    try {
+      const aboutResponse = await fetch('https://www.googleapis.com/drive/v3/about?fields=user', {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+      });
+      if (aboutResponse.ok) {
+        const aboutData = await aboutResponse.json();
+        if (aboutData.user) {
+          metadata.email = aboutData.user.emailAddress;
+          metadata.name = aboutData.user.displayName;
+        }
+      }
+    } catch (e) {
+      // User info is optional
+    }
+
     // Test document access
     const docResponse = await fetch(
       `https://docs.googleapis.com/v1/documents/${document_id}?fields=title`,
@@ -307,16 +406,17 @@ export async function validateGoogleDocsSource(config: any, credentials: any): P
     );
 
     if (!docResponse.ok) {
+      const accountInfo = metadata.email || 'your Google account';
       if (docResponse.status === 404) {
-        errors.push(`Document ${document_id} not found or not accessible`);
-        return { valid: false, warnings, errors };
+        errors.push(`Document not found. The document ID may be incorrect, or ${accountInfo} does not have access.`);
+        return { valid: false, warnings, errors, metadata };
       }
       if (docResponse.status === 403) {
-        errors.push('Insufficient permissions to access this document. Grant access to the document or update OAuth scopes.');
-        return { valid: false, warnings, errors };
+        errors.push(`Access denied. Please share the document with ${accountInfo} or update OAuth scopes.`);
+        return { valid: false, warnings, errors, metadata };
       }
       errors.push(`Google Docs API error: ${docResponse.status}`);
-      return { valid: false, warnings, errors };
+      return { valid: false, warnings, errors, metadata };
     }
 
     const doc = await docResponse.json();

@@ -132,6 +132,19 @@ app.post('/', async (c) => {
     parent_id: body.parent_id
   });
 
+  // Add initial entangled assignments if provided
+  if (body.initial_entangled && Array.isArray(body.initial_entangled)) {
+    for (const assignment of body.initial_entangled) {
+      if (assignment.entangled_id && assignment.role) {
+        try {
+          await db.assignToMatrix(volition.id, assignment.entangled_id, assignment.role);
+        } catch (error) {
+          console.warn(`Failed to assign ${assignment.entangled_id} to ${assignment.role}:`, error);
+        }
+      }
+    }
+  }
+
   return c.json(volition, 201);
 });
 
@@ -392,18 +405,42 @@ app.get('/:id/sources', async (c) => {
 
   const sources = await db.listSources(id);
 
-  // Don't expose credentials
-  const sanitizedSources = sources.map(s => ({
-    id: s.id,
-    volition_id: s.volition_id,
-    type: s.type,
-    config: s.config,
-    enabled: s.enabled,
-    last_sync: s.last_sync,
-    created_at: s.created_at
+  // Enrich with credential info (without exposing encrypted data)
+  const enriched = await Promise.all(sources.map(async (s) => {
+    let credentialInfo = null;
+
+    if (s.credential_id) {
+      const credential = await db.getCredential(s.credential_id);
+      if (credential) {
+        const validationMetadata = credential.validation_metadata
+          ? JSON.parse(credential.validation_metadata)
+          : {};
+
+        credentialInfo = {
+          id: credential.id,
+          name: credential.name,
+          email: validationMetadata.email || validationMetadata.authenticated_as || null
+        };
+      }
+    }
+
+    return {
+      id: s.id,
+      volition_id: s.volition_id,
+      type: s.type,
+      config: s.config,
+      enabled: s.enabled,
+      last_sync: s.last_sync,
+      sync_cursor: s.sync_cursor,
+      last_error: s.last_error,
+      error_count: s.error_count,
+      last_error_at: s.last_error_at,
+      created_at: s.created_at,
+      credential: credentialInfo
+    };
   }));
 
-  return c.json({ sources: sanitizedSources });
+  return c.json({ sources: enriched });
 });
 
 // Add source to volition
@@ -425,7 +462,7 @@ app.post('/:id/sources', async (c) => {
   const warnings: string[] = [];
   let validationMetadata: Record<string, any> = {};
 
-  // If credential_id is provided, verify it exists and matches type
+  // If credential_id is provided, verify it exists, matches type, and has access to the resource
   if (body.credential_id) {
     const credential = await db.getCredential(body.credential_id);
     if (!credential) {
@@ -440,6 +477,64 @@ app.post('/:id/sources', async (c) => {
           message: `Credential type mismatch: credential is ${credential.type}, source is ${body.type}`
         }
       }, 400);
+    }
+
+    // Validate source access with the credential
+    const { decryptCredentials } = await import('../lib/crypto');
+    const decryptedCreds = JSON.parse(await decryptCredentials(credential.data, c.env.ENCRYPTION_KEY));
+
+    // Validate access to the specific resource
+    const { validateGitHubSource, validateZammadSource, validateGoogleDocsSource } = await import('../handlers/validate');
+
+    console.log(`🔍 Validating ${body.type} source access for document_id:`, body.config.document_id);
+
+    let accessValidation;
+    try {
+      switch (body.type) {
+        case 'github':
+          accessValidation = await validateGitHubSource(body.config, decryptedCreds);
+          break;
+        case 'zammad':
+          accessValidation = await validateZammadSource(body.config, decryptedCreds);
+          break;
+        case 'gdocs':
+          console.log('🔍 Calling validateGoogleDocsSource...');
+          accessValidation = await validateGoogleDocsSource(body.config, decryptedCreds);
+          console.log('✅ Validation result:', {
+            valid: accessValidation.valid,
+            errors: accessValidation.errors,
+            warnings: accessValidation.warnings,
+            metadata: accessValidation.metadata
+          });
+          break;
+      }
+
+      if (accessValidation && !accessValidation.valid) {
+        console.log('❌ Validation failed, blocking source creation');
+
+        // Get account info from validation metadata
+        let accountInfo = '';
+        if (credential.validation_metadata) {
+          const metadata = JSON.parse(credential.validation_metadata);
+          accountInfo = metadata.authenticated_as || metadata.email || 'the credential';
+        }
+
+        return c.json({
+          error: {
+            code: 'ACCESS_DENIED',
+            message: `Cannot access this resource. Please ensure ${accountInfo} has permission to access it.`,
+            details: accessValidation.errors
+          }
+        }, 403);
+      }
+
+      if (accessValidation && accessValidation.valid) {
+        warnings.push(...accessValidation.warnings);
+        validationMetadata = accessValidation.metadata || {};
+      }
+    } catch (error) {
+      console.error('Source validation error:', error);
+      warnings.push(`Could not validate access: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   } else if (body.credentials) {
     const { validateGitHubSource, validateZammadSource, validateGoogleDocsSource } = await import('../handlers/validate');
@@ -491,6 +586,15 @@ app.post('/:id/sources', async (c) => {
     credentials: credentials ? { encrypted: credentials } : undefined,
     credential_id: body.credential_id
   });
+
+  // Trigger initial sync to pull last 30 days of activity (ensures at least 20 items for active sources)
+  const thirtyDaysAgo = Math.floor(Date.now() / 1000) - (30 * 24 * 60 * 60);
+  try {
+    await db.updateSource(source.id, { last_sync: thirtyDaysAgo });
+    console.log(`Set initial sync window to last 30 days for source ${source.id}`);
+  } catch (error) {
+    console.warn(`Failed to set initial sync window for source ${source.id}:`, error);
+  }
 
   // Return response with validation warnings if any
   const response: any = {

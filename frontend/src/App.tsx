@@ -7,17 +7,18 @@ import EntangledList from './components/EntangledList'
 import EntangledDetail from './components/EntangledDetail'
 import ActivityList from './components/ActivityList'
 import SourcesList from './components/SourcesList'
+import CredentialsList from './components/CredentialsList'
 import { useTheme } from './lib/theme'
 import { useNotifications } from './lib/notifications'
 import { api } from './lib/api'
 
-type View = 'dashboard' | 'volitions' | 'entangled' | 'activity' | 'sources'
+type View = 'dashboard' | 'volitions' | 'entangled' | 'activity' | 'sources' | 'credentials'
 
 export default function App() {
   const [currentView, setCurrentView] = useState<View>(() => {
     const params = new URLSearchParams(window.location.search)
     const view = params.get('view')
-    if (view === 'volitions' || view === 'entangled' || view === 'activity' || view === 'sources') {
+    if (view === 'volitions' || view === 'entangled' || view === 'activity' || view === 'sources' || view === 'credentials') {
       return view
     }
     return 'dashboard'
@@ -56,7 +57,7 @@ export default function App() {
       setSelectedVolitionId(params.get('volition'))
       setSelectedEntangledId(params.get('entangled'))
       const view = params.get('view')
-      if (view === 'volitions' || view === 'entangled' || view === 'activity' || view === 'sources') {
+      if (view === 'volitions' || view === 'entangled' || view === 'activity' || view === 'sources' || view === 'credentials') {
         setCurrentView(view)
       } else {
         setCurrentView('dashboard')
@@ -113,6 +114,12 @@ export default function App() {
     setSelectedEntangledId(null)
   }
 
+  const handleShowCredentialsList = () => {
+    setCurrentView('credentials')
+    setSelectedVolitionId(null)
+    setSelectedEntangledId(null)
+  }
+
   const { data: volitions = [] } = useQuery({
     queryKey: ['volitions'],
     queryFn: () => api.listVolitions({ root_only: true, limit: 50 })
@@ -131,17 +138,26 @@ export default function App() {
 
       const results = await Promise.all(sources.map(s => api.syncSource(s.id)))
       const totalQupts = results.reduce((sum, r) => sum + (r.qupts_collected || 0), 0)
+      const successCount = results.filter(r => r.success !== false).length
+      const errorCount = sources.length - successCount
 
-      console.log(`✅ Sync complete: ${totalQupts} new qupt(s) collected`)
+      console.log(`✅ Sync complete: ${totalQupts} item(s) processed, ${successCount} succeeded, ${errorCount} failed`)
 
       // Invalidate all queries to refresh data
       queryClient.invalidateQueries()
 
-      // Show notification
-      if (totalQupts > 0) {
-        addNotification('success', `Collected ${totalQupts} new activity item${totalQupts === 1 ? '' : 's'}`)
+      // Build informative notification message
+      let message = `Synced ${sources.length} source${sources.length === 1 ? '' : 's'}`
+
+      if (errorCount > 0) {
+        message += ` (${errorCount} failed)`
+        addNotification('error', message)
+      } else if (totalQupts > 0) {
+        message += ` - checked for updates`
+        addNotification('success', message)
       } else {
-        addNotification('info', 'Sync complete - no new activity')
+        message += ` - no new activity`
+        addNotification('info', message)
       }
     } catch (error) {
       console.error('❌ Sync failed:', error)
@@ -213,11 +229,16 @@ export default function App() {
         ) : currentView === 'volitions' ? (
           <VolitionsList onSelectVolition={handleSelectVolition} />
         ) : currentView === 'entangled' ? (
-          <EntangledList onSelectEntangled={handleSelectEntangled} />
+          <EntangledList
+            onSelectEntangled={handleSelectEntangled}
+            onSelectVolition={handleSelectVolition}
+          />
         ) : currentView === 'activity' ? (
           <ActivityList onBack={handleShowDashboard} />
         ) : currentView === 'sources' ? (
           <SourcesList onBack={handleShowDashboard} />
+        ) : currentView === 'credentials' ? (
+          <CredentialsList onBack={handleShowDashboard} />
         ) : (
           <Dashboard
             onSelectVolition={handleSelectVolition}
@@ -225,6 +246,7 @@ export default function App() {
             onShowEntangledList={handleShowEntangledList}
             onShowActivityList={handleShowActivityList}
             onShowSourcesList={handleShowSourcesList}
+            onShowCredentialsList={handleShowCredentialsList}
           />
         )}
       </main>

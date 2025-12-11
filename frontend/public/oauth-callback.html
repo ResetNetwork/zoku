@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OAuth Callback</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-center;
+      height: 100vh;
+      margin: 0;
+      background: #0a0e1a;
+      color: #fff;
+    }
+    .message {
+      text-align: center;
+    }
+    .spinner {
+      border: 3px solid #374151;
+      border-top: 3px solid #6366f1;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="message">
+    <div class="spinner"></div>
+    <h2>Completing authorization...</h2>
+    <p>You can close this window.</p>
+  </div>
+
+  <script>
+    // Extract tokens from URL hash
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const tokens = {
+      refresh_token: hashParams.get('refresh_token'),
+      access_token: hashParams.get('access_token'),
+      expires_in: hashParams.get('expires_in'),
+      scope: hashParams.get('scope'),
+      state: hashParams.get('state')
+    };
+
+    // Send tokens to parent window
+    if (window.opener) {
+      window.opener.postMessage({
+        type: 'google-oauth-callback',
+        tokens
+      }, window.location.origin);
+
+      // Close popup after sending message
+      setTimeout(() => {
+        window.close();
+      }, 1000);
+    } else {
+      document.querySelector('.message').innerHTML =
+        '<h2>Authorization Complete</h2><p>Please close this window and return to the app.</p>';
+    }
+  </script>
+</body>
+</html>

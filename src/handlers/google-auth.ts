@@ -5,6 +5,10 @@ export async function refreshGoogleAccessToken(credentials: {
   client_secret: string;
   refresh_token: string;
 }): Promise<string> {
+  if (!credentials.client_id || !credentials.client_secret || !credentials.refresh_token) {
+    throw new Error('Google OAuth credentials must include client_id, client_secret, and refresh_token');
+  }
+
   const response = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },

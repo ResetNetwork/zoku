@@ -64,4 +64,12 @@ export interface Source {
   config: any
   enabled: number
   last_sync?: number | null
+  last_error?: string | null
+  error_count?: number
+  last_error_at?: number | null
+  credential?: {
+    id: string
+    name: string
+    email: string | null
+  } | null
 }

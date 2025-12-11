@@ -10,6 +10,7 @@ interface DashboardProps {
   onShowEntangledList?: () => void
   onShowActivityList?: () => void
   onShowSourcesList?: () => void
+  onShowCredentialsList?: () => void
 }
 
 export default function Dashboard({
@@ -17,7 +18,8 @@ export default function Dashboard({
   onShowVolitionsList,
   onShowEntangledList,
   onShowActivityList,
-  onShowSourcesList
+  onShowSourcesList,
+  onShowCredentialsList
 }: DashboardProps) {
   const { data: volitions = [], isLoading: volitionsLoading } = useQuery({
     queryKey: ['volitions'],
@@ -27,6 +29,11 @@ export default function Dashboard({
   const { data: entangled = [] } = useQuery({
     queryKey: ['entangled'],
     queryFn: () => api.listEntangled()
+  })
+
+  const { data: credentials = [] } = useQuery({
+    queryKey: ['credentials'],
+    queryFn: () => api.listCredentials()
   })
 
   const { data: recentQupts = [], isLoading: quptsLoading } = useQuery({
@@ -80,7 +87,7 @@ export default function Dashboard({
   return (
     <div className="space-y-8">
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <button
           onClick={onShowVolitionsList}
           className="card hover:bg-gray-200 dark:hover:bg-quantum-700/70 transition-colors cursor-pointer text-left"
@@ -94,6 +101,13 @@ export default function Dashboard({
         >
           <div className="text-sm text-gray-400 mb-1">Total Entangled</div>
           <div className="text-3xl font-bold text-quantum-400">{entangled.length}</div>
+        </button>
+        <button
+          onClick={onShowCredentialsList}
+          className="card hover:bg-gray-200 dark:hover:bg-quantum-700/70 transition-colors cursor-pointer text-left"
+        >
+          <div className="text-sm text-gray-400 mb-1">Credentials</div>
+          <div className="text-3xl font-bold text-quantum-400">{credentials.length}</div>
         </button>
         <button
           onClick={onShowActivityList}

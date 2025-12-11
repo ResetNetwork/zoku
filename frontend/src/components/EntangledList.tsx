@@ -4,9 +4,10 @@ import { api } from '../lib/api'
 
 interface EntangledListProps {
   onSelectEntangled: (id: string) => void
+  onSelectVolition: (id: string) => void
 }
 
-export default function EntangledList({ onSelectEntangled }: EntangledListProps) {
+export default function EntangledList({ onSelectEntangled, onSelectVolition }: EntangledListProps) {
   const [showAllMatrix, setShowAllMatrix] = useState(false)
 
   const { data: entangled = [], isLoading } = useQuery({
@@ -112,8 +113,13 @@ export default function EntangledList({ onSelectEntangled }: EntangledListProps)
                   key={volition_id}
                   className="border-b border-gray-200 dark:border-quantum-700 hover:bg-gray-50 dark:hover:bg-quantum-800/30"
                 >
-                  <td className="p-3 font-medium text-gray-900 dark:text-gray-100">
-                    {volition_name}
+                  <td className="p-3">
+                    <button
+                      onClick={() => onSelectVolition(volition_id)}
+                      className="font-medium text-quantum-500 hover:text-quantum-400 transition-colors text-left"
+                    >
+                      {volition_name}
+                    </button>
                   </td>
                   {pasciRoles.map(role => {
                     const entities = matrix[role.key as keyof typeof matrix] || []

@@ -9,7 +9,11 @@ export const gdocsHandler: SourceHandler = {
     const qupts: QuptInput[] = [];
 
     try {
+      console.log(`📄 Fetching Google Doc: ${document_id}`);
+
+      // Credentials now include client_id and client_secret from user's Google Cloud project
       const accessToken = await refreshGoogleAccessToken(credentials);
+      console.log('✅ Got access token');
 
       const headers = {
         'Authorization': `Bearer ${accessToken}`,
@@ -22,8 +26,11 @@ export const gdocsHandler: SourceHandler = {
         { headers }
       );
 
+      console.log(`📡 Document fetch status: ${docResponse.status}`);
+
       if (!docResponse.ok) {
         const errorText = await docResponse.text();
+        console.error(`❌ Google Docs API error (${docResponse.status}):`, errorText);
         throw new Error(`Google Docs API error (${docResponse.status}): ${errorText}`);
       }
 
@@ -88,8 +95,8 @@ export const gdocsHandler: SourceHandler = {
       return { qupts, cursor: String(maxRevisionId) };
     } catch (error) {
       console.error(`Google Docs handler error for source ${source.id}:`, error);
-      // Return empty results, will retry on next cron
-      return { qupts: [], cursor: null };
+      // Re-throw so sync endpoint can catch and store the error
+      throw error;
     }
   }
 };

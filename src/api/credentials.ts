@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { DB } from '../db';
 import type { Bindings } from '../types';
 import { encryptCredentials, decryptCredentials } from '../lib/crypto';
-import { validateGitHubCredential, validateZammadCredential, validateGoogleDocsSource } from '../handlers/validate';
+import { validateGitHubCredential, validateZammadCredential, validateGoogleDocsCredential } from '../handlers/validate';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -61,7 +61,11 @@ app.post('/', async (c) => {
         validationResult = await validateZammadCredential(body.data);
         break;
       case 'gdocs':
-        validationResult = await validateGoogleDocsSource({ document_id: body.data.test_document_id || '' }, body.data);
+        validationResult = await validateGoogleDocsCredential(
+          body.data,
+          body.data.client_id,
+          body.data.client_secret
+        );
         break;
       default:
         // Other types don't have validation yet
@@ -172,7 +176,11 @@ app.patch('/:id', async (c) => {
           validationResult = await validateZammadCredential(body.data);
           break;
         case 'gdocs':
-          validationResult = await validateGoogleDocsSource({ document_id: body.data.test_document_id || '' }, body.data);
+          validationResult = await validateGoogleDocsCredential(
+            body.data,
+            body.data.client_id,
+            body.data.client_secret
+          );
           break;
       }
 
@@ -198,12 +206,57 @@ app.patch('/:id', async (c) => {
     const encrypted = await encryptCredentials(JSON.stringify(body.data), c.env.ENCRYPTION_KEY);
     updates.data = encrypted;
     updates.last_validated = Math.floor(Date.now() / 1000);
+    // Store as object, not stringified - DB layer handles serialization
     updates.validation_metadata = validationMetadata;
+
+    console.log('💾 Saving validation metadata:', validationMetadata);
   }
 
   await db.updateCredential(id, updates);
 
   return c.json({ success: true });
+});
+
+// Re-authorize Google credential (uses existing client_id/secret)
+app.post('/:id/reauthorize', async (c) => {
+  const db = new DB(c.env.DB);
+  const id = c.req.param('id');
+
+  const credential = await db.getCredential(id);
+  if (!credential) {
+    return c.json({ error: { code: 'NOT_FOUND', message: 'Credential not found' } }, 404);
+  }
+
+  if (credential.type !== 'gdocs') {
+    return c.json({
+      error: { code: 'INVALID_TYPE', message: 'Re-authorization only supported for Google Drive credentials' }
+    }, 400);
+  }
+
+  // Decrypt existing credential to get client_id/secret
+  const decrypted = JSON.parse(await decryptCredentials(credential.data, c.env.ENCRYPTION_KEY));
+
+  // Generate OAuth URL using existing credentials
+  const state = JSON.stringify({
+    nonce: crypto.randomUUID(),
+    client_id: decrypted.client_id,
+    client_secret: decrypted.client_secret,
+    credential_id: id  // Track which credential this is for
+  });
+
+  const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+  authUrl.searchParams.set('client_id', decrypted.client_id);
+  authUrl.searchParams.set('redirect_uri', `${new URL(c.req.url).origin}/api/oauth/google/callback`);
+  authUrl.searchParams.set('response_type', 'code');
+  authUrl.searchParams.set('scope', 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/documents.readonly');
+  authUrl.searchParams.set('access_type', 'offline');
+  authUrl.searchParams.set('prompt', 'consent');
+  authUrl.searchParams.set('state', btoa(state));
+
+  return c.json({
+    authorization_url: authUrl.toString(),
+    state: btoa(state)
+  });
 });
 
 // Delete credential
