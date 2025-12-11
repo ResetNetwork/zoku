@@ -69,5 +69,12 @@ export const api = {
     const res = await fetch(`${API_BASE}/volitions/${volitionId}/sources`)
     const data = await res.json()
     return data.sources as Source[]
+  },
+
+  async syncSource(sourceId: string) {
+    const res = await fetch(`${API_BASE}/sources/${sourceId}/sync`, {
+      method: 'POST'
+    })
+    return await res.json()
   }
 }

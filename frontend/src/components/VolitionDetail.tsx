@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import QuptItem from './QuptItem'
 
@@ -8,6 +9,9 @@ interface VolitionDetailProps {
 }
 
 export default function VolitionDetail({ volitionId, onBack }: VolitionDetailProps) {
+  const queryClient = useQueryClient()
+  const [syncingSource, setSyncingSource] = useState<string | null>(null)
+
   const { data: volition, isLoading } = useQuery({
     queryKey: ['volition', volitionId],
     queryFn: () => api.getVolition(volitionId, false)
@@ -30,6 +34,21 @@ export default function VolitionDetail({ volitionId, onBack }: VolitionDetailPro
 
   const formatDate = (timestamp: number) => {
     return new Date(timestamp * 1000).toLocaleString()
+  }
+
+  const handleSyncSource = async (sourceId: string) => {
+    setSyncingSource(sourceId)
+    try {
+      await api.syncSource(sourceId)
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries({ queryKey: ['qupts', volitionId] })
+      queryClient.invalidateQueries({ queryKey: ['sources', volitionId] })
+      queryClient.invalidateQueries({ queryKey: ['recent-qupts'] })
+    } catch (error) {
+      console.error('Sync failed:', error)
+    } finally {
+      setSyncingSource(null)
+    }
   }
 
   const formatRelativeTime = (timestamp: number) => {
@@ -125,26 +144,35 @@ export default function VolitionDetail({ volitionId, onBack }: VolitionDetailPro
               const config = typeof source.config === 'string' ? JSON.parse(source.config) : source.config
               return (
                 <div key={source.id} className="p-3 bg-gray-100 dark:bg-quantum-700/30 rounded-lg border border-gray-300 dark:border-quantum-600">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-3">
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <span className={`px-2 py-0.5 text-xs rounded-full ${getSourceColor(source.type)}`}>
                           {source.type}
                         </span>
                         {config.owner && config.repo && (
-                          <span className="text-sm text-gray-300">{config.owner}/{config.repo}</span>
+                          <span className="text-sm text-gray-700 dark:text-gray-300">{config.owner}/{config.repo}</span>
                         )}
                         {config.tag && (
-                          <span className="text-sm text-gray-400">tag: {config.tag}</span>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">tag: {config.tag}</span>
                         )}
                       </div>
                       {source.last_sync && (
-                        <div className="text-xs text-gray-600 mt-1">
+                        <div className="text-xs text-gray-600 dark:text-gray-500 mt-1">
                           Last sync: {formatRelativeTime(source.last_sync)}
                         </div>
                       )}
                     </div>
-                    <div className={`w-2 h-2 rounded-full ${source.enabled ? 'bg-green-500' : 'bg-gray-600'}`} />
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleSyncSource(source.id)}
+                        disabled={syncingSource === source.id}
+                        className="px-3 py-1 text-xs bg-quantum-500 hover:bg-quantum-400 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md transition-colors"
+                      >
+                        {syncingSource === source.id ? 'Syncing...' : 'Sync Now'}
+                      </button>
+                      <div className={`w-2 h-2 rounded-full ${source.enabled ? 'bg-green-500' : 'bg-gray-600'}`} />
+                    </div>
                   </div>
                 </div>
               )
