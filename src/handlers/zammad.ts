@@ -71,6 +71,8 @@ export const zammadHandler: SourceHandler = {
               ticket_id: ticket.id,
               ticket_number: ticket.number,
               title: ticket.title,
+              note: ticket.note,
+              body: ticket.note || ticket.body,
               state: ticket.state_id || ticket.state,
               priority: ticket.priority_id || ticket.priority,
               group: ticket.group_id || ticket.group,

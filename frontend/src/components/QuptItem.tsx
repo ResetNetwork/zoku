@@ -200,10 +200,10 @@ export default function QuptItem({ qupt, formatRelativeTime, formatDate, getSour
                   )}
                 </div>
 
-                {metadata.title && metadata.type === 'ticket' && (
+                {(metadata.body || metadata.note) && metadata.type === 'ticket' && (
                   <div className="text-gray-700 dark:text-gray-300 mt-2 p-3 bg-gray-100 dark:bg-quantum-900/30 rounded border-l-2 border-blue-500">
-                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Ticket Info:</div>
-                    <div className="text-sm">Title: {metadata.title}</div>
+                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Ticket Description:</div>
+                    <div className="text-sm whitespace-pre-wrap">{metadata.body || metadata.note}</div>
                   </div>
                 )}
 
