@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../lib/api'
+import QuptItem from './QuptItem'
 
 interface VolitionDetailProps {
   volitionId: string
@@ -19,7 +20,7 @@ export default function VolitionDetail({ volitionId, onBack }: VolitionDetailPro
 
   const { data: qupts = [], isLoading: quptsLoading } = useQuery({
     queryKey: ['qupts', volitionId],
-    queryFn: () => api.listQupts(volitionId, { limit: 50 })
+    queryFn: () => api.listQupts(volitionId, { limit: 50, detailed: true })
   })
 
   const { data: sources = [] } = useQuery({
@@ -162,18 +163,13 @@ export default function VolitionDetail({ volitionId, onBack }: VolitionDetailPro
         ) : (
           <div className="space-y-2">
             {qupts.map(qupt => (
-              <div key={qupt.id} className="p-3 bg-gray-100 dark:bg-quantum-700/30 rounded-lg border border-gray-300 dark:border-quantum-600">
-                <p className="text-gray-900 dark:text-gray-200">{qupt.content}</p>
-                <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
-                  <span className={`px-2 py-0.5 rounded-full ${getSourceColor(qupt.source)}`}>
-                    {qupt.source}
-                  </span>
-                  <span>•</span>
-                  <span>{formatRelativeTime(qupt.created_at)}</span>
-                  <span>•</span>
-                  <span className="text-gray-600">{formatDate(qupt.created_at)}</span>
-                </div>
-              </div>
+              <QuptItem
+                key={qupt.id}
+                qupt={qupt}
+                formatRelativeTime={formatRelativeTime}
+                formatDate={formatDate}
+                getSourceColor={getSourceColor}
+              />
             ))}
           </div>
         )}

@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import type { Volition, Qupt } from '../lib/types'
+import QuptItem from './QuptItem'
 
 interface DashboardProps {
   onSelectVolition: (id: string) => void
@@ -18,7 +20,7 @@ export default function Dashboard({ onSelectVolition }: DashboardProps) {
       if (volitions.length === 0) return []
       const allQupts: Qupt[] = []
       for (const vol of volitions.slice(0, 3)) {
-        const qupts = await api.listQupts(vol.id, { limit: 10 })
+        const qupts = await api.listQupts(vol.id, { limit: 10, detailed: true })
         allQupts.push(...qupts)
       }
       return allQupts.sort((a, b) => b.created_at - a.created_at).slice(0, 20)
@@ -119,22 +121,13 @@ export default function Dashboard({ onSelectVolition }: DashboardProps) {
         ) : (
           <div className="space-y-3">
             {recentQupts.map(qupt => (
-              <div key={qupt.id} className="p-3 bg-gray-100 dark:bg-quantum-700/30 rounded-lg border border-gray-300 dark:border-quantum-600">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1">
-                    <p className="text-gray-900 dark:text-gray-200">{qupt.content}</p>
-                    <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
-                      <span className={`px-2 py-0.5 rounded-full ${getSourceColor(qupt.source)}`}>
-                        {qupt.source}
-                      </span>
-                      <span>•</span>
-                      <span>{formatRelativeTime(qupt.created_at)}</span>
-                      <span>•</span>
-                      <span className="text-gray-600">{formatDate(qupt.created_at)}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <QuptItem
+                key={qupt.id}
+                qupt={qupt}
+                formatRelativeTime={formatRelativeTime}
+                formatDate={formatDate}
+                getSourceColor={getSourceColor}
+              />
             ))}
           </div>
         )}

@@ -1,0 +1,173 @@
+import { useState } from 'react'
+import type { Qupt } from '../lib/types'
+
+interface QuptItemProps {
+  qupt: Qupt
+  formatRelativeTime: (timestamp: number) => string
+  formatDate: (timestamp: number) => string
+  getSourceColor: (source: string) => string
+}
+
+export default function QuptItem({ qupt, formatRelativeTime, formatDate, getSourceColor }: QuptItemProps) {
+  const [expanded, setExpanded] = useState(false)
+
+  const metadata = qupt.metadata
+    ? (typeof qupt.metadata === 'string' ? JSON.parse(qupt.metadata) : qupt.metadata)
+    : null
+
+  return (
+    <div className="bg-gray-100 dark:bg-quantum-700/30 rounded-lg border border-gray-300 dark:border-quantum-600 overflow-hidden">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full p-3 text-left hover:bg-gray-200 dark:hover:bg-quantum-700/50 transition-colors"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <p className="text-gray-900 dark:text-gray-200 flex-1">{qupt.content}</p>
+              {metadata?.url && (
+                <a
+                  href={metadata.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-gray-400 hover:text-quantum-500 transition-colors flex-shrink-0"
+                  title="View source"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                </a>
+              )}
+            </div>
+            <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
+              <span className={`px-2 py-0.5 rounded-full ${getSourceColor(qupt.source)}`}>
+                {qupt.source}
+              </span>
+              <span>•</span>
+              <span>{formatRelativeTime(qupt.created_at)}</span>
+              <span>•</span>
+              <span className="text-gray-600 dark:text-gray-500">{formatDate(qupt.created_at)}</span>
+            </div>
+          </div>
+          <svg
+            className={`w-5 h-5 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </button>
+
+      {expanded && metadata && (
+        <div className="px-3 pb-3 border-t border-gray-300 dark:border-quantum-600 pt-3 mt-0">
+          <div className="text-sm space-y-2">
+            {/* GitHub-specific metadata */}
+            {qupt.source === 'github' && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-3 text-sm">
+                  {metadata.event_type && (
+                    <span className="text-gray-600 dark:text-gray-400">
+                      <span className="font-semibold">Event:</span> {metadata.event_type}
+                    </span>
+                  )}
+                  {metadata.action && (
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                      metadata.action === 'opened' ? 'bg-green-500/20 text-green-400' :
+                      metadata.action === 'closed' ? 'bg-red-500/20 text-red-400' :
+                      metadata.action === 'reopened' ? 'bg-yellow-500/20 text-yellow-400' :
+                      'bg-gray-500/20 text-gray-400'
+                    }`}>
+                      {metadata.action}
+                    </span>
+                  )}
+                  {metadata.issue_number && (
+                    <span className="text-gray-600 dark:text-gray-400">
+                      <span className="font-semibold">#{metadata.issue_number}</span>
+                    </span>
+                  )}
+                  {metadata.actor && (
+                    <span className="text-gray-600 dark:text-gray-400">
+                      by @{metadata.actor}
+                    </span>
+                  )}
+                </div>
+
+                {metadata.repo && (
+                  <div className="text-gray-600 dark:text-gray-400 text-sm">
+                    <span className="font-semibold">Repo:</span> {metadata.repo}
+                  </div>
+                )}
+
+                {/* Commit Message */}
+                {metadata.commit_message && (
+                  <div className="text-gray-700 dark:text-gray-300 mt-2 p-3 bg-gray-100 dark:bg-quantum-900/30 rounded border-l-2 border-quantum-500">
+                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Commit Message:</div>
+                    <pre className="text-sm whitespace-pre-wrap font-mono">{metadata.commit_message}</pre>
+                  </div>
+                )}
+
+                {/* Issue Body */}
+                {metadata.issue_body && (
+                  <div className="text-gray-700 dark:text-gray-300 mt-2 p-3 bg-gray-100 dark:bg-quantum-900/30 rounded border-l-2 border-green-500">
+                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Issue Description:</div>
+                    <div className="text-sm whitespace-pre-wrap">{metadata.issue_body}</div>
+                  </div>
+                )}
+
+                {/* Comment Body */}
+                {metadata.comment_body && (
+                  <div className="text-gray-700 dark:text-gray-300 mt-2 p-3 bg-gray-100 dark:bg-quantum-900/30 rounded border-l-2 border-blue-500">
+                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Comment:</div>
+                    <div className="text-sm whitespace-pre-wrap">{metadata.comment_body}</div>
+                  </div>
+                )}
+
+                {metadata.payload && (
+                  <details className="mt-2">
+                    <summary className="cursor-pointer text-gray-500 dark:text-gray-400 text-xs hover:text-gray-700 dark:hover:text-gray-300">
+                      Raw payload
+                    </summary>
+                    <pre className="mt-2 p-2 bg-gray-200 dark:bg-quantum-900/50 rounded text-xs overflow-x-auto">
+                      {JSON.stringify(metadata.payload, null, 2)}
+                    </pre>
+                  </details>
+                )}
+              </div>
+            )}
+
+            {/* Zammad-specific metadata */}
+            {qupt.source === 'zammad' && (
+              <div className="space-y-1">
+                {metadata.ticket_number && (
+                  <div className="text-gray-600 dark:text-gray-400">
+                    <span className="font-semibold">Ticket:</span> #{metadata.ticket_number}
+                  </div>
+                )}
+                {metadata.title && (
+                  <div className="text-gray-600 dark:text-gray-400">
+                    <span className="font-semibold">Title:</span> {metadata.title}
+                  </div>
+                )}
+                {metadata.type && (
+                  <div className="text-gray-600 dark:text-gray-400">
+                    <span className="font-semibold">Type:</span> {metadata.type}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Fallback for other sources */}
+            {!['github', 'zammad'].includes(qupt.source) && (
+              <pre className="p-2 bg-gray-200 dark:bg-quantum-900/50 rounded text-xs overflow-x-auto">
+                {JSON.stringify(metadata, null, 2)}
+              </pre>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

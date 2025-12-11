@@ -39,6 +39,37 @@ export const githubHandler: SourceHandler = {
         const eventType = mapEventType(event.type);
         if (events.length > 0 && !events.includes(eventType)) continue;
 
+        // Fetch additional details for specific event types
+        let commitMessage = undefined;
+        let issueBody = undefined;
+        let commentBody = undefined;
+
+        if (event.type === 'PushEvent' && event.payload.head) {
+          try {
+            const commitResponse = await fetch(
+              `https://api.github.com/repos/${owner}/${repo}/commits/${event.payload.head}`,
+              {
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Accept': 'application/vnd.github+json',
+                  'User-Agent': 'Zoku/1.0',
+                  'X-GitHub-Api-Version': '2022-11-28'
+                }
+              }
+            );
+            if (commitResponse.ok) {
+              const commit = await commitResponse.json();
+              commitMessage = commit.commit?.message;
+            }
+          } catch (error) {
+            console.warn(`Failed to fetch commit message for ${event.payload.head}:`, error);
+          }
+        } else if (event.type === 'IssuesEvent') {
+          issueBody = event.payload.issue?.body;
+        } else if (event.type === 'IssueCommentEvent') {
+          commentBody = event.payload.comment?.body;
+        }
+
         qupts.push({
           volition_id: source.volition_id,
           content: formatEventContent(event),
@@ -49,7 +80,12 @@ export const githubHandler: SourceHandler = {
             actor: event.actor?.login,
             repo: `${owner}/${repo}`,
             payload: event.payload,
-            url: getEventUrl(event, owner, repo)
+            url: getEventUrl(event, owner, repo),
+            commit_message: commitMessage,
+            issue_body: issueBody,
+            comment_body: commentBody,
+            action: event.payload.action,
+            issue_number: event.payload.issue?.number || event.payload.pull_request?.number
           },
           created_at: Math.floor(eventTime)
         });
@@ -92,10 +128,10 @@ function formatEventContent(event: any): string {
       return `PR #${event.payload.pull_request.number} ${event.payload.action} by @${event.actor.login}: ${event.payload.pull_request.title}`;
 
     case 'IssuesEvent':
-      return `Issue #${event.payload.issue.number} ${event.payload.action} by @${event.actor.login}: ${event.payload.issue.title}`;
+      return `Issue #${event.payload.issue.number}: ${event.payload.issue.title} [${event.payload.action}]`;
 
     case 'IssueCommentEvent':
-      return `Comment on #${event.payload.issue.number} by @${event.actor.login}`;
+      return `Issue #${event.payload.issue.number} comment by @${event.actor.login}: ${event.payload.issue.title}`;
 
     case 'CreateEvent':
       return `Created ${event.payload.ref_type} ${event.payload.ref || ''} by @${event.actor.login}`;
