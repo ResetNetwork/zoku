@@ -107,7 +107,7 @@ export default function QuptItem({ qupt, formatRelativeTime, formatDate, getSour
                 </span>
                 {metadata?.event_type && qupt.source === 'github' && getGitHubIcon(metadata.event_type) && (
                   <span
-                    className={`font-semibold ${getEventTypeColor(metadata.event_type)}`}
+                    className={`text-sm font-semibold ${getEventTypeColor(metadata.event_type)}`}
                     title={metadata.event_type}
                   >
                     {getGitHubIcon(metadata.event_type)}
@@ -115,7 +115,7 @@ export default function QuptItem({ qupt, formatRelativeTime, formatDate, getSour
                 )}
                 {metadata?.type && qupt.source === 'zammad' && (
                   <span
-                    className={`text-base ${getZammadTypeColor(metadata.type)}`}
+                    className={`text-sm ${getZammadTypeColor(metadata.type)}`}
                     title={metadata.type}
                   >
                     {getZammadIcon(metadata.type)}
