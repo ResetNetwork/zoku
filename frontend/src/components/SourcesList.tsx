@@ -133,7 +133,7 @@ export default function SourcesList({ onBack }: SourcesListProps) {
                         {source.type === 'zammad' && source.config.tag && (
                           <span>Tag: {source.config.tag}</span>
                         )}
-                        {source.type === 'gdocs' && source.config.document_id && (
+                        {source.type === 'gdrive' && source.config.document_id && (
                           <span>Doc ID: {source.config.document_id.substring(0, 12)}...</span>
                         )}
                       </div>

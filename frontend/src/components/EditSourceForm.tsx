@@ -92,7 +92,7 @@ export default function EditSourceForm({ source, onSuccess, onCancel }: EditSour
       )}
 
       {/* Google Docs Config */}
-      {source.type === 'gdocs' && (
+      {source.type === 'gdrive' && (
         <div>
           <label className="block text-sm text-gray-400 mb-2">File or Folder URL</label>
           <input

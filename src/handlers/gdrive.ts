@@ -64,7 +64,7 @@ export const gdocsHandler: SourceHandler = {
         qupts.push({
           volition_id: source.volition_id,
           content: formatRevisionContent(revision, docTitle),
-          source: 'gdocs',
+          source: 'gdrive',
           external_id: `gdocs:${document_id}:rev:${revision.id}`,
           metadata: {
             type: 'revision',

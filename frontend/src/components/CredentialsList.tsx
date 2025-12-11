@@ -9,7 +9,7 @@ interface CredentialsListProps {
 }
 
 export default function CredentialsList({ onBack }: CredentialsListProps) {
-  const [showAddForm, setShowAddForm] = useState<'github' | 'zammad' | 'gdocs' | null>(null)
+  const [showAddForm, setShowAddForm] = useState<'github' | 'zammad' | 'gdrive' | null>(null)
   const [editingCredential, setEditingCredential] = useState<any>(null)
   const [formData, setFormData] = useState<any>({ name: '', token: '', url: '' })
   const [saving, setSaving] = useState(false)
@@ -175,7 +175,7 @@ export default function CredentialsList({ onBack }: CredentialsListProps) {
         <div className="card">
           <div className="text-sm text-gray-400 mb-1">Google Drive</div>
           <div className="text-3xl font-bold text-quantum-400">
-            {credentials.filter(c => c.type === 'gdocs').length}
+            {credentials.filter(c => c.type === 'gdrive').length}
           </div>
         </div>
       </div>
@@ -204,7 +204,7 @@ export default function CredentialsList({ onBack }: CredentialsListProps) {
               Zammad Token
             </button>
             <button
-              onClick={() => setShowAddForm('gdocs')}
+              onClick={() => setShowAddForm('gdrive')}
               className="btn btn-secondary flex items-center gap-2"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -220,7 +220,7 @@ export default function CredentialsList({ onBack }: CredentialsListProps) {
       )}
 
       {/* Add GitHub/Zammad Token Form */}
-      {showAddForm && showAddForm !== 'gdocs' && (
+      {showAddForm && showAddForm !== 'gdrive' && (
         <div className="card space-y-4">
           <div>
             <h3 className="text-lg font-semibold mb-2">Add {getTypeLabel(showAddForm)} Credential</h3>
@@ -288,7 +288,7 @@ export default function CredentialsList({ onBack }: CredentialsListProps) {
       )}
 
       {/* Google OAuth Form (Add) */}
-      {showAddForm === 'gdocs' && !editingCredential && (
+      {showAddForm === 'gdrive' && !editingCredential && (
         <GoogleOAuthButton
           onSuccess={handleGoogleOAuthSuccess}
           onCancel={() => setShowAddForm(null)}
@@ -296,7 +296,7 @@ export default function CredentialsList({ onBack }: CredentialsListProps) {
       )}
 
       {/* Google OAuth Re-auth (Edit) */}
-      {editingCredential && editingCredential.type === 'gdocs' && (
+      {editingCredential && editingCredential.type === 'gdrive' && (
         <div className="card space-y-4">
           <div>
             <h3 className="text-lg font-semibold mb-2">Re-authorize Google Drive</h3>
@@ -390,7 +390,7 @@ export default function CredentialsList({ onBack }: CredentialsListProps) {
       )}
 
       {/* Edit GitHub/Zammad Token Form */}
-      {editingCredential && editingCredential.type !== 'gdocs' && (
+      {editingCredential && editingCredential.type !== 'gdrive' && (
         <div className="card space-y-4">
           <div>
             <h3 className="text-lg font-semibold mb-2">Update {getTypeLabel(editingCredential.type)} Credential</h3>
@@ -478,7 +478,7 @@ export default function CredentialsList({ onBack }: CredentialsListProps) {
                     </div>
 
                     {/* Show account email prominently for Google Drive */}
-                    {cred.type === 'gdocs' && cred.validation_metadata?.email && (
+                    {cred.type === 'gdrive' && cred.validation_metadata?.email && (
                       <div className="text-sm text-quantum-400 font-medium mb-2">
                         {cred.validation_metadata.email}
                       </div>

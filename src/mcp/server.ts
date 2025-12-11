@@ -127,7 +127,7 @@ const schemas = {
 
   add_source: z.object({
     volition_id: z.string(),
-    type: z.enum(['github', 'gmail', 'zammad', 'gdrive', 'gdocs', 'webhook']),
+    type: z.enum(['github', 'gmail', 'zammad', 'gdrive', 'gdrive', 'webhook']),
     config: z.record(z.any()),
     credentials: z.record(z.any()).optional(),
     credential_id: z.string().optional()
@@ -149,12 +149,12 @@ const schemas = {
   // Credentials
   add_credential: z.object({
     name: z.string(),
-    type: z.enum(['github', 'gmail', 'zammad', 'gdrive', 'gdocs']),
+    type: z.enum(['github', 'gmail', 'zammad', 'gdrive', 'gdrive']),
     data: z.record(z.any())
   }),
 
   list_credentials: z.object({
-    type: z.enum(['github', 'gmail', 'zammad', 'gdrive', 'gdocs']).optional(),
+    type: z.enum(['github', 'gmail', 'zammad', 'gdrive', 'gdrive']).optional(),
     limit: z.number().optional()
   }),
 
@@ -497,7 +497,7 @@ const tools: Tool[] = [
       type: 'object',
       properties: {
         volition_id: { type: 'string' },
-        type: { type: 'string', enum: ['github', 'gmail', 'zammad', 'gdrive', 'gdocs', 'webhook'] },
+        type: { type: 'string', enum: ['github', 'gmail', 'zammad', 'gdrive', 'gdrive', 'webhook'] },
         config: { type: 'object', description: 'Source-specific configuration (e.g., owner, repo for GitHub)' },
         credentials: { type: 'object', description: 'Inline authentication credentials (will be validated and encrypted). Omit if using credential_id.' },
         credential_id: { type: 'string', description: 'ID of stored credential to use. Omit if providing inline credentials.' }
@@ -546,7 +546,7 @@ const tools: Tool[] = [
       type: 'object',
       properties: {
         name: { type: 'string', description: 'User-friendly name (e.g., "GitHub - Personal")' },
-        type: { type: 'string', enum: ['github', 'gmail', 'zammad', 'gdrive', 'gdocs'] },
+        type: { type: 'string', enum: ['github', 'gmail', 'zammad', 'gdrive', 'gdrive'] },
         data: { type: 'object', description: 'Authentication credentials (will be validated and encrypted)' }
       },
       required: ['name', 'type', 'data']
@@ -558,7 +558,7 @@ const tools: Tool[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        type: { type: 'string', enum: ['github', 'gmail', 'zammad', 'gdrive', 'gdocs'], description: 'Filter by credential type' },
+        type: { type: 'string', enum: ['github', 'gmail', 'zammad', 'gdrive', 'gdrive'], description: 'Filter by credential type' },
         limit: { type: 'number', default: 20 }
       }
     }
@@ -891,7 +891,7 @@ async function handleToolCall(name: string, args: any, db: DB, encryptionKey: st
           case 'zammad':
             validationResult = await validateZammadSource(input.config, input.credentials);
             break;
-          case 'gdocs':
+          case 'gdrive':
             validationResult = await validateGoogleDocsSource(input.config, input.credentials);
             break;
           default:
@@ -1025,7 +1025,7 @@ async function handleToolCall(name: string, args: any, db: DB, encryptionKey: st
         case 'zammad':
           validationResult = await validateZammadCredential(input.data);
           break;
-        case 'gdocs':
+        case 'gdrive':
           // For Google, just validate OAuth credentials work
           validationResult = await validateGoogleDocsSource({ document_id: input.data.test_document_id || '' }, input.data);
           break;
@@ -1119,7 +1119,7 @@ async function handleToolCall(name: string, args: any, db: DB, encryptionKey: st
           case 'zammad':
             validationResult = await validateZammadCredential(input.data);
             break;
-          case 'gdocs':
+          case 'gdrive':
             validationResult = await validateGoogleDocsSource({ document_id: input.data.test_document_id || '' }, input.data);
             break;
         }

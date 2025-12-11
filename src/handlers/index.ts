@@ -17,11 +17,11 @@ export interface SourceHandler {
 
 import { githubHandler } from './github';
 import { zammadHandler } from './zammad';
-import { gdocsHandler } from './gdocs';
+import { gdriveHandler } from './gdrive';
 
 export const handlers: Record<string, SourceHandler> = {
   github: githubHandler,
   zammad: zammadHandler,
-  gdocs: gdocsHandler
-  // Will add gmail, gdrive, webhook handlers later
+  gdrive: gdriveHandler
+  // Will add gmail, webhook handlers later
 };

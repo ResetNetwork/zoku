@@ -91,12 +91,12 @@ export default function GoogleOAuthButton({ onSuccess, onCancel, initialValues }
             }
 
             console.log('🎫 Creating credential with tokens...')
-            console.log('Credential data:', { name, type: 'gdocs' })
+            console.log('Credential data:', { name, type: 'gdrive' })
 
             // Create credential with the tokens + client credentials
             const credential = await api.createCredential({
               name: name,
-              type: 'gdocs',
+              type: 'gdrive',
               data: {
                 refresh_token: tokens.refresh_token,
                 client_id: tokens.client_id,

@@ -497,7 +497,7 @@ app.post('/:id/sources', async (c) => {
         case 'zammad':
           accessValidation = await validateZammadSource(body.config, decryptedCreds);
           break;
-        case 'gdocs':
+        case 'gdrive':
           console.log('🔍 Calling validateGoogleDocsSource...');
           accessValidation = await validateGoogleDocsSource(body.config, decryptedCreds);
           console.log('✅ Validation result:', {
@@ -547,7 +547,7 @@ app.post('/:id/sources', async (c) => {
       case 'zammad':
         validationResult = await validateZammadSource(body.config, body.credentials);
         break;
-      case 'gdocs':
+      case 'gdrive':
         validationResult = await validateGoogleDocsSource(body.config, body.credentials);
         break;
       default:

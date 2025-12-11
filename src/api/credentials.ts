@@ -60,7 +60,7 @@ app.post('/', async (c) => {
       case 'zammad':
         validationResult = await validateZammadCredential(body.data);
         break;
-      case 'gdocs':
+      case 'gdrive':
         validationResult = await validateGoogleDocsCredential(
           body.data,
           body.data.client_id,
@@ -175,7 +175,7 @@ app.patch('/:id', async (c) => {
         case 'zammad':
           validationResult = await validateZammadCredential(body.data);
           break;
-        case 'gdocs':
+        case 'gdrive':
           validationResult = await validateGoogleDocsCredential(
             body.data,
             body.data.client_id,
@@ -227,7 +227,7 @@ app.post('/:id/reauthorize', async (c) => {
     return c.json({ error: { code: 'NOT_FOUND', message: 'Credential not found' } }, 404);
   }
 
-  if (credential.type !== 'gdocs') {
+  if (credential.type !== 'gdrive') {
     return c.json({
       error: { code: 'INVALID_TYPE', message: 'Re-authorization only supported for Google Drive credentials' }
     }, 400);

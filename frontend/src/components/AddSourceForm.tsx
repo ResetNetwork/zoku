@@ -10,7 +10,7 @@ interface AddSourceFormProps {
 }
 
 export default function AddSourceForm({ volitionId, onSuccess, onCancel }: AddSourceFormProps) {
-  const [sourceType, setSourceType] = useState<'github' | 'zammad' | 'gdocs'>('github')
+  const [sourceType, setSourceType] = useState<'github' | 'zammad' | 'gdrive'>('github')
   const [selectedCredential, setSelectedCredential] = useState('')
   const [config, setConfig] = useState<any>({
     // GitHub defaults
@@ -29,7 +29,7 @@ export default function AddSourceForm({ volitionId, onSuccess, onCancel }: AddSo
   // Filter credentials by type
   const availableCredentials = credentials.filter(c => c.type === sourceType)
 
-  const handleTypeChange = (type: 'github' | 'zammad' | 'gdocs') => {
+  const handleTypeChange = (type: 'github' | 'zammad' | 'gdrive') => {
     setSourceType(type)
     setSelectedCredential('')
     // Reset config based on type
@@ -37,7 +37,7 @@ export default function AddSourceForm({ volitionId, onSuccess, onCancel }: AddSo
       setConfig({ owner: '', repo: '', events: ['push', 'pull_request', 'issues'] })
     } else if (type === 'zammad') {
       setConfig({ tag: '', include_articles: true })
-    } else if (type === 'gdocs') {
+    } else if (type === 'gdrive') {
       setConfig({ document_id: '', track_suggestions: false })
     }
   }
@@ -57,7 +57,7 @@ export default function AddSourceForm({ volitionId, onSuccess, onCancel }: AddSo
       addNotification('error', 'Please provide tag for Zammad source')
       return
     }
-    if (sourceType === 'gdocs' && !config.document_id) {
+    if (sourceType === 'gdrive' && !config.document_id) {
       addNotification('error', 'Please provide document ID for Google Docs source')
       return
     }
@@ -193,7 +193,7 @@ export default function AddSourceForm({ volitionId, onSuccess, onCancel }: AddSo
       )}
 
       {/* Google Drive Config */}
-      {sourceType === 'gdocs' && (
+      {sourceType === 'gdrive' && (
         <>
           <div>
             <label className="block text-sm text-gray-400 mb-2">File or Folder URL</label>
