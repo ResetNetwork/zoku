@@ -5,13 +5,14 @@ Zoku is a project/initiative tracking system inspired by the Quantum Thief trilo
 
 ## Current Status: ✅ Full-Stack Application Complete
 
-### Completed Phases (0-5)
+### Completed Phases (0-5.5)
 - **Phase 0**: Infrastructure setup (GitHub, D1, encryption)
 - **Phase 1**: Dependencies and database schema
 - **Phase 2**: Full REST API with CRUD operations
-- **Phase 3**: Source handlers (GitHub, Zammad, Google Docs)
+- **Phase 3**: Source handlers (GitHub, Zammad, Google Drive)
 - **Phase 4**: MCP Server with 29 tools (includes credential store)
-- **Phase 5**: React frontend with light/dark mode ✅ NEW
+- **Phase 5**: React frontend with light/dark mode
+- **Phase 5.5**: Source & Credential Management + Google OAuth ✅ NEW
 
 ### Remaining Phases
 - **Phase 6**: Production deployment to zoku.205.dev (pending)
@@ -355,13 +356,23 @@ add_source({
 - **Simplified Responses**: All tools support optional `detailed` parameter for verbose output
 - **Zammad**: Tag-based filtering required - `tag` field mandatory in config
 - **Response Size**: 60-80% reduction with default (non-detailed) responses
-- **Frontend Complete**: Full app with 7 pages (Dashboard, Volitions, Entangled, Activity, Sources, + detail pages)
+- **Frontend Complete**: Full app with 8 pages (Dashboard, Volitions, Entangled, Activity, Sources, Credentials, + detail pages)
 - **Theme**: Light/dark mode with localStorage persistence
-- **Activity Formatting**: Type-specific icons and expandable details for GitHub/Zammad events
-- **Dev Setup**: Backend on :8787, frontend on :5173, run in separate terminals
-- **Entangled Metadata**: Description, GitHub username, email, role, org, timezone, deal_id
+- **Activity Formatting**: Client-side dynamic formatting from metadata for all sources (instant format changes!)
+- **Type-specific Icons**: ← commits/edits, 💬 comments, ◆ issues/tickets, ⇄ PRs (consistent across sources)
+- **Google OAuth**: Per-credential OAuth flow with popup, re-authorization, account email display
+- **Source Management**: Add/Edit/Delete UI with validation, access checking, error handling
+- **Credential Management**: Full CRUD page for GitHub tokens, Zammad (token+URL), Google Drive OAuth
+- **Health Monitoring**: Red/green/gray dots with error messages ("Access denied. Add email@example.com...")
+- **Manual Sync**: Fully implemented (was TODO) with error tracking
+- **Activity Filtering**: Filter by volition and source type
+- **Initial Sync**: New sources pull 30 days of history
+- **Error Lifecycle**: Detect → Store → Display → Clear on success
+- **Dev Setup**: Backend on :8788, frontend on :3002, run in separate terminals
+- **Entangled Metadata**: Description, GitHub username, email, role, org, timezone, deal_id (all editable)
 - **Responsibility Matrix**: Volitions × PASCI roles grid view on Entangled page
-- **Navigation**: Clickable metrics, URL routing, direct links to any entity
+- **Navigation**: Clickable metrics, URL routing, direct links to any entity, clickable volitions in matrix
 - **Counts**: All views show entangled_count, qupts_count, sources_count, children_count
-- **Example Data**: 12 entangled (8 humans, 4 AI agents) + 6 volitions with PASCI assignments
-- **Notifications**: Toast notification system in bottom-right for sync results and system events
+- **Example Data**: 15 entangled + 7 volitions with PASCI assignments
+- **Notifications**: Toast system with success/error/info types, auto-dismiss
+- **OAuth Callback**: 5-second success message before auto-close

@@ -22,26 +22,32 @@ A project/initiative tracking system inspired by the Quantum Thief trilogy. Stat
 
 ### Web Frontend ✅
 
-**7 Pages:**
+**8 Pages:**
 1. **Dashboard** - Clickable metrics, top 5 volitions, recent activity
 2. **All Volitions** - Complete list sorted by activity
 3. **All Entangled** - Team members with PASCI responsibility matrix
-4. **All Activity** - Complete activity stream across volitions
-5. **All Sources** - Configured sources with sync status
-6. **Volition Detail** - Individual project view
-7. **Entangled Detail** - Individual team member with editable metadata
+4. **All Activity** - Complete activity stream with filtering
+5. **All Sources** - Configured sources with sync status and health monitoring
+6. **All Credentials** - API tokens and OAuth connections management
+7. **Volition Detail** - Individual project view with source management
+8. **Entangled Detail** - Individual team member with editable metadata
 
 **Key Features:**
-- **Clickable Metrics**: Navigate to detail pages from dashboard stats
+- **Clickable Metrics**: Navigate to detail pages from dashboard stats (5 metrics)
 - **Responsibility Matrix**: Volitions × PASCI roles grid (first 5, expandable)
 - **Entangled Metadata**: GitHub username, email, role, org, timezone, deal_id (editable)
 - **Deal Integration**: Deal IDs link to deals.reset.tech
-- **Activity Display**: Type-specific icons, expandable details, volition badges
+- **Activity Display**: Type-specific icons, expandable details, volition badges, client-side formatting
+- **Activity Filtering**: Filter by volition and source type
 - **Toast Notifications**: Bottom-right notifications for sync results and system events
 - **Light/Dark Mode**: Theme switching with persistent preference
 - **URL Routing**: Direct links to any page or entity
 - **Smart Sorting**: Volitions by activity, entangled alphabetically
-- **Source Management**: Configure and sync GitHub/Zammad/Google Docs sources
+- **Source Management**: Add/Edit/Delete sources with validation and access checking
+- **Credential Management**: Full CRUD for GitHub tokens, Zammad tokens, Google OAuth
+- **Google OAuth**: Per-credential OAuth flow with re-authorization
+- **Health Monitoring**: Red/green/gray dots show source status with error messages
+- **Manual Sync**: Functional sync button (previously TODO)
 - **Console Logging**: Detailed logs for all operations
 - **Responsive Design**: Mobile and desktop optimized
 
@@ -117,15 +123,23 @@ Full API documentation in `zoku-spec.md`.
 Qupts are automatically collected from:
 
 - **GitHub**: Repository events (push, PR, issues, comments) ✅ Tested & Working
-  - Commit messages with branch and SHA
-  - PR titles fetched and displayed
+  - Commit messages with branch and SHA (first line only)
+  - PR titles with status
   - Issue links and details
+  - Comment threads
   - External link icons
+  - Dynamic formatting from metadata
 - **Zammad**: Ticket updates and articles (tag-based filtering) ✅ Tested & Working
   - Ticket state and priority
   - Article bodies with formatting
-  - Type indicators (email, note, phone)
-- **Google Docs**: Document revisions (ready, not tested)
+  - Type indicators (email, note, phone) using consistent icons
+  - URL stored in credential
+- **Google Drive**: Document revisions and comments ✅ Tested & Working
+  - Revision history with author and email
+  - Comments with quoted/highlighted text
+  - Resolved status tracking
+  - Per-credential OAuth (no system-wide config)
+  - Health monitoring with access validation
 
 Sources are configured per-volition and run on a 5-minute cron schedule.
 
