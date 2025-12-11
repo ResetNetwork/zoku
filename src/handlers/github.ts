@@ -97,13 +97,17 @@ export const githubHandler: SourceHandler = {
           }
         }
 
-        // For commits, enhance the content with commit message title
+        // Enhance content with fetched details
         let content = formatEventContent(event);
         if (event.type === 'PushEvent' && commitMessage) {
           const messageTitle = commitMessage.split('\n')[0];
           const branch = event.payload.ref?.replace('refs/heads/', '') || 'unknown';
           const sha = event.payload.head?.substring(0, 7) || '';
           content = `${branch} ← ${sha}: ${messageTitle}`;
+        } else if (event.type === 'PullRequestEvent' && prTitle) {
+          const prNumber = event.payload.pull_request?.number;
+          const action = event.payload.action;
+          content = `#${prNumber}: ${prTitle} [${action}]`;
         }
 
         qupts.push({
