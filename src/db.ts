@@ -607,7 +607,37 @@ export class DB {
     return result.results || [];
   }
 
-  // Volition Attributes
+  // Volition Attributes (Batch)
+  async getVolitionsAttributes(volitionIds: string[]): Promise<Map<string, Record<string, string>>> {
+    if (volitionIds.length === 0) return new Map();
+
+    const query = `
+      SELECT
+        va.volition_id,
+        d.name as dimension_name,
+        dv.label as value_label
+      FROM volition_attributes va
+      JOIN dimensions d ON va.dimension_id = d.id
+      JOIN dimension_values dv ON va.value_id = dv.id
+      WHERE va.volition_id IN (${volitionIds.map(() => '?').join(',')})
+      ORDER BY va.volition_id, d.name
+    `;
+
+    const result = await this.d1.prepare(query).bind(...volitionIds).all();
+
+    // Group by volition_id
+    const attributesMap = new Map<string, Record<string, string>>();
+    for (const row of result.results as any[]) {
+      if (!attributesMap.has(row.volition_id)) {
+        attributesMap.set(row.volition_id, {});
+      }
+      attributesMap.get(row.volition_id)![row.dimension_name] = row.value_label;
+    }
+
+    return attributesMap;
+  }
+
+  // Volition Attributes (Single)
   async getVolitionAttributes(volitionId: string): Promise<VolitionAttribute[]> {
     const result = await this.d1
       .prepare('SELECT * FROM volition_attributes WHERE volition_id = ?')
