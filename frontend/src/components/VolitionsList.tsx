@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../lib/api'
+import VolitionCard from './VolitionCard'
 
 interface VolitionsListProps {
   onSelectVolition: (id: string) => void
