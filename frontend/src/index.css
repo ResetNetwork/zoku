@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-quantum-700;
+  }
+
+  body {
+    @apply antialiased;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-gray-50 dark:bg-quantum-800 rounded-lg border border-gray-200 dark:border-quantum-700 p-4;
+  }
+
+  .btn {
+    @apply px-4 py-2 rounded-md font-medium transition-colors;
+  }
+
+  .btn-primary {
+    @apply bg-quantum-500 hover:bg-quantum-400 text-white;
+  }
+
+  .btn-secondary {
+    @apply bg-gray-200 dark:bg-quantum-700 hover:bg-gray-300 dark:hover:bg-quantum-600 text-gray-900 dark:text-gray-200;
+  }
+}

@@ -147,7 +147,17 @@ export const zammadHandler: SourceHandler = {
 };
 
 function formatTicketContent(ticket: any): string {
-  const state = ticket.state || 'unknown';
+  // Map common state IDs to names (Zammad default states)
+  const stateMap: Record<number, string> = {
+    1: 'new',
+    2: 'open',
+    3: 'pending',
+    4: 'closed',
+    5: 'merged',
+    6: 'removed',
+    7: 'pending close'
+  };
+  const state = stateMap[ticket.state_id] || ticket.state || 'open';
   return `Ticket #${ticket.number} [${state}]: ${ticket.title}`;
 }
 

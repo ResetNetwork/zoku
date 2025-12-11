@@ -1,0 +1,73 @@
+import type { Volition, Qupt, Entangled, PASCIMatrix, Source } from './types'
+
+const API_BASE = '/api'
+
+export const api = {
+  // Volitions
+  async listVolitions(params?: { root_only?: boolean; limit?: number; detailed?: boolean }) {
+    const query = new URLSearchParams()
+    if (params?.root_only) query.set('root_only', 'true')
+    if (params?.limit) query.set('limit', String(params.limit))
+    if (params?.detailed) query.set('detailed', 'true')
+
+    const res = await fetch(`${API_BASE}/volitions?${query}`)
+    const data = await res.json()
+    return data.volitions as Volition[]
+  },
+
+  async getVolition(id: string, detailed = false) {
+    const res = await fetch(`${API_BASE}/volitions/${id}?detailed=${detailed}`)
+    return await res.json() as Volition
+  },
+
+  // Qupts
+  async listQupts(volitionId: string, params?: { source?: string; limit?: number; detailed?: boolean }) {
+    const query = new URLSearchParams({ volition_id: volitionId })
+    if (params?.source) query.set('source', params.source)
+    if (params?.limit) query.set('limit', String(params.limit))
+    if (params?.detailed) query.set('detailed', 'true')
+
+    const res = await fetch(`${API_BASE}/qupts?${query}`)
+    const data = await res.json()
+    return data.qupts as Qupt[]
+  },
+
+  // Entangled
+  async listEntangled() {
+    const res = await fetch(`${API_BASE}/entangled`)
+    const data = await res.json()
+    return data.entangled as Entangled[]
+  },
+
+  async createEntangled(data: { name: string; type: 'human' | 'agent' }) {
+    const res = await fetch(`${API_BASE}/entangled`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    })
+    return await res.json() as Entangled
+  },
+
+  // Matrix
+  async getMatrix(volitionId: string) {
+    const res = await fetch(`${API_BASE}/volitions/${volitionId}/matrix`)
+    const data = await res.json()
+    return data.matrix as PASCIMatrix
+  },
+
+  async assignToMatrix(volitionId: string, entangledId: string, role: string) {
+    const res = await fetch(`${API_BASE}/volitions/${volitionId}/matrix`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ entangled_id: entangledId, role })
+    })
+    return await res.json()
+  },
+
+  // Sources
+  async listSources(volitionId: string) {
+    const res = await fetch(`${API_BASE}/volitions/${volitionId}/sources`)
+    const data = await res.json()
+    return data.sources as Source[]
+  }
+}

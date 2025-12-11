@@ -606,22 +606,30 @@ async function handleToolCall(name: string, args: any, db: DB, encryptionKey: st
         limit: input.limit
       });
 
-      // Default: return minimal info (no description)
-      if (!input.detailed) {
-        return {
-          volitions: volitions.map(v => ({
-            id: v.id,
-            name: v.name,
-            parent_id: v.parent_id,
-            created_at: v.created_at,
-            updated_at: v.updated_at
-            // Omit description by default
-          }))
-        };
-      }
+      // Always include counts (lightweight and useful)
+      const volitionsWithCounts = await Promise.all(
+        volitions.map(async v => {
+          const qupts_count = (await db.listQupts({ volition_id: v.id, recursive: true, limit: 1000 })).length;
+          const sources_count = (await db.listSources(v.id)).length;
 
-      // Detailed: return full volition data
-      return { volitions };
+          if (!input.detailed) {
+            return {
+              id: v.id,
+              name: v.name,
+              parent_id: v.parent_id,
+              created_at: v.created_at,
+              updated_at: v.updated_at,
+              qupts_count,
+              sources_count
+              // Omit description by default
+            };
+          }
+
+          return { ...v, qupts_count, sources_count };
+        })
+      );
+
+      return { volitions: volitionsWithCounts };
     }
 
     case 'get_volition': {

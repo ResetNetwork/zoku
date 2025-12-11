@@ -83,9 +83,9 @@ function mapEventType(ghType: string): string {
 function formatEventContent(event: any): string {
   switch (event.type) {
     case 'PushEvent':
-      const count = event.payload.commits?.length || 0;
+      const count = event.payload.size || event.payload.commits?.length || 0;
       const branch = event.payload.ref?.replace('refs/heads/', '') || 'unknown';
-      return `${count} commit(s) pushed to ${branch} by @${event.actor.login}`;
+      return `${count} commit${count !== 1 ? 's' : ''} pushed to ${branch} by @${event.actor.login}`;
 
     case 'PullRequestEvent':
       return `PR #${event.payload.pull_request.number} ${event.payload.action} by @${event.actor.login}: ${event.payload.pull_request.title}`;
