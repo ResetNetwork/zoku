@@ -2,7 +2,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPTransport } from '@hono/mcp';
 import { z } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
 import type { Context } from 'hono';
 import type { Bindings } from '../types';
 import { DB } from '../db';
@@ -230,16 +229,9 @@ const schemas = {
   })
 };
 
-// Helper to convert Zod schema to MCP SDK format
-function zodToMcpSchema(zodSchema: z.ZodTypeAny): any {
-  const jsonSchema = zodToJsonSchema(zodSchema, { target: 'openApi3', $refStrategy: 'none' });
-  // The MCP SDK expects just the properties object, not the full JSON Schema
-  if (jsonSchema && typeof jsonSchema === 'object' && 'properties' in jsonSchema) {
-    return jsonSchema.properties;
-  }
-  // For empty objects or non-object schemas
-  return {};
-}
+// Note: The MCP SDK expects Zod schemas directly (not JSON Schema).
+// The SDK handles conversion to JSON Schema internally when responding to tools/list.
+// We can pass our Zod schemas directly without any conversion.
 
 // Create and configure MCP server
 function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServer {
@@ -255,828 +247,1214 @@ function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServ
     }
   );
 
-  // Tool handlers
-  const handleToolCall = async (name: string, args: any): Promise<any> => {
-    const toolLogger = logger.child({ tool: name });
-    const startTime = Date.now();
+  // Tools are registered with inline implementations. Each tool receives validated args and returns CallToolResult format.
 
-    try {
-      toolLogger.info(`Tool called`, { args });
+  server.registerTool(
+    'list_entanglements',
+    {
+      description: 'List entanglements in the Zoku system',
+      inputSchema: schemas.list_entanglements
+    },
+    async (args, extra) => {
+      const toolLogger = logger.child({ tool: 'list_entanglements', session_id: extra.sessionId });
+      const startTime = Date.now();
 
-      let result: any;
+      try {
+        const entanglementsWithCounts = await db.listEntanglementsWithCounts({
+          parent_id: args.parent_id,
+          root_only: args.root_only,
+          status: args.status,
+          function: args.function,
+          limit: args.limit
+        });
 
-      switch (name) {
-        case 'list_entanglements': {
-          const input = schemas.list_entanglements.parse(args);
-          const entanglementsWithCounts = await db.listEntanglementsWithCounts({
-            parent_id: input.parent_id,
-            root_only: input.root_only,
-            status: input.status,
-            function: input.function,
-            limit: input.limit
-          });
-
-          // Return minimal or detailed view
-          if (!input.detailed) {
-            result = {
-              entanglements: entanglementsWithCounts.map(v => ({
-                id: v.id,
-                name: v.name,
-                parent_id: v.parent_id,
-                created_at: v.created_at,
-                updated_at: v.updated_at,
-                qupts_count: v.qupts_count,
-                sources_count: v.sources_count
-              }))
-            };
-          } else {
-            result = { entanglements: entanglementsWithCounts };
-          }
-          break;
-        }
-
-        case 'get_entanglement': {
-          const input = schemas.get_entanglement.parse(args);
-          const entanglement = await db.getEntanglement(input.id);
-          if (!entanglement) throw new Error('Entanglement not found');
-
-          // Default: return minimal info with proper counts
-          if (!input.detailed) {
-            const [childrenCount, quptsCount, sourcesCount] = await Promise.all([
-              db.getEntanglementChildrenCount(input.id),
-              db.getEntanglementQuptsCount(input.id, input.include_children_qupts ?? true),
-              db.getEntanglementSourcesCount(input.id)
-            ]);
-
-            result = {
-              ...entanglement,
-              children_count: childrenCount,
-              qupts_count: quptsCount,
-              sources_count: sourcesCount
-            };
-          } else {
-            // Detailed: return full nested data
-            const children = await db.getEntanglementChildren(input.id);
-            const matrix = await db.getMatrix(input.id);
-            const attributes = await db.getEntanglementAttributes(input.id);
-            const qupts = await db.listQupts({
-              entanglement_id: input.id,
-              recursive: input.include_children_qupts ?? true,
-              limit: 20
-            });
-
-            result = { ...entanglement, children, matrix, attributes, qupts };
-          }
-          break;
-        }
-
-        case 'get_child_entanglements': {
-          const input = schemas.get_child_entanglements.parse(args);
-          if (input.recursive) {
-            result = { children: await db.getEntanglementDescendants(input.parent_id) };
-          } else {
-            result = { children: await db.getEntanglementChildren(input.parent_id) };
-          }
-          break;
-        }
-
-        case 'create_entanglement': {
-          const input = schemas.create_entanglement.parse(args);
-          const entanglement = await db.createEntanglement({
-            name: input.name,
-            description: input.description,
-            parent_id: input.parent_id
-          });
-
-          // Add initial zoku assignments if provided
-          if (input.initial_zoku && Array.isArray(input.initial_zoku)) {
-            for (const assignment of input.initial_zoku) {
-              try {
-                await db.assignToMatrix(entanglement.id, assignment.zoku_id, assignment.role);
-              } catch (error) {
-                toolLogger.warn(`Failed to assign ${assignment.zoku_id} to ${assignment.role}`, { error });
-              }
-            }
-          }
-
-          result = entanglement;
-          break;
-        }
-
-        case 'update_entanglement': {
-          const input = schemas.update_entanglement.parse(args);
-          await db.updateEntanglement(input.id, {
-            name: input.name,
-            description: input.description,
-            parent_id: input.parent_id
-          });
-          result = { success: true };
-          break;
-        }
-
-        case 'move_entanglement': {
-          const input = schemas.move_entanglement.parse(args);
-          await db.updateEntanglement(input.id, { parent_id: input.new_parent_id || null });
-          result = { success: true };
-          break;
-        }
-
-        case 'delete_entanglement': {
-          const input = schemas.delete_entanglement.parse(args);
-          if (!input.confirm) {
-            throw new Error('Must set confirm=true to delete entanglement');
-          }
-          await db.deleteEntanglement(input.id);
-          result = { success: true };
-          break;
-        }
-
-        case 'create_qupt': {
-          const input = schemas.create_qupt.parse(args);
-          const qupt = await db.createQupt({
-            entanglement_id: input.entanglement_id,
-            content: input.content,
-            zoku_id: input.zoku_id,
-            source: 'mcp',
-            metadata: input.metadata
-          });
-          result = qupt;
-          break;
-        }
-
-        case 'list_qupts': {
-          const input = schemas.list_qupts.parse(args);
-          const qupts = await db.listQupts({
-            entanglement_id: input.entanglement_id,
-            recursive: input.recursive ?? true,
-            source: input.source,
-            limit: input.limit
-          });
-
-          // Default: return minimal qupts (no metadata)
-          if (!input.detailed) {
-            result = {
-              qupts: qupts.map(q => ({
-                id: q.id,
-                entanglement_id: q.entanglement_id,
-                content: q.content,
-                source: q.source,
-                external_id: q.external_id,
-                created_at: q.created_at
-              }))
-            };
-          } else {
-            // Detailed: return full qupts with metadata
-            result = { qupts };
-          }
-          break;
-        }
-
-        case 'list_zoku': {
-          const input = schemas.list_zoku.parse(args);
-          const zoku = await db.listZoku({
-            type: input.type,
-            limit: input.limit
-          });
-          result = { zoku };
-          break;
-        }
-
-        case 'create_zoku': {
-          const input = schemas.create_zoku.parse(args);
-          const zoku = await db.createZoku(input);
-          result = zoku;
-          break;
-        }
-
-        case 'get_entangled': {
-          const input = schemas.get_entangled.parse(args);
-          const zoku = await db.getZoku(input.id);
-          if (!zoku) throw new Error('Zoku not found');
-          result = zoku;
-          break;
-        }
-
-        case 'entangle': {
-          const input = schemas.entangle.parse(args);
-          await db.assignToMatrix(input.entanglement_id, input.zoku_id, input.role);
-          result = { success: true };
-          break;
-        }
-
-        case 'disentangle': {
-          const input = schemas.disentangle.parse(args);
-          await db.removeFromMatrix(input.entanglement_id, input.zoku_id, input.role);
-          result = { success: true };
-          break;
-        }
-
-        case 'get_matrix': {
-          const input = schemas.get_matrix.parse(args);
-          const matrix = await db.getMatrix(input.entanglement_id);
-          result = { matrix };
-          break;
-        }
-
-        case 'list_dimensions': {
-          const dimensions = await db.listDimensions();
-          const values = await db.getAllDimensionValues();
-          const dimensionsWithValues = dimensions.map(dim => ({
-            ...dim,
-            values: values.filter(v => v.dimension_id === dim.id)
-          }));
-          result = { dimensions: dimensionsWithValues };
-          break;
-        }
-
-        case 'set_attributes': {
-          const input = schemas.set_attributes.parse(args);
-          const dimensions = await db.listDimensions();
-          const values = await db.getAllDimensionValues();
-
-          const attributesToSet = input.attributes.map(attr => {
-            const dim = dimensions.find(d => d.name === attr.dimension);
-            if (!dim) throw new Error(`Unknown dimension: ${attr.dimension}`);
-            const val = values.find(v => v.dimension_id === dim.id && v.value === attr.value);
-            if (!val) throw new Error(`Unknown value: ${attr.value} for dimension ${attr.dimension}`);
-            return { dimension_id: dim.id, value_id: val.id };
-          });
-
-          await db.setEntanglementAttributes(input.entanglement_id, attributesToSet);
-          result = { success: true };
-          break;
-        }
-
-        case 'get_attributes': {
-          const input = schemas.get_attributes.parse(args);
-          const attributes = await db.getEntanglementAttributes(input.entanglement_id);
-          result = { attributes };
-          break;
-        }
-
-        case 'list_sources': {
-          const input = schemas.list_sources.parse(args);
-          const sources = await db.listSources(input.entanglement_id);
+        // Return minimal or detailed view
+        let result: any;
+        if (!args.detailed) {
           result = {
-            sources: sources.map(s => ({
-              id: s.id,
-              type: s.type,
-              config: s.config,
-              enabled: s.enabled,
-              last_sync: s.last_sync
+            entanglements: entanglementsWithCounts.map(v => ({
+              id: v.id,
+              name: v.name,
+              parent_id: v.parent_id,
+              created_at: v.created_at,
+              updated_at: v.updated_at,
+              qupts_count: v.qupts_count,
+              sources_count: v.sources_count
             }))
           };
-          break;
+        } else {
+          result = { entanglements: entanglementsWithCounts };
         }
 
-        case 'add_source': {
-          const input = schemas.add_source.parse(args);
+        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
 
-          // Validate source configuration if jewels are provided
-          const warnings: string[] = [];
-          let validationMetadata: Record<string, any> = {};
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify(result, null, 2)
+          }]
+        };
+      } catch (error) {
+        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
+        throw error;
+      }
+    }
+  );
 
-          // If jewel_id is provided, verify it exists and matches type
-          if (input.jewel_id) {
-            const jewel = await db.getJewel(input.jewel_id);
-            if (!jewel) {
-              throw new Error('Jewel not found');
-            }
-            if (jewel.type !== input.type) {
-              throw new Error(`Jewel type mismatch: jewel is ${jewel.type}, source is ${input.type}`);
-            }
-          } else if (input.jewels) {
-            // Validate inline jewels
-            const { validateGitHubSource, validateZammadSource, validateGoogleDocsSource } = await import('../handlers/validate');
+  server.registerTool(
+    'get_entanglement',
+    {
+      description: 'Get entanglement details. By default returns minimal info (counts only). Use detailed=true for full nested data.',
+      inputSchema: schemas.get_entanglement
+    },
+    async (args, extra) => {
+      const toolLogger = logger.child({ tool: 'get_entanglement', session_id: extra.sessionId });
+      const startTime = Date.now();
 
-            let validationResult;
-            switch (input.type) {
-              case 'github':
-                validationResult = await validateGitHubSource(input.config, input.jewels);
-                break;
-              case 'zammad':
-                validationResult = await validateZammadSource(input.config, input.jewels);
-                break;
-              case 'gdocs':
-              case 'gdrive':
-                validationResult = await validateGoogleDocsSource(input.config, input.jewels);
-                break;
-              default:
-                // Other source types don't have validation yet
-                break;
-            }
+      try {
+        const entanglement = await db.getEntanglement(args.id);
+        if (!entanglement) throw new Error('Entanglement not found');
 
-            if (validationResult) {
-              if (!validationResult.valid) {
-                throw new Error(`Source validation failed: ${validationResult.errors.join(', ')}${validationResult.warnings.length > 0 ? '. Warnings: ' + validationResult.warnings.join(', ') : ''}`);
-              }
+        let result: any;
+        // Default: return minimal info with proper counts
+        if (!args.detailed) {
+          const [childrenCount, quptsCount, sourcesCount] = await Promise.all([
+            db.getEntanglementChildrenCount(args.id),
+            db.getEntanglementQuptsCount(args.id, args.include_children_qupts ?? true),
+            db.getEntanglementSourcesCount(args.id)
+          ]);
 
-              warnings.push(...validationResult.warnings);
-              validationMetadata = validationResult.metadata || {};
-            }
-          }
-
-          const source = await db.createSource({
-            entanglement_id: input.entanglement_id,
-            type: input.type,
-            config: input.config,
-            credentials: input.jewels,  // Store as credentials in DB for backward compat
-            jewel_id: input.jewel_id
+          result = {
+            ...entanglement,
+            children_count: childrenCount,
+            qupts_count: quptsCount,
+            sources_count: sourcesCount
+          };
+        } else {
+          // Detailed: return full nested data
+          const children = await db.getEntanglementChildren(args.id);
+          const matrix = await db.getMatrix(args.id);
+          const attributes = await db.getEntanglementAttributes(args.id);
+          const qupts = await db.listQupts({
+            entanglement_id: args.id,
+            recursive: args.include_children_qupts ?? true,
+            limit: 20
           });
 
-          // Set initial sync window to last 30 days (mandatory)
-          const thirtyDaysAgo = Math.floor(Date.now() / 1000) - (30 * 24 * 60 * 60);
-          await db.updateSource(source.id, { last_sync: thirtyDaysAgo });
-          toolLogger.info(`Set initial sync window to last 30 days for source ${source.id}`);
-
-          result = { source };
-          if (warnings.length > 0) {
-            result.warnings = warnings;
-          }
-          if (Object.keys(validationMetadata).length > 0) {
-            result.validation = validationMetadata;
-          }
-          break;
+          result = { ...entanglement, children, matrix, attributes, qupts };
         }
 
-        case 'sync_source': {
-          const input = schemas.sync_source.parse(args);
-          const { decryptCredentials } = await import('../lib/crypto');
-          const { handlers } = await import('../handlers');
+        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
 
-          // Get the source
-          const source = await db.getSource(input.source_id);
-          if (!source) {
-            throw new Error('Source not found');
-          }
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify(result, null, 2)
+          }]
+        };
+      } catch (error) {
+        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
+        throw error;
+      }
+    }
+  );
 
-          const handler = handlers[source.type];
-          if (!handler) {
-            throw new Error(`No handler for source type: ${source.type}`);
-          }
+  server.registerTool(
+    'get_child_entanglements',
+    {
+      description: 'Get child entanglements of a parent entanglement',
+      inputSchema: schemas.get_child_entanglements
+    },
+    async (args, extra) => {
+      const toolLogger = logger.child({ tool: 'get_child_entanglements', session_id: extra.sessionId });
+      const startTime = Date.now();
 
-          const config = JSON.parse(source.config);
+      try {
+        let result: any;
+        if (args.recursive) {
+          result = { children: await db.getEntanglementDescendants(args.parent_id) };
+        } else {
+          result = { children: await db.getEntanglementChildren(args.parent_id) };
+        }
 
-          // Get credentials - either from jewel_id or inline
-          let credentials = {};
-          if (source.jewel_id) {
-            const jewel = await db.getJewel(source.jewel_id);
-            if (!jewel) {
-              throw new Error('Jewel not found');
+        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
+
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify(result, null, 2)
+          }]
+        };
+      } catch (error) {
+        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
+        throw error;
+      }
+    }
+  );
+
+  server.registerTool(
+    'create_entanglement',
+    {
+      description: 'Create a new entanglement/initiative, optionally as a child of another entanglement with initial team assignments',
+      inputSchema: schemas.create_entanglement
+    },
+    async (args, extra) => {
+      const toolLogger = logger.child({ tool: 'create_entanglement', session_id: extra.sessionId });
+      const startTime = Date.now();
+
+      try {
+        const entanglement = await db.createEntanglement({
+          name: args.name,
+          description: args.description,
+          parent_id: args.parent_id
+        });
+
+        // Add initial zoku assignments if provided
+        if (args.initial_zoku && Array.isArray(args.initial_zoku)) {
+          for (const assignment of args.initial_zoku) {
+            try {
+              await db.assignToMatrix(entanglement.id, assignment.zoku_id, assignment.role);
+            } catch (error) {
+              toolLogger.warn(`Failed to assign ${assignment.zoku_id} to ${assignment.role}`, { error });
             }
-            credentials = JSON.parse(await decryptCredentials(jewel.data, encryptionKey));
-          } else if (source.credentials) {
-            credentials = JSON.parse(await decryptCredentials(source.credentials, encryptionKey));
           }
+        }
 
-          // Fetch new activity with error tracking and timeout
-          try {
-            // Timeout after 25 seconds (leave 5s buffer for Cloudflare Workers 30s limit)
-            const SYNC_TIMEOUT = 25000;
-            const collectPromise = handler.collect({
-              source,
-              config,
-              credentials,
-              since: source.last_sync,
-              cursor: source.sync_cursor
-            });
+        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
 
-            const timeoutPromise = new Promise((_, reject) => {
-              setTimeout(() => reject(new Error('Source sync timeout after 25 seconds')), SYNC_TIMEOUT);
-            });
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify(entanglement, null, 2)
+          }]
+        };
+      } catch (error) {
+        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
+        throw error;
+      }
+    }
+  );
 
-            const { qupts, cursor } = await Promise.race([collectPromise, timeoutPromise]) as any;
+  server.registerTool(
+    'update_entanglement',
+    {
+      description: "Update an entanglement's name, description, or parent",
+      inputSchema: schemas.update_entanglement
+    },
+    async (args, extra) => {
+      const toolLogger = logger.child({ tool: 'update_entanglement', session_id: extra.sessionId });
+      const startTime = Date.now();
 
-            // Insert qupts
-            if (qupts.length > 0) {
-              await db.batchCreateQupts(qupts);
-            }
+      try {
+        await db.updateEntanglement(args.id, {
+          name: args.name,
+          description: args.description,
+          parent_id: args.parent_id
+        });
 
-            // Update sync state and clear any previous errors
-            await db.updateSource(source.id, {
-              last_sync: Math.floor(Date.now() / 1000),
-              sync_cursor: cursor,
-              last_error: null,
-              error_count: 0,
-              last_error_at: null
-            });
+        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
 
-            result = {
-              success: true,
-              qupts_collected: qupts.length,
-              source_id: source.id,
-              cursor: cursor
-            };
-          } catch (syncError) {
-            // Track sync failure
-            const errorMessage = syncError instanceof Error ? syncError.message : String(syncError);
-            await db.updateSource(source.id, {
-              last_error: errorMessage,
-              error_count: (source.error_count || 0) + 1,
-              last_error_at: Math.floor(Date.now() / 1000)
-            });
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({ success: true }, null, 2)
+          }]
+        };
+      } catch (error) {
+        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
+        throw error;
+      }
+    }
+  );
 
-            toolLogger.error('Source sync failed', syncError as Error, { source_id: source.id });
-            throw new Error(`Source sync failed: ${errorMessage}`);
+  server.registerTool(
+    'move_entanglement',
+    {
+      description: 'Move an entanglement to become a child of another entanglement, or make it a root entanglement',
+      inputSchema: schemas.move_entanglement
+    },
+    async (args, extra) => {
+      const toolLogger = logger.child({ tool: 'move_entanglement', session_id: extra.sessionId });
+      const startTime = Date.now();
+
+      try {
+        await db.updateEntanglement(args.id, { parent_id: args.new_parent_id || null });
+
+        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
+
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({ success: true }, null, 2)
+          }]
+        };
+      } catch (error) {
+        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
+        throw error;
+      }
+    }
+  );
+
+  server.registerTool(
+    'delete_entanglement',
+    {
+      description: 'Delete an entanglement. WARNING: Also deletes all child entanglements, qupts, sources, and assignments.',
+      inputSchema: schemas.delete_entanglement
+    },
+    async (args, extra) => {
+      const toolLogger = logger.child({ tool: 'delete_entanglement', session_id: extra.sessionId });
+      const startTime = Date.now();
+
+      try {
+        if (!args.confirm) {
+          throw new Error('Must set confirm=true to delete entanglement');
+        }
+        await db.deleteEntanglement(args.id);
+
+        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
+
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({ success: true }, null, 2)
+          }]
+        };
+      } catch (error) {
+        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
+        throw error;
+      }
+    }
+  );
+
+  server.registerTool(
+    'create_qupt',
+    {
+      description: 'Record activity or update on an entanglement',
+      inputSchema: schemas.create_qupt
+    },
+    async (args, extra) => {
+      const toolLogger = logger.child({ tool: 'create_qupt', session_id: extra.sessionId });
+      const startTime = Date.now();
+
+      try {
+        const qupt = await db.createQupt({
+          entanglement_id: args.entanglement_id,
+          content: args.content,
+          zoku_id: args.zoku_id,
+          source: 'mcp',
+          metadata: args.metadata
+        });
+
+        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
+
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify(qupt, null, 2)
+          }]
+        };
+      } catch (error) {
+        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
+        throw error;
+      }
+    }
+  );
+
+  server.registerTool(
+    'list_qupts',
+    {
+      description: 'List activity for an entanglement. By default omits metadata for brevity. Use detailed=true for full metadata.',
+      inputSchema: schemas.list_qupts
+    },
+    async (args, extra) => {
+      const toolLogger = logger.child({ tool: 'list_qupts', session_id: extra.sessionId });
+      const startTime = Date.now();
+
+      try {
+        const qupts = await db.listQupts({
+          entanglement_id: args.entanglement_id,
+          recursive: args.recursive ?? true,
+          source: args.source,
+          limit: args.limit
+        });
+
+        let result: any;
+        // Default: return minimal qupts (no metadata)
+        if (!args.detailed) {
+          result = {
+            qupts: qupts.map(q => ({
+              id: q.id,
+              entanglement_id: q.entanglement_id,
+              content: q.content,
+              source: q.source,
+              external_id: q.external_id,
+              created_at: q.created_at
+            }))
+          };
+        } else {
+          // Detailed: return full qupts with metadata
+          result = { qupts };
+        }
+
+        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
+
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify(result, null, 2)
+          }]
+        };
+      } catch (error) {
+        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
+        throw error;
+      }
+    }
+  );
+
+  server.registerTool(
+    'list_zoku',
+    {
+      description: 'List all zoku partners (humans and AI agents)',
+      inputSchema: schemas.list_zoku
+    },
+    async (args, extra) => {
+      const toolLogger = logger.child({ tool: 'list_zoku', session_id: extra.sessionId });
+      const startTime = Date.now();
+
+      try {
+        const zoku = await db.listZoku({
+          type: args.type,
+          limit: args.limit
+        });
+
+        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
+
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({ zoku }, null, 2)
+          }]
+        };
+      } catch (error) {
+        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
+        throw error;
+      }
+    }
+  );
+
+  server.registerTool(
+    'create_zoku',
+    {
+      description: 'Register a new zoku partner (human or AI agent)',
+      inputSchema: schemas.create_zoku
+    },
+    async (args, extra) => {
+      const toolLogger = logger.child({ tool: 'create_zoku', session_id: extra.sessionId });
+      const startTime = Date.now();
+
+      try {
+        const zoku = await db.createZoku(args);
+
+        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
+
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify(zoku, null, 2)
+          }]
+        };
+      } catch (error) {
+        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
+        throw error;
+      }
+    }
+  );
+
+  server.registerTool(
+    'get_entangled',
+    {
+      description: 'Get details of a zoku partner including their entanglements and roles',
+      inputSchema: schemas.get_entangled
+    },
+    async (args, extra) => {
+      const toolLogger = logger.child({ tool: 'get_entangled', session_id: extra.sessionId });
+      const startTime = Date.now();
+
+      try {
+        const zoku = await db.getZoku(args.id);
+        if (!zoku) throw new Error('Zoku not found');
+
+        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
+
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify(zoku, null, 2)
+          }]
+        };
+      } catch (error) {
+        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
+        throw error;
+      }
+    }
+  );
+
+  server.registerTool(
+    'entangle',
+    {
+      description: 'Assign a zoku partner to a PASCI role on an entanglement',
+      inputSchema: schemas.entangle
+    },
+    async (args, extra) => {
+      const toolLogger = logger.child({ tool: 'entangle', session_id: extra.sessionId });
+      const startTime = Date.now();
+
+      try {
+        await db.assignToMatrix(args.entanglement_id, args.zoku_id, args.role);
+
+        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
+
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({ success: true }, null, 2)
+          }]
+        };
+      } catch (error) {
+        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
+        throw error;
+      }
+    }
+  );
+
+  server.registerTool(
+    'disentangle',
+    {
+      description: 'Remove a zoku partner from a PASCI role on an entanglement',
+      inputSchema: schemas.disentangle
+    },
+    async (args, extra) => {
+      const toolLogger = logger.child({ tool: 'disentangle', session_id: extra.sessionId });
+      const startTime = Date.now();
+
+      try {
+        await db.removeFromMatrix(args.entanglement_id, args.zoku_id, args.role);
+
+        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
+
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({ success: true }, null, 2)
+          }]
+        };
+      } catch (error) {
+        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
+        throw error;
+      }
+    }
+  );
+
+  server.registerTool(
+    'get_matrix',
+    {
+      description: 'Get the PASCI responsibility matrix showing who is assigned to each role',
+      inputSchema: schemas.get_matrix
+    },
+    async (args, extra) => {
+      const toolLogger = logger.child({ tool: 'get_matrix', session_id: extra.sessionId });
+      const startTime = Date.now();
+
+      try {
+        const matrix = await db.getMatrix(args.entanglement_id);
+
+        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
+
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({ matrix }, null, 2)
+          }]
+        };
+      } catch (error) {
+        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
+        throw error;
+      }
+    }
+  );
+
+  server.registerTool(
+    'list_dimensions',
+    {
+      description: 'List all taxonomy dimensions and their available values',
+      inputSchema: schemas.list_dimensions
+    },
+    async (args, extra) => {
+      const toolLogger = logger.child({ tool: 'list_dimensions', session_id: extra.sessionId });
+      const startTime = Date.now();
+
+      try {
+        const dimensions = await db.listDimensions();
+        const values = await db.getAllDimensionValues();
+        const dimensionsWithValues = dimensions.map(dim => ({
+          ...dim,
+          values: values.filter(v => v.dimension_id === dim.id)
+        }));
+
+        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
+
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({ dimensions: dimensionsWithValues }, null, 2)
+          }]
+        };
+      } catch (error) {
+        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
+        throw error;
+      }
+    }
+  );
+
+  server.registerTool(
+    'set_attributes',
+    {
+      description: 'Set taxonomy attributes on an entanglement (function, pillar, service area, etc.)',
+      inputSchema: schemas.set_attributes
+    },
+    async (args, extra) => {
+      const toolLogger = logger.child({ tool: 'set_attributes', session_id: extra.sessionId });
+      const startTime = Date.now();
+
+      try {
+        const dimensions = await db.listDimensions();
+        const values = await db.getAllDimensionValues();
+
+        const attributesToSet = args.attributes.map(attr => {
+          const dim = dimensions.find(d => d.name === attr.dimension);
+          if (!dim) throw new Error(`Unknown dimension: ${attr.dimension}`);
+          const val = values.find(v => v.dimension_id === dim.id && v.value === attr.value);
+          if (!val) throw new Error(`Unknown value: ${attr.value} for dimension ${attr.dimension}`);
+          return { dimension_id: dim.id, value_id: val.id };
+        });
+
+        await db.setEntanglementAttributes(args.entanglement_id, attributesToSet);
+
+        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
+
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({ success: true }, null, 2)
+          }]
+        };
+      } catch (error) {
+        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
+        throw error;
+      }
+    }
+  );
+
+  server.registerTool(
+    'get_attributes',
+    {
+      description: 'Get taxonomy attributes assigned to an entanglement',
+      inputSchema: schemas.get_attributes
+    },
+    async (args, extra) => {
+      const toolLogger = logger.child({ tool: 'get_attributes', session_id: extra.sessionId });
+      const startTime = Date.now();
+
+      try {
+        const attributes = await db.getEntanglementAttributes(args.entanglement_id);
+
+        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
+
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({ attributes }, null, 2)
+          }]
+        };
+      } catch (error) {
+        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
+        throw error;
+      }
+    }
+  );
+
+  server.registerTool(
+    'list_sources',
+    {
+      description: 'List activity sources configured for an entanglement',
+      inputSchema: schemas.list_sources
+    },
+    async (args, extra) => {
+      const toolLogger = logger.child({ tool: 'list_sources', session_id: extra.sessionId });
+      const startTime = Date.now();
+
+      try {
+        const sources = await db.listSources(args.entanglement_id);
+        const result = {
+          sources: sources.map(s => ({
+            id: s.id,
+            type: s.type,
+            config: s.config,
+            enabled: s.enabled,
+            last_sync: s.last_sync
+          }))
+        };
+
+        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
+
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify(result, null, 2)
+          }]
+        };
+      } catch (error) {
+        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
+        throw error;
+      }
+    }
+  );
+
+  server.registerTool(
+    'add_source',
+    {
+      description: 'Add an activity source to an entanglement. Can use stored jewels (via jewel_id) or provide inline jewels.',
+      inputSchema: schemas.add_source
+    },
+    async (args, extra) => {
+      const toolLogger = logger.child({ tool: 'add_source', session_id: extra.sessionId });
+      const startTime = Date.now();
+
+      try {
+        // Validate source configuration if jewels are provided
+        const warnings: string[] = [];
+        let validationMetadata: Record<string, any> = {};
+
+        // If jewel_id is provided, verify it exists and matches type
+        if (args.jewel_id) {
+          const jewel = await db.getJewel(args.jewel_id);
+          if (!jewel) {
+            throw new Error('Jewel not found');
           }
-          break;
-        }
+          if (jewel.type !== args.type) {
+            throw new Error(`Jewel type mismatch: jewel is ${jewel.type}, source is ${args.type}`);
+          }
+        } else if (args.jewels) {
+          // Validate inline jewels
+          const { validateGitHubSource, validateZammadSource, validateGoogleDocsSource } = await import('../handlers/validate');
 
-        case 'remove_source': {
-          const input = schemas.remove_source.parse(args);
-          await db.deleteSource(input.source_id);
-          result = { success: true };
-          break;
-        }
-
-        case 'toggle_source': {
-          const input = schemas.toggle_source.parse(args);
-          await db.updateSource(input.source_id, { enabled: input.enabled });
-          result = { success: true };
-          break;
-        }
-
-        // Jewel/Credential management
-        case 'add_jewel': {
-          const input = schemas.add_jewel.parse(args);
-          const { encryptCredentials } = await import('../lib/crypto');
-          const { validateGitHubCredential, validateZammadCredential, validateGoogleDocsSource } = await import('../handlers/validate');
-
-          const warnings: string[] = [];
-          let validationMetadata: Record<string, any> = {};
-
-          // Validate credentials
           let validationResult;
-          switch (input.type) {
+          switch (args.type) {
             case 'github':
-              validationResult = await validateGitHubCredential(input.data);
+              validationResult = await validateGitHubSource(args.config, args.jewels);
               break;
             case 'zammad':
-              validationResult = await validateZammadCredential(input.data);
+              validationResult = await validateZammadSource(args.config, args.jewels);
               break;
             case 'gdocs':
             case 'gdrive':
-              // For Google, just validate OAuth credentials work (no document needed)
-              validationResult = await validateGoogleDocsSource({}, input.data);
+              validationResult = await validateGoogleDocsSource(args.config, args.jewels);
+              break;
+            default:
+              // Other source types don't have validation yet
               break;
           }
 
           if (validationResult) {
             if (!validationResult.valid) {
-              throw new Error(`Credential validation failed: ${validationResult.errors.join(', ')}`);
+              throw new Error(`Source validation failed: ${validationResult.errors.join(', ')}${validationResult.warnings.length > 0 ? '. Warnings: ' + validationResult.warnings.join(', ') : ''}`);
             }
+
             warnings.push(...validationResult.warnings);
             validationMetadata = validationResult.metadata || {};
           }
-
-          // Encrypt and store
-          const encrypted = await encryptCredentials(JSON.stringify(input.data), encryptionKey);
-          const jewel = await db.createJewel({
-            name: input.name,
-            type: input.type,
-            data: encrypted,
-            last_validated: Math.floor(Date.now() / 1000),
-            validation_metadata: validationMetadata
-          });
-
-          result = {
-            id: jewel.id,
-            name: jewel.name,
-            type: jewel.type,
-            validation: validationMetadata,
-            warnings: warnings.length > 0 ? warnings : undefined
-          };
-          break;
         }
 
-        case 'list_jewels': {
-          const input = schemas.list_jewels.parse(args);
-          const jewels = await db.listJewels({
-            type: input.type,
-            limit: input.limit
-          });
+        const source = await db.createSource({
+          entanglement_id: args.entanglement_id,
+          type: args.type,
+          config: args.config,
+          credentials: args.jewels,  // Store as credentials in DB for backward compat
+          jewel_id: args.jewel_id
+        });
 
-          // Remove encrypted data
-          result = {
-            jewels: jewels.map(c => ({
-              id: c.id,
-              name: c.name,
-              type: c.type,
-              last_validated: c.last_validated,
-              validation_metadata: c.validation_metadata ? JSON.parse(c.validation_metadata) : null,
-              created_at: c.created_at,
-              updated_at: c.updated_at
-            }))
-          };
-          break;
+        // Set initial sync window to last 30 days (mandatory)
+        const thirtyDaysAgo = Math.floor(Date.now() / 1000) - (30 * 24 * 60 * 60);
+        await db.updateSource(source.id, { last_sync: thirtyDaysAgo });
+        toolLogger.info(`Set initial sync window to last 30 days for source ${source.id}`);
+
+        const result: any = { source };
+        if (warnings.length > 0) {
+          result.warnings = warnings;
+        }
+        if (Object.keys(validationMetadata).length > 0) {
+          result.validation = validationMetadata;
         }
 
-        case 'get_jewel': {
-          const input = schemas.get_jewel.parse(args);
-          const jewel = await db.getJewel(input.id);
+        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
+
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify(result, null, 2)
+          }]
+        };
+      } catch (error) {
+        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
+        throw error;
+      }
+    }
+  );
+
+  server.registerTool(
+    'sync_source',
+    {
+      description: 'Manually trigger a sync for a source',
+      inputSchema: schemas.sync_source
+    },
+    async (args, extra) => {
+      const toolLogger = logger.child({ tool: 'sync_source', session_id: extra.sessionId });
+      const startTime = Date.now();
+
+      try {
+        const { decryptCredentials } = await import('../lib/crypto');
+        const { handlers } = await import('../handlers');
+
+        // Get the source
+        const source = await db.getSource(args.source_id);
+        if (!source) {
+          throw new Error('Source not found');
+        }
+
+        const handler = handlers[source.type];
+        if (!handler) {
+          throw new Error(`No handler for source type: ${source.type}`);
+        }
+
+        const config = JSON.parse(source.config);
+
+        // Get credentials - either from jewel_id or inline
+        let credentials = {};
+        if (source.jewel_id) {
+          const jewel = await db.getJewel(source.jewel_id);
+          if (!jewel) {
+            throw new Error('Jewel not found');
+          }
+          credentials = JSON.parse(await decryptCredentials(jewel.data, encryptionKey));
+        } else if (source.credentials) {
+          credentials = JSON.parse(await decryptCredentials(source.credentials, encryptionKey));
+        }
+
+        // Fetch new activity with error tracking and timeout
+        try {
+          // Timeout after 25 seconds (leave 5s buffer for Cloudflare Workers 30s limit)
+          const SYNC_TIMEOUT = 25000;
+          const collectPromise = handler.collect({
+            source,
+            config,
+            credentials,
+            since: source.last_sync,
+            cursor: source.sync_cursor
+          });
+
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Source sync timeout after 25 seconds')), SYNC_TIMEOUT);
+          });
+
+          const { qupts, cursor } = await Promise.race([collectPromise, timeoutPromise]) as any;
+
+          // Insert qupts
+          if (qupts.length > 0) {
+            await db.batchCreateQupts(qupts);
+          }
+
+          // Update sync state and clear any previous errors
+          await db.updateSource(source.id, {
+            last_sync: Math.floor(Date.now() / 1000),
+            sync_cursor: cursor,
+            last_error: null,
+            error_count: 0,
+            last_error_at: null
+          });
+
+          const result = {
+            success: true,
+            qupts_collected: qupts.length,
+            source_id: source.id,
+            cursor: cursor
+          };
+
+          toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
+
+          return {
+            content: [{
+              type: 'text',
+              text: JSON.stringify(result, null, 2)
+            }]
+          };
+        } catch (syncError) {
+          // Track sync failure
+          const errorMessage = syncError instanceof Error ? syncError.message : String(syncError);
+          await db.updateSource(source.id, {
+            last_error: errorMessage,
+            error_count: (source.error_count || 0) + 1,
+            last_error_at: Math.floor(Date.now() / 1000)
+          });
+
+          toolLogger.error('Source sync failed', syncError as Error, { source_id: source.id });
+          throw new Error(`Source sync failed: ${errorMessage}`);
+        }
+      } catch (error) {
+        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
+        throw error;
+      }
+    }
+  );
+
+  server.registerTool(
+    'remove_source',
+    {
+      description: 'Remove an activity source from an entanglement',
+      inputSchema: schemas.remove_source
+    },
+    async (args, extra) => {
+      const toolLogger = logger.child({ tool: 'remove_source', session_id: extra.sessionId });
+      const startTime = Date.now();
+
+      try {
+        await db.deleteSource(args.source_id);
+
+        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
+
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({ success: true }, null, 2)
+          }]
+        };
+      } catch (error) {
+        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
+        throw error;
+      }
+    }
+  );
+
+  server.registerTool(
+    'toggle_source',
+    {
+      description: 'Enable or disable a source',
+      inputSchema: schemas.toggle_source
+    },
+    async (args, extra) => {
+      const toolLogger = logger.child({ tool: 'toggle_source', session_id: extra.sessionId });
+      const startTime = Date.now();
+
+      try {
+        await db.updateSource(args.source_id, { enabled: args.enabled });
+
+        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
+
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({ success: true }, null, 2)
+          }]
+        };
+      } catch (error) {
+        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
+        throw error;
+      }
+    }
+  );
+
+  server.registerTool(
+    'add_jewel',
+    {
+      description: 'Store and validate jewels that can be reused across multiple sources',
+      inputSchema: schemas.add_jewel
+    },
+    async (args, extra) => {
+      const toolLogger = logger.child({ tool: 'add_jewel', session_id: extra.sessionId });
+      const startTime = Date.now();
+
+      try {
+        const { encryptCredentials } = await import('../lib/crypto');
+        const { validateGitHubCredential, validateZammadCredential, validateGoogleDocsSource } = await import('../handlers/validate');
+
+        const warnings: string[] = [];
+        let validationMetadata: Record<string, any> = {};
+
+        // Validate credentials
+        let validationResult;
+        switch (args.type) {
+          case 'github':
+            validationResult = await validateGitHubCredential(args.data);
+            break;
+          case 'zammad':
+            validationResult = await validateZammadCredential(args.data);
+            break;
+          case 'gdocs':
+          case 'gdrive':
+            // For Google, just validate OAuth credentials work (no document needed)
+            validationResult = await validateGoogleDocsSource({}, args.data);
+            break;
+        }
+
+        if (validationResult) {
+          if (!validationResult.valid) {
+            throw new Error(`Credential validation failed: ${validationResult.errors.join(', ')}`);
+          }
+          warnings.push(...validationResult.warnings);
+          validationMetadata = validationResult.metadata || {};
+        }
+
+        // Encrypt and store
+        const encrypted = await encryptCredentials(JSON.stringify(args.data), encryptionKey);
+        const jewel = await db.createJewel({
+          name: args.name,
+          type: args.type,
+          data: encrypted,
+          last_validated: Math.floor(Date.now() / 1000),
+          validation_metadata: validationMetadata
+        });
+
+        const result = {
+          id: jewel.id,
+          name: jewel.name,
+          type: jewel.type,
+          validation: validationMetadata,
+          warnings: warnings.length > 0 ? warnings : undefined
+        };
+
+        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
+
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify(result, null, 2)
+          }]
+        };
+      } catch (error) {
+        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
+        throw error;
+      }
+    }
+  );
+
+  server.registerTool(
+    'list_jewels',
+    {
+      description: 'List stored jewels (without exposing sensitive data)',
+      inputSchema: schemas.list_jewels
+    },
+    async (args, extra) => {
+      const toolLogger = logger.child({ tool: 'list_jewels', session_id: extra.sessionId });
+      const startTime = Date.now();
+
+      try {
+        const jewels = await db.listJewels({
+          type: args.type,
+          limit: args.limit
+        });
+
+        // Remove encrypted data
+        const result = {
+          jewels: jewels.map(c => ({
+            id: c.id,
+            name: c.name,
+            type: c.type,
+            last_validated: c.last_validated,
+            validation_metadata: c.validation_metadata ? JSON.parse(c.validation_metadata) : null,
+            created_at: c.created_at,
+            updated_at: c.updated_at
+          }))
+        };
+
+        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
+
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify(result, null, 2)
+          }]
+        };
+      } catch (error) {
+        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
+        throw error;
+      }
+    }
+  );
+
+  server.registerTool(
+    'get_jewel',
+    {
+      description: 'Get jewel details (without exposing sensitive data)',
+      inputSchema: schemas.get_jewel
+    },
+    async (args, extra) => {
+      const toolLogger = logger.child({ tool: 'get_jewel', session_id: extra.sessionId });
+      const startTime = Date.now();
+
+      try {
+        const jewel = await db.getJewel(args.id);
+        if (!jewel) throw new Error('Jewel not found');
+
+        const result = {
+          id: jewel.id,
+          name: jewel.name,
+          type: jewel.type,
+          last_validated: jewel.last_validated,
+          validation_metadata: jewel.validation_metadata ? JSON.parse(jewel.validation_metadata) : null,
+          created_at: jewel.created_at,
+          updated_at: jewel.updated_at
+        };
+
+        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
+
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify(result, null, 2)
+          }]
+        };
+      } catch (error) {
+        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
+        throw error;
+      }
+    }
+  );
+
+  server.registerTool(
+    'update_jewel',
+    {
+      description: 'Update jewel name or data (will re-validate if data is updated)',
+      inputSchema: schemas.update_jewel
+    },
+    async (args, extra) => {
+      const toolLogger = logger.child({ tool: 'update_jewel', session_id: extra.sessionId });
+      const startTime = Date.now();
+
+      try {
+        const updates: any = {};
+
+        if (args.name) {
+          updates.name = args.name;
+        }
+
+        if (args.data) {
+          const { encryptCredentials } = await import('../lib/crypto');
+          const { validateGitHubCredential, validateZammadCredential, validateGoogleDocsSource } = await import('../handlers/validate');
+
+          const jewel = await db.getJewel(args.id);
           if (!jewel) throw new Error('Jewel not found');
 
-          result = {
-            id: jewel.id,
-            name: jewel.name,
-            type: jewel.type,
-            last_validated: jewel.last_validated,
-            validation_metadata: jewel.validation_metadata ? JSON.parse(jewel.validation_metadata) : null,
-            created_at: jewel.created_at,
-            updated_at: jewel.updated_at
-          };
-          break;
-        }
-
-        case 'update_jewel': {
-          const input = schemas.update_jewel.parse(args);
-          const updates: any = {};
-
-          if (input.name) {
-            updates.name = input.name;
+          // Validate new credentials
+          let validationResult;
+          switch (jewel.type) {
+            case 'github':
+              validationResult = await validateGitHubCredential(args.data);
+              break;
+            case 'zammad':
+              validationResult = await validateZammadCredential(args.data);
+              break;
+            case 'gdocs':
+            case 'gdrive':
+              validationResult = await validateGoogleDocsSource({}, args.data);
+              break;
           }
 
-          if (input.data) {
-            const { encryptCredentials } = await import('../lib/crypto');
-            const { validateGitHubCredential, validateZammadCredential, validateGoogleDocsSource } = await import('../handlers/validate');
-
-            const jewel = await db.getJewel(input.id);
-            if (!jewel) throw new Error('Jewel not found');
-
-            // Validate new credentials
-            let validationResult;
-            switch (jewel.type) {
-              case 'github':
-                validationResult = await validateGitHubCredential(input.data);
-                break;
-              case 'zammad':
-                validationResult = await validateZammadCredential(input.data);
-                break;
-              case 'gdocs':
-              case 'gdrive':
-                validationResult = await validateGoogleDocsSource({}, input.data);
-                break;
-            }
-
-            if (validationResult && !validationResult.valid) {
-              throw new Error(`Credential validation failed: ${validationResult.errors.join(', ')}`);
-            }
-
-            const encrypted = await encryptCredentials(JSON.stringify(input.data), encryptionKey);
-            updates.data = encrypted;
-            updates.last_validated = Math.floor(Date.now() / 1000);
-            updates.validation_metadata = validationResult?.metadata || {};
+          if (validationResult && !validationResult.valid) {
+            throw new Error(`Credential validation failed: ${validationResult.errors.join(', ')}`);
           }
 
-          await db.updateJewel(input.id, updates);
-          result = { success: true };
-          break;
+          const encrypted = await encryptCredentials(JSON.stringify(args.data), encryptionKey);
+          updates.data = encrypted;
+          updates.last_validated = Math.floor(Date.now() / 1000);
+          updates.validation_metadata = validationResult?.metadata || {};
         }
 
-        case 'delete_jewel': {
-          const input = schemas.delete_jewel.parse(args);
+        await db.updateJewel(args.id, updates);
 
-          // Check if in use
-          const usage = await db.getJewelUsage(input.id);
-          if (usage.length > 0) {
-            throw new Error(`Cannot delete jewel: used by ${usage.length} source(s). Usage: ${usage.map(u => `${u.entanglement_name} (${u.source_type})`).join(', ')}`);
-          }
+        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
 
-          await db.deleteJewel(input.id);
-          result = { success: true };
-          break;
-        }
-
-        case 'get_jewel_usage': {
-          const input = schemas.get_jewel_usage.parse(args);
-          const usage = await db.getJewelUsage(input.id);
-          result = { usage };
-          break;
-        }
-
-        default:
-          throw new Error(`Unknown tool: ${name}`);
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({ success: true }, null, 2)
+          }]
+        };
+      } catch (error) {
+        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
+        throw error;
       }
-
-      const duration = Date.now() - startTime;
-      toolLogger.info('Tool completed', { duration_ms: duration });
-
-      return result;
-    } catch (error) {
-      const duration = Date.now() - startTime;
-      toolLogger.error('Tool failed', error as Error, { duration_ms: duration });
-      throw error;
     }
-  };
-
-  // Register all 29 tools
-  // NOTE: Tool schemas are now auto-generated from Zod schemas using zodToJsonSchema.
-  // This eliminates the previous duplication between Zod schemas (for validation) and
-  // SDK schemas (for documentation). All field descriptions are now defined once in the
-  // Zod schemas using .describe().
-  //
-  // When adding/modifying tools, only update the Zod schema in the `schemas` object.
-  server.tool(
-    'list_entanglements',
-    'List entanglements in the Zoku system',
-    zodToMcpSchema(schemas.list_entanglements),
-    (args) => handleToolCall('list_entanglements', args)
   );
 
-  server.tool(
-    'get_entanglement',
-    'Get entanglement details. By default returns minimal info (counts only). Use detailed=true for full nested data.',
-    zodToMcpSchema(schemas.get_entanglement),
-    (args) => handleToolCall('get_entanglement', args)
-  );
-
-  server.tool(
-    'get_child_entanglements',
-    'Get child entanglements of a parent entanglement',
-    zodToMcpSchema(schemas.get_child_entanglements),
-    (args) => handleToolCall('get_child_entanglements', args)
-  );
-
-  server.tool(
-    'create_entanglement',
-    'Create a new entanglement/initiative, optionally as a child of another entanglement with initial team assignments',
-    zodToMcpSchema(schemas.create_entanglement),
-    (args) => handleToolCall('create_entanglement', args)
-  );
-
-  server.tool(
-    'update_entanglement',
-    "Update an entanglement's name, description, or parent",
-    zodToMcpSchema(schemas.update_entanglement),
-    (args) => handleToolCall('update_entanglement', args)
-  );
-
-  server.tool(
-    'move_entanglement',
-    'Move an entanglement to become a child of another entanglement, or make it a root entanglement',
-    zodToMcpSchema(schemas.move_entanglement),
-    (args) => handleToolCall('move_entanglement', args)
-  );
-
-  server.tool(
-    'delete_entanglement',
-    'Delete an entanglement. WARNING: Also deletes all child entanglements, qupts, sources, and assignments.',
-    zodToMcpSchema(schemas.delete_entanglement),
-    (args) => handleToolCall('delete_entanglement', args)
-  );
-
-  server.tool(
-    'create_qupt',
-    'Record activity or update on an entanglement',
-    zodToMcpSchema(schemas.create_qupt),
-    (args) => handleToolCall('create_qupt', args)
-  );
-
-  server.tool(
-    'list_qupts',
-    'List activity for an entanglement. By default omits metadata for brevity. Use detailed=true for full metadata.',
-    zodToMcpSchema(schemas.list_qupts),
-    (args) => handleToolCall('list_qupts', args)
-  );
-
-  server.tool(
-    'list_zoku',
-    'List all zoku partners (humans and AI agents)',
-    zodToMcpSchema(schemas.list_zoku),
-    (args) => handleToolCall('list_zoku', args)
-  );
-
-  server.tool(
-    'create_zoku',
-    'Register a new zoku partner (human or AI agent)',
-    zodToMcpSchema(schemas.create_zoku),
-    (args) => handleToolCall('create_zoku', args)
-  );
-
-  server.tool(
-    'get_entangled',
-    'Get details of a zoku partner including their entanglements and roles',
-    zodToMcpSchema(schemas.get_entangled),
-    (args) => handleToolCall('get_entangled', args)
-  );
-
-  server.tool(
-    'entangle',
-    'Assign a zoku partner to a PASCI role on an entanglement',
-    zodToMcpSchema(schemas.entangle),
-    (args) => handleToolCall('entangle', args)
-  );
-
-  server.tool(
-    'disentangle',
-    'Remove a zoku partner from a PASCI role on an entanglement',
-    zodToMcpSchema(schemas.disentangle),
-    (args) => handleToolCall('disentangle', args)
-  );
-
-  server.tool(
-    'get_matrix',
-    'Get the PASCI responsibility matrix showing who is assigned to each role',
-    zodToMcpSchema(schemas.get_matrix),
-    (args) => handleToolCall('get_matrix', args)
-  );
-
-  server.tool(
-    'list_dimensions',
-    'List all taxonomy dimensions and their available values',
-    zodToMcpSchema(schemas.list_dimensions),
-    (args) => handleToolCall('list_dimensions', args)
-  );
-
-  server.tool(
-    'set_attributes',
-    'Set taxonomy attributes on an entanglement (function, pillar, service area, etc.)',
-    zodToMcpSchema(schemas.set_attributes),
-    (args) => handleToolCall('set_attributes', args)
-  );
-
-  server.tool(
-    'get_attributes',
-    'Get taxonomy attributes assigned to an entanglement',
-    zodToMcpSchema(schemas.get_attributes),
-    (args) => handleToolCall('get_attributes', args)
-  );
-
-  server.tool(
-    'list_sources',
-    'List activity sources configured for an entanglement',
-    zodToMcpSchema(schemas.list_sources),
-    (args) => handleToolCall('list_sources', args)
-  );
-
-  server.tool(
-    'add_source',
-    'Add an activity source to an entanglement. Can use stored jewels (via jewel_id) or provide inline jewels.',
-    zodToMcpSchema(schemas.add_source),
-    (args) => handleToolCall('add_source', args)
-  );
-
-  server.tool(
-    'sync_source',
-    'Manually trigger a sync for a source',
-    zodToMcpSchema(schemas.sync_source),
-    (args) => handleToolCall('sync_source', args)
-  );
-
-  server.tool(
-    'remove_source',
-    'Remove an activity source from an entanglement',
-    zodToMcpSchema(schemas.remove_source),
-    (args) => handleToolCall('remove_source', args)
-  );
-
-  server.tool(
-    'toggle_source',
-    'Enable or disable a source',
-    zodToMcpSchema(schemas.toggle_source),
-    (args) => handleToolCall('toggle_source', args)
-  );
-
-  server.tool(
-    'add_jewel',
-    'Store and validate jewels that can be reused across multiple sources',
-    zodToMcpSchema(schemas.add_jewel),
-    (args) => handleToolCall('add_jewel', args)
-  );
-
-  server.tool(
-    'list_jewels',
-    'List stored jewels (without exposing sensitive data)',
-    zodToMcpSchema(schemas.list_jewels),
-    (args) => handleToolCall('list_jewels', args)
-  );
-
-  server.tool(
-    'get_jewel',
-    'Get jewel details (without exposing sensitive data)',
-    zodToMcpSchema(schemas.get_jewel),
-    (args) => handleToolCall('get_jewel', args)
-  );
-
-  server.tool(
-    'update_jewel',
-    'Update jewel name or data (will re-validate if data is updated)',
-    zodToMcpSchema(schemas.update_jewel),
-    (args) => handleToolCall('update_jewel', args)
-  );
-
-  server.tool(
+  server.registerTool(
     'delete_jewel',
-    'Delete a stored jewel (fails if used by any sources)',
-    zodToMcpSchema(schemas.delete_jewel),
-    (args) => handleToolCall('delete_jewel', args)
+    {
+      description: 'Delete a stored jewel (fails if used by any sources)',
+      inputSchema: schemas.delete_jewel
+    },
+    async (args, extra) => {
+      const toolLogger = logger.child({ tool: 'delete_jewel', session_id: extra.sessionId });
+      const startTime = Date.now();
+
+      try {
+        // Check if in use
+        const usage = await db.getJewelUsage(args.id);
+        if (usage.length > 0) {
+          throw new Error(`Cannot delete jewel: used by ${usage.length} source(s). Usage: ${usage.map(u => `${u.entanglement_name} (${u.source_type})`).join(', ')}`);
+        }
+
+        await db.deleteJewel(args.id);
+
+        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
+
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({ success: true }, null, 2)
+          }]
+        };
+      } catch (error) {
+        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
+        throw error;
+      }
+    }
   );
 
-  server.tool(
+  server.registerTool(
     'get_jewel_usage',
-    'See which sources are using a jewel',
-    zodToMcpSchema(schemas.get_jewel_usage),
-    (args) => handleToolCall('get_jewel_usage', args)
+    {
+      description: 'See which sources are using a jewel',
+      inputSchema: schemas.get_jewel_usage
+    },
+    async (args, extra) => {
+      const toolLogger = logger.child({ tool: 'get_jewel_usage', session_id: extra.sessionId });
+      const startTime = Date.now();
+
+      try {
+        const usage = await db.getJewelUsage(args.id);
+
+        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
+
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({ usage }, null, 2)
+          }]
+        };
+      } catch (error) {
+        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
+        throw error;
+      }
+    }
   );
 
   return server;
@@ -1104,6 +1482,9 @@ export async function mcpHandler(c: Context<{ Bindings: Bindings }>) {
   logger.info('MCP request received');
 
   try {
+    // Parse request body
+    const body = await c.req.json().catch(() => undefined);
+
     // Create fresh transport and server for this request
     const transport = new StreamableHTTPTransport();
     const server = createMcpServer(db, encryptionKey, logger);
@@ -1112,7 +1493,7 @@ export async function mcpHandler(c: Context<{ Bindings: Bindings }>) {
     await server.connect(transport);
 
     // Handle the request
-    const response = await transport.handleRequest(c);
+    const response = await transport.handleRequest(c, body);
 
     logger.info('MCP request completed', logger.withDuration());
 
