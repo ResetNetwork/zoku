@@ -13,7 +13,7 @@ app.get('/', async (c) => {
   const type = c.req.query('type');
   const limit = c.req.query('limit');
 
-  const credentials = await db.listCredentials({
+  const credentials = await db.listJewels({
     type: type || undefined,
     limit: limit ? parseInt(limit) : undefined
   });
@@ -96,7 +96,7 @@ app.post('/', async (c) => {
   const encrypted = await encryptCredentials(JSON.stringify(body.data), c.env.ENCRYPTION_KEY);
 
   // Store credential
-  const credential = await db.createCredential({
+  const credential = await db.createJewel({
     name: body.name,
     type: body.type,
     data: encrypted,
@@ -212,7 +212,7 @@ app.patch('/:id', async (c) => {
     console.log('💾 Saving validation metadata:', validationMetadata);
   }
 
-  await db.updateCredential(id, updates);
+  await db.updateJewel(id, updates);
 
   return c.json({ success: true });
 });
@@ -281,7 +281,7 @@ app.delete('/:id', async (c) => {
     }, 400);
   }
 
-  await db.deleteCredential(id);
+  await db.deleteJewel(id);
   return c.json({ success: true });
 });
 
