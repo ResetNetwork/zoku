@@ -3,9 +3,10 @@
 export interface Bindings {
   DB: D1Database;
   ENCRYPTION_KEY: string;
+  LOG_LEVEL?: string;
 }
 
-export interface Volition {
+export interface Entanglement {
   id: string;
   name: string;
   description: string | null;
@@ -14,7 +15,7 @@ export interface Volition {
   updated_at: number;
 }
 
-export interface Entangled {
+export interface Zoku {
   id: string;
   name: string;
   description?: string | null;
@@ -34,7 +35,7 @@ export interface Qupt {
   created_at: number;
 }
 
-export interface Credential {
+export interface Jewel {
   id: string;
   name: string;
   type: string;
@@ -44,6 +45,9 @@ export interface Credential {
   created_at: number;
   updated_at: number;
 }
+
+// Legacy alias for backward compatibility
+export type Credential = Jewel;
 
 export interface Source {
   id: string;
@@ -55,6 +59,9 @@ export interface Source {
   enabled: number;
   last_sync: number | null;
   sync_cursor: string | null;
+  last_error: string | null;
+  error_count: number;
+  last_error_at: number | null;
   created_at: number;
 }
 
@@ -80,7 +87,7 @@ export interface DimensionValue {
   created_at: number;
 }
 
-export interface VolitionAttribute {
+export interface EntanglementAttribute {
   entanglement_id: string;
   dimension_id: string;
   value_id: string;

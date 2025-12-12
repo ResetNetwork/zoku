@@ -562,32 +562,48 @@ function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServ
             credentials = JSON.parse(await decryptCredentials(source.credentials, encryptionKey));
           }
 
-          // Fetch new activity
-          const { qupts, cursor } = await handler.collect({
-            source,
-            config,
-            credentials,
-            since: source.last_sync,
-            cursor: source.sync_cursor
-          });
+          // Fetch new activity with error tracking
+          try {
+            const { qupts, cursor } = await handler.collect({
+              source,
+              config,
+              credentials,
+              since: source.last_sync,
+              cursor: source.sync_cursor
+            });
 
-          // Insert qupts
-          if (qupts.length > 0) {
-            await db.batchCreateQupts(qupts);
+            // Insert qupts
+            if (qupts.length > 0) {
+              await db.batchCreateQupts(qupts);
+            }
+
+            // Update sync state and clear any previous errors
+            await db.updateSource(source.id, {
+              last_sync: Math.floor(Date.now() / 1000),
+              sync_cursor: cursor,
+              last_error: null,
+              error_count: 0,
+              last_error_at: null
+            });
+
+            result = {
+              success: true,
+              qupts_collected: qupts.length,
+              source_id: source.id,
+              cursor: cursor
+            };
+          } catch (syncError) {
+            // Track sync failure
+            const errorMessage = syncError instanceof Error ? syncError.message : String(syncError);
+            await db.updateSource(source.id, {
+              last_error: errorMessage,
+              error_count: (source.error_count || 0) + 1,
+              last_error_at: Math.floor(Date.now() / 1000)
+            });
+
+            toolLogger.error('Source sync failed', syncError as Error, { source_id: source.id });
+            throw new Error(`Source sync failed: ${errorMessage}`);
           }
-
-          // Update sync state
-          await db.updateSource(source.id, {
-            last_sync: Math.floor(Date.now() / 1000),
-            sync_cursor: cursor
-          });
-
-          result = {
-            success: true,
-            qupts_collected: qupts.length,
-            source_id: source.id,
-            cursor: cursor
-          };
           break;
         }
 
