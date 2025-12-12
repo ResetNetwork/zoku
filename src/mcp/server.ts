@@ -199,35 +199,28 @@ function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServ
       switch (name) {
         case 'list_entanglements': {
           const input = schemas.list_entanglements.parse(args);
-          const entanglements = await db.listEntanglements({
+          const entanglementsWithCounts = await db.listEntanglementsWithCounts({
             parent_id: input.parent_id,
             root_only: input.root_only,
             limit: input.limit
           });
 
-          // Always include counts
-          const entanglementsWithCounts = await Promise.all(
-            entanglements.map(async v => {
-              const qupts_count = (await db.listQupts({ entanglement_id: v.id, recursive: true, limit: 1000 })).length;
-              const sources_count = (await db.listSources(v.id)).length;
-
-              if (!input.detailed) {
-                return {
-                  id: v.id,
-                  name: v.name,
-                  parent_id: v.parent_id,
-                  created_at: v.created_at,
-                  updated_at: v.updated_at,
-                  qupts_count,
-                  sources_count
-                };
-              }
-
-              return { ...v, qupts_count, sources_count };
-            })
-          );
-
-          result = { entanglements: entanglementsWithCounts };
+          // Return minimal or detailed view
+          if (!input.detailed) {
+            result = {
+              entanglements: entanglementsWithCounts.map(v => ({
+                id: v.id,
+                name: v.name,
+                parent_id: v.parent_id,
+                created_at: v.created_at,
+                updated_at: v.updated_at,
+                qupts_count: v.qupts_count,
+                sources_count: v.sources_count
+              }))
+            };
+          } else {
+            result = { entanglements: entanglementsWithCounts };
+          }
           break;
         }
 
@@ -236,20 +229,19 @@ function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServ
           const entanglement = await db.getEntanglement(input.id);
           if (!entanglement) throw new Error('Entanglement not found');
 
-          // Default: return minimal info
+          // Default: return minimal info with proper counts
           if (!input.detailed) {
-            const childrenCount = (await db.getEntanglementChildren(input.id)).length;
-            const quptsCount = (await db.listQupts({
-              entanglement_id: input.id,
-              recursive: input.include_children_qupts ?? true,
-              limit: 1000
-            })).length;
+            const [childrenCount, quptsCount, sourcesCount] = await Promise.all([
+              db.getEntanglementChildrenCount(input.id),
+              db.getEntanglementQuptsCount(input.id, input.include_children_qupts ?? true),
+              db.getEntanglementSourcesCount(input.id)
+            ]);
 
             result = {
               ...entanglement,
               children_count: childrenCount,
               qupts_count: quptsCount,
-              sources_count: (await db.listSources(input.id)).length
+              sources_count: sourcesCount
             };
           } else {
             // Detailed: return full nested data
