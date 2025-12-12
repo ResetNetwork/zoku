@@ -2,6 +2,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPTransport } from '@hono/mcp';
 import { z } from 'zod';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 import type { Context } from 'hono';
 import type { Bindings } from '../types';
 import { DB } from '../db';
@@ -10,76 +11,76 @@ import { Logger } from '../lib/logger';
 // Tool schemas using Zod
 const schemas = {
   list_entanglements: z.object({
-    status: z.enum(['draft', 'active', 'paused', 'complete', 'archived']).optional(),
-    function: z.enum(['tech_innovation', 'info_tech']).optional(),
-    parent_id: z.string().optional(),
-    root_only: z.boolean().optional(),
-    limit: z.number().optional(),
-    detailed: z.boolean().optional()
+    status: z.enum(['draft', 'active', 'paused', 'complete', 'archived']).optional().describe('Filter by status'),
+    function: z.enum(['tech_innovation', 'info_tech']).optional().describe('Filter by function'),
+    parent_id: z.string().optional().describe('Get children of a specific entanglement'),
+    root_only: z.boolean().optional().default(false).describe('Only return top-level entanglements'),
+    limit: z.number().optional().default(20).describe('Max results to return'),
+    detailed: z.boolean().optional().default(false).describe('Include full details (default: counts only)')
   }),
 
   get_entanglement: z.object({
-    id: z.string(),
-    include_children_qupts: z.boolean().optional(),
-    detailed: z.boolean().optional()
+    id: z.string().describe('Entanglement ID'),
+    include_children_qupts: z.boolean().optional().default(true).describe('Include qupts from child entanglements'),
+    detailed: z.boolean().optional().default(false).describe('Return full nested data (children, matrix, attributes, qupts). Default: false (returns counts only)')
   }),
 
   get_child_entanglements: z.object({
-    parent_id: z.string(),
-    recursive: z.boolean().optional()
+    parent_id: z.string().describe('Parent entanglement ID'),
+    recursive: z.boolean().optional().default(false).describe('Include all descendants, not just direct children')
   }),
 
   create_entanglement: z.object({
-    name: z.string(),
-    description: z.string().optional(),
-    parent_id: z.string().optional(),
+    name: z.string().describe('Name of the entanglement'),
+    description: z.string().optional().describe('Description of the entanglement'),
+    parent_id: z.string().optional().describe('Parent entanglement ID for nesting'),
     initial_zoku: z.array(z.object({
       zoku_id: z.string(),
       role: z.enum(['perform', 'accountable', 'control', 'support', 'informed'])
-    })).optional()
+    })).optional().describe('Initial PASCI role assignments (e.g., [{ zoku_id: "ent-1", role: "accountable" }])')
   }),
 
   update_entanglement: z.object({
     id: z.string(),
     name: z.string().optional(),
     description: z.string().optional(),
-    parent_id: z.string().optional()
+    parent_id: z.string().optional().describe('Move to new parent (null to make root)')
   }),
 
   move_entanglement: z.object({
-    id: z.string(),
-    new_parent_id: z.string().optional()
+    id: z.string().describe('Entanglement ID to move'),
+    new_parent_id: z.string().optional().describe('New parent entanglement ID, or null to make root-level')
   }),
 
   delete_entanglement: z.object({
-    id: z.string(),
-    confirm: z.boolean()
+    id: z.string().describe('Entanglement ID to delete'),
+    confirm: z.boolean().default(false).describe('Must be true to confirm deletion')
   }),
 
   create_qupt: z.object({
-    entanglement_id: z.string(),
-    content: z.string(),
-    zoku_id: z.string().optional(),
-    metadata: z.record(z.any()).optional()
+    entanglement_id: z.string().describe('ID of the entanglement'),
+    content: z.string().describe('Activity description'),
+    zoku_id: z.string().optional().describe('ID of the zoku creating this qupt'),
+    metadata: z.record(z.any()).optional().describe('Additional structured data')
   }),
 
   list_qupts: z.object({
     entanglement_id: z.string(),
-    recursive: z.boolean().optional(),
-    source: z.string().optional(),
-    limit: z.number().optional(),
-    detailed: z.boolean().optional()
+    recursive: z.boolean().optional().default(true).describe('Include qupts from child entanglements'),
+    source: z.string().optional().describe('Filter by source (github, gmail, zammad, etc.)'),
+    limit: z.number().optional().default(20),
+    detailed: z.boolean().optional().default(false).describe('Include full metadata. Default: false (omits metadata for brevity)')
   }),
 
   list_zoku: z.object({
     type: z.enum(['human', 'agent']).optional(),
-    limit: z.number().optional()
+    limit: z.number().optional().default(20)
   }),
 
   create_zoku: z.object({
-    name: z.string(),
+    name: z.string().describe('Name of the entity'),
     type: z.enum(['human', 'agent']),
-    metadata: z.record(z.any()).optional()
+    metadata: z.record(z.any()).optional().describe('Additional metadata')
   }),
 
   get_entangled: z.object({
@@ -89,7 +90,7 @@ const schemas = {
   entangle: z.object({
     entanglement_id: z.string(),
     zoku_id: z.string(),
-    role: z.enum(['perform', 'accountable', 'control', 'support', 'informed'])
+    role: z.enum(['perform', 'accountable', 'control', 'support', 'informed']).describe('PASCI role: Perform (does work), Accountable (answerable), Control (veto power), Support (advisory), Informed (notified)')
   }),
 
   disentangle: z.object({
@@ -107,8 +108,8 @@ const schemas = {
   set_attributes: z.object({
     entanglement_id: z.string(),
     attributes: z.array(z.object({
-      dimension: z.string(),
-      value: z.string()
+      dimension: z.string().describe("Dimension name (e.g., 'function', 'pillar')"),
+      value: z.string().describe('Value within that dimension')
     }))
   }),
 
@@ -128,9 +129,9 @@ const schemas = {
         owner: z.string(),
         repo: z.string(),
         events: z.array(z.string()).optional()
-      }),
-      jewels: z.record(z.any()).optional(),  // Inline jewels (renamed from credentials)
-      jewel_id: z.string().optional()
+      }).describe('Source-specific configuration (e.g., owner, repo for GitHub)'),
+      jewels: z.record(z.any()).optional().describe('Inline authentication jewels (will be validated and encrypted). Omit if using jewel_id.'),
+      jewel_id: z.string().optional().describe('ID of stored jewel to use. Omit if providing inline jewels.')
     }),
     z.object({
       entanglement_id: z.string(),
@@ -139,9 +140,9 @@ const schemas = {
         url: z.string().url(),
         tag: z.string(),
         include_articles: z.boolean().optional()
-      }),
-      jewels: z.record(z.any()).optional(),
-      jewel_id: z.string().optional()
+      }).describe('Source-specific configuration (e.g., owner, repo for GitHub)'),
+      jewels: z.record(z.any()).optional().describe('Inline authentication jewels (will be validated and encrypted). Omit if using jewel_id.'),
+      jewel_id: z.string().optional().describe('ID of stored jewel to use. Omit if providing inline jewels.')
     }),
     z.object({
       entanglement_id: z.string(),
@@ -149,9 +150,9 @@ const schemas = {
       config: z.object({
         document_id: z.string(),
         track_suggestions: z.boolean().optional()
-      }),
-      jewels: z.record(z.any()).optional(),
-      jewel_id: z.string().optional()
+      }).describe('Source-specific configuration (e.g., owner, repo for GitHub)'),
+      jewels: z.record(z.any()).optional().describe('Inline authentication jewels (will be validated and encrypted). Omit if using jewel_id.'),
+      jewel_id: z.string().optional().describe('ID of stored jewel to use. Omit if providing inline jewels.')
     }),
     z.object({
       entanglement_id: z.string(),
@@ -159,9 +160,9 @@ const schemas = {
       config: z.object({
         folder_id: z.string().optional(),
         file_types: z.array(z.string()).optional()
-      }),
-      jewels: z.record(z.any()).optional(),
-      jewel_id: z.string().optional()
+      }).describe('Source-specific configuration (e.g., owner, repo for GitHub)'),
+      jewels: z.record(z.any()).optional().describe('Inline authentication jewels (will be validated and encrypted). Omit if using jewel_id.'),
+      jewel_id: z.string().optional().describe('ID of stored jewel to use. Omit if providing inline jewels.')
     }),
     z.object({
       entanglement_id: z.string(),
@@ -169,9 +170,9 @@ const schemas = {
       config: z.object({
         query: z.string().optional(),
         labels: z.array(z.string()).optional()
-      }),
-      jewels: z.record(z.any()).optional(),
-      jewel_id: z.string().optional()
+      }).describe('Source-specific configuration (e.g., owner, repo for GitHub)'),
+      jewels: z.record(z.any()).optional().describe('Inline authentication jewels (will be validated and encrypted). Omit if using jewel_id.'),
+      jewel_id: z.string().optional().describe('ID of stored jewel to use. Omit if providing inline jewels.')
     }),
     z.object({
       entanglement_id: z.string(),
@@ -179,9 +180,9 @@ const schemas = {
       config: z.object({
         url: z.string().url().optional(),
         secret: z.string().optional()
-      }),
-      jewels: z.record(z.any()).optional(),
-      jewel_id: z.string().optional()
+      }).describe('Source-specific configuration (e.g., owner, repo for GitHub)'),
+      jewels: z.record(z.any()).optional().describe('Inline authentication jewels (will be validated and encrypted). Omit if using jewel_id.'),
+      jewel_id: z.string().optional().describe('ID of stored jewel to use. Omit if providing inline jewels.')
     })
   ]),
 
@@ -200,14 +201,14 @@ const schemas = {
 
   // Jewel/Credentials management
   add_jewel: z.object({
-    name: z.string(),
+    name: z.string().describe('User-friendly name (e.g., "GitHub - Personal")'),
     type: z.enum(['github', 'gmail', 'zammad', 'gdrive', 'gdocs']),
-    data: z.record(z.any())
+    data: z.record(z.any()).describe('Authentication credentials (will be validated and encrypted)')
   }),
 
   list_jewels: z.object({
-    type: z.enum(['github', 'gmail', 'zammad', 'gdrive', 'gdocs']).optional(),
-    limit: z.number().optional()
+    type: z.enum(['github', 'gmail', 'zammad', 'gdrive', 'gdocs']).optional().describe('Filter by jewel type'),
+    limit: z.number().optional().default(20)
   }),
 
   get_jewel: z.object({
@@ -216,8 +217,8 @@ const schemas = {
 
   update_jewel: z.object({
     id: z.string(),
-    name: z.string().optional(),
-    data: z.record(z.any()).optional()
+    name: z.string().optional().describe('New name for the jewel'),
+    data: z.record(z.any()).optional().describe('New authentication credentials (will be validated)')
   }),
 
   delete_jewel: z.object({
@@ -228,6 +229,17 @@ const schemas = {
     id: z.string()
   })
 };
+
+// Helper to convert Zod schema to MCP SDK format
+function zodToMcpSchema(zodSchema: z.ZodTypeAny): any {
+  const jsonSchema = zodToJsonSchema(zodSchema, { target: 'openApi3', $refStrategy: 'none' });
+  // The MCP SDK expects just the properties object, not the full JSON Schema
+  if (jsonSchema && typeof jsonSchema === 'object' && 'properties' in jsonSchema) {
+    return jsonSchema.properties;
+  }
+  // For empty objects or non-object schemas
+  return {};
+}
 
 // Create and configure MCP server
 function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServer {
@@ -858,395 +870,212 @@ function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServ
   };
 
   // Register all 29 tools
-  // NOTE: Tool schemas are duplicated - defined as Zod schemas (lines 11-230) for runtime validation
-  // and as SDK schemas (below) for API documentation. This duplication is intentional because:
-  // 1. Zod schemas provide runtime type safety and validation
-  // 2. SDK schemas include detailed descriptions for API consumers
-  // 3. Converting Zod→SDK via zodToJsonSchema would lose the descriptions
+  // NOTE: Tool schemas are now auto-generated from Zod schemas using zodToJsonSchema.
+  // This eliminates the previous duplication between Zod schemas (for validation) and
+  // SDK schemas (for documentation). All field descriptions are now defined once in the
+  // Zod schemas using .describe().
   //
-  // When adding/modifying tools, update BOTH locations:
-  // - Zod schema in `schemas` object (for validation)
-  // - SDK schema in server.tool() call (for documentation)
-  //
-  // Future improvement: Add .describe() to all Zod schema fields, then use zodToJsonSchema
+  // When adding/modifying tools, only update the Zod schema in the `schemas` object.
   server.tool(
     'list_entanglements',
     'List entanglements in the Zoku system',
-    {
-      status: {
-        type: 'string',
-        enum: ['draft', 'active', 'paused', 'complete', 'archived'],
-        description: 'Filter by status'
-      },
-      function: {
-        type: 'string',
-        enum: ['tech_innovation', 'info_tech'],
-        description: 'Filter by function'
-      },
-      parent_id: {
-        type: 'string',
-        description: 'Get children of a specific entanglement'
-      },
-      root_only: {
-        type: 'boolean',
-        description: 'Only return top-level entanglements',
-        default: false
-      },
-      limit: {
-        type: 'number',
-        description: 'Max results to return',
-        default: 20
-      },
-      detailed: {
-        type: 'boolean',
-        description: 'Include full details (default: counts only)',
-        default: false
-      }
-    },
+    zodToMcpSchema(schemas.list_entanglements),
     (args) => handleToolCall('list_entanglements', args)
   );
 
   server.tool(
     'get_entanglement',
     'Get entanglement details. By default returns minimal info (counts only). Use detailed=true for full nested data.',
-    {
-      id: { type: 'string', description: 'Entanglement ID' },
-      include_children_qupts: {
-        type: 'boolean',
-        description: 'Include qupts from child entanglements',
-        default: true
-      },
-      detailed: {
-        type: 'boolean',
-        description: 'Return full nested data (children, matrix, attributes, qupts). Default: false (returns counts only)',
-        default: false
-      }
-    },
+    zodToMcpSchema(schemas.get_entanglement),
     (args) => handleToolCall('get_entanglement', args)
   );
 
   server.tool(
     'get_child_entanglements',
     'Get child entanglements of a parent entanglement',
-    {
-      parent_id: { type: 'string', description: 'Parent entanglement ID' },
-      recursive: {
-        type: 'boolean',
-        description: 'Include all descendants, not just direct children',
-        default: false
-      }
-    },
+    zodToMcpSchema(schemas.get_child_entanglements),
     (args) => handleToolCall('get_child_entanglements', args)
   );
 
   server.tool(
     'create_entanglement',
     'Create a new entanglement/initiative, optionally as a child of another entanglement with initial team assignments',
-    {
-      name: { type: 'string', description: 'Name of the entanglement' },
-      description: { type: 'string', description: 'Description of the entanglement' },
-      parent_id: { type: 'string', description: 'Parent entanglement ID for nesting' },
-      initial_zoku: {
-        type: 'array',
-        description: 'Initial PASCI role assignments (e.g., [{ zoku_id: "ent-1", role: "accountable" }])',
-        items: {
-          type: 'object',
-          properties: {
-            zoku_id: { type: 'string' },
-            role: { type: 'string', enum: ['perform', 'accountable', 'control', 'support', 'informed'] }
-          },
-          required: ['zoku_id', 'role']
-        }
-      }
-    },
+    zodToMcpSchema(schemas.create_entanglement),
     (args) => handleToolCall('create_entanglement', args)
   );
 
   server.tool(
     'update_entanglement',
     "Update an entanglement's name, description, or parent",
-    {
-      id: { type: 'string' },
-      name: { type: 'string' },
-      description: { type: 'string' },
-      parent_id: { type: 'string', description: 'Move to new parent (null to make root)' }
-    },
+    zodToMcpSchema(schemas.update_entanglement),
     (args) => handleToolCall('update_entanglement', args)
   );
 
   server.tool(
     'move_entanglement',
     'Move an entanglement to become a child of another entanglement, or make it a root entanglement',
-    {
-      id: { type: 'string', description: 'Entanglement ID to move' },
-      new_parent_id: {
-        type: 'string',
-        description: 'New parent entanglement ID, or null to make root-level'
-      }
-    },
+    zodToMcpSchema(schemas.move_entanglement),
     (args) => handleToolCall('move_entanglement', args)
   );
 
   server.tool(
     'delete_entanglement',
     'Delete an entanglement. WARNING: Also deletes all child entanglements, qupts, sources, and assignments.',
-    {
-      id: { type: 'string', description: 'Entanglement ID to delete' },
-      confirm: {
-        type: 'boolean',
-        description: 'Must be true to confirm deletion',
-        default: false
-      }
-    },
+    zodToMcpSchema(schemas.delete_entanglement),
     (args) => handleToolCall('delete_entanglement', args)
   );
 
   server.tool(
     'create_qupt',
     'Record activity or update on an entanglement',
-    {
-      entanglement_id: { type: 'string', description: 'ID of the entanglement' },
-      content: { type: 'string', description: 'Activity description' },
-      zoku_id: { type: 'string', description: 'ID of the zoku creating this qupt' },
-      metadata: { type: 'object', description: 'Additional structured data' }
-    },
+    zodToMcpSchema(schemas.create_qupt),
     (args) => handleToolCall('create_qupt', args)
   );
 
   server.tool(
     'list_qupts',
     'List activity for an entanglement. By default omits metadata for brevity. Use detailed=true for full metadata.',
-    {
-      entanglement_id: { type: 'string' },
-      recursive: {
-        type: 'boolean',
-        description: 'Include qupts from child entanglements',
-        default: true
-      },
-      source: {
-        type: 'string',
-        description: 'Filter by source (github, gmail, zammad, etc.)'
-      },
-      limit: { type: 'number', default: 20 },
-      detailed: {
-        type: 'boolean',
-        description: 'Include full metadata. Default: false (omits metadata for brevity)',
-        default: false
-      }
-    },
+    zodToMcpSchema(schemas.list_qupts),
     (args) => handleToolCall('list_qupts', args)
   );
 
   server.tool(
     'list_zoku',
     'List all zoku partners (humans and AI agents)',
-    {
-      type: { type: 'string', enum: ['human', 'agent'] },
-      limit: { type: 'number', default: 20 }
-    },
+    zodToMcpSchema(schemas.list_zoku),
     (args) => handleToolCall('list_zoku', args)
   );
 
   server.tool(
     'create_zoku',
     'Register a new zoku partner (human or AI agent)',
-    {
-      name: { type: 'string', description: 'Name of the entity' },
-      type: { type: 'string', enum: ['human', 'agent'] },
-      metadata: { type: 'object', description: 'Additional metadata' }
-    },
+    zodToMcpSchema(schemas.create_zoku),
     (args) => handleToolCall('create_zoku', args)
   );
 
   server.tool(
     'get_entangled',
     'Get details of a zoku partner including their entanglements and roles',
-    {
-      id: { type: 'string' }
-    },
+    zodToMcpSchema(schemas.get_entangled),
     (args) => handleToolCall('get_entangled', args)
   );
 
   server.tool(
     'entangle',
     'Assign a zoku partner to a PASCI role on an entanglement',
-    {
-      entanglement_id: { type: 'string' },
-      zoku_id: { type: 'string' },
-      role: {
-        type: 'string',
-        enum: ['perform', 'accountable', 'control', 'support', 'informed'],
-        description: 'PASCI role: Perform (does work), Accountable (answerable), Control (veto power), Support (advisory), Informed (notified)'
-      }
-    },
+    zodToMcpSchema(schemas.entangle),
     (args) => handleToolCall('entangle', args)
   );
 
   server.tool(
     'disentangle',
     'Remove a zoku partner from a PASCI role on an entanglement',
-    {
-      entanglement_id: { type: 'string' },
-      zoku_id: { type: 'string' },
-      role: {
-        type: 'string',
-        enum: ['perform', 'accountable', 'control', 'support', 'informed']
-      }
-    },
+    zodToMcpSchema(schemas.disentangle),
     (args) => handleToolCall('disentangle', args)
   );
 
   server.tool(
     'get_matrix',
     'Get the PASCI responsibility matrix showing who is assigned to each role',
-    {
-      entanglement_id: { type: 'string' }
-    },
+    zodToMcpSchema(schemas.get_matrix),
     (args) => handleToolCall('get_matrix', args)
   );
 
   server.tool(
     'list_dimensions',
     'List all taxonomy dimensions and their available values',
-    {},
+    zodToMcpSchema(schemas.list_dimensions),
     (args) => handleToolCall('list_dimensions', args)
   );
 
   server.tool(
     'set_attributes',
     'Set taxonomy attributes on an entanglement (function, pillar, service area, etc.)',
-    {
-      entanglement_id: { type: 'string' },
-      attributes: {
-        type: 'array',
-        items: {
-          type: 'object',
-          properties: {
-            dimension: { type: 'string', description: "Dimension name (e.g., 'function', 'pillar')" },
-            value: { type: 'string', description: 'Value within that dimension' }
-          },
-          required: ['dimension', 'value']
-        }
-      }
-    },
+    zodToMcpSchema(schemas.set_attributes),
     (args) => handleToolCall('set_attributes', args)
   );
 
   server.tool(
     'get_attributes',
     'Get taxonomy attributes assigned to an entanglement',
-    {
-      entanglement_id: { type: 'string' }
-    },
+    zodToMcpSchema(schemas.get_attributes),
     (args) => handleToolCall('get_attributes', args)
   );
 
   server.tool(
     'list_sources',
     'List activity sources configured for an entanglement',
-    {
-      entanglement_id: { type: 'string' }
-    },
+    zodToMcpSchema(schemas.list_sources),
     (args) => handleToolCall('list_sources', args)
   );
 
   server.tool(
     'add_source',
     'Add an activity source to an entanglement. Can use stored jewels (via jewel_id) or provide inline jewels.',
-    {
-      entanglement_id: { type: 'string' },
-      type: { type: 'string', enum: ['github', 'gmail', 'zammad', 'gdrive', 'gdocs', 'webhook'] },
-      config: { type: 'object', description: 'Source-specific configuration (e.g., owner, repo for GitHub)' },
-      jewels: { type: 'object', description: 'Inline authentication jewels (will be validated and encrypted). Omit if using jewel_id.' },
-      jewel_id: { type: 'string', description: 'ID of stored jewel to use. Omit if providing inline jewels.' }
-    },
+    zodToMcpSchema(schemas.add_source),
     (args) => handleToolCall('add_source', args)
   );
 
   server.tool(
     'sync_source',
     'Manually trigger a sync for a source',
-    {
-      source_id: { type: 'string' }
-    },
+    zodToMcpSchema(schemas.sync_source),
     (args) => handleToolCall('sync_source', args)
   );
 
   server.tool(
     'remove_source',
     'Remove an activity source from an entanglement',
-    {
-      source_id: { type: 'string' }
-    },
+    zodToMcpSchema(schemas.remove_source),
     (args) => handleToolCall('remove_source', args)
   );
 
   server.tool(
     'toggle_source',
     'Enable or disable a source',
-    {
-      source_id: { type: 'string' },
-      enabled: { type: 'boolean' }
-    },
+    zodToMcpSchema(schemas.toggle_source),
     (args) => handleToolCall('toggle_source', args)
   );
 
   server.tool(
     'add_jewel',
     'Store and validate jewels that can be reused across multiple sources',
-    {
-      name: { type: 'string', description: 'User-friendly name (e.g., "GitHub - Personal")' },
-      type: { type: 'string', enum: ['github', 'gmail', 'zammad', 'gdrive', 'gdocs'] },
-      data: { type: 'object', description: 'Authentication credentials (will be validated and encrypted)' }
-    },
+    zodToMcpSchema(schemas.add_jewel),
     (args) => handleToolCall('add_jewel', args)
   );
 
   server.tool(
     'list_jewels',
     'List stored jewels (without exposing sensitive data)',
-    {
-      type: { type: 'string', enum: ['github', 'gmail', 'zammad', 'gdrive', 'gdocs'], description: 'Filter by jewel type' },
-      limit: { type: 'number', default: 20 }
-    },
+    zodToMcpSchema(schemas.list_jewels),
     (args) => handleToolCall('list_jewels', args)
   );
 
   server.tool(
     'get_jewel',
     'Get jewel details (without exposing sensitive data)',
-    {
-      id: { type: 'string' }
-    },
+    zodToMcpSchema(schemas.get_jewel),
     (args) => handleToolCall('get_jewel', args)
   );
 
   server.tool(
     'update_jewel',
     'Update jewel name or data (will re-validate if data is updated)',
-    {
-      id: { type: 'string' },
-      name: { type: 'string', description: 'New name for the jewel' },
-      data: { type: 'object', description: 'New authentication credentials (will be validated)' }
-    },
+    zodToMcpSchema(schemas.update_jewel),
     (args) => handleToolCall('update_jewel', args)
   );
 
   server.tool(
     'delete_jewel',
     'Delete a stored jewel (fails if used by any sources)',
-    {
-      id: { type: 'string' }
-    },
+    zodToMcpSchema(schemas.delete_jewel),
     (args) => handleToolCall('delete_jewel', args)
   );
 
   server.tool(
     'get_jewel_usage',
     'See which sources are using a jewel',
-    {
-      id: { type: 'string' }
-    },
+    zodToMcpSchema(schemas.get_jewel_usage),
     (args) => handleToolCall('get_jewel_usage', args)
   );
 
