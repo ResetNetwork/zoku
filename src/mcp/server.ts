@@ -617,15 +617,23 @@ function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServ
             credentials = JSON.parse(await decryptCredentials(source.credentials, encryptionKey));
           }
 
-          // Fetch new activity with error tracking
+          // Fetch new activity with error tracking and timeout
           try {
-            const { qupts, cursor } = await handler.collect({
+            // Timeout after 25 seconds (leave 5s buffer for Cloudflare Workers 30s limit)
+            const SYNC_TIMEOUT = 25000;
+            const collectPromise = handler.collect({
               source,
               config,
               credentials,
               since: source.last_sync,
               cursor: source.sync_cursor
             });
+
+            const timeoutPromise = new Promise((_, reject) => {
+              setTimeout(() => reject(new Error('Source sync timeout after 25 seconds')), SYNC_TIMEOUT);
+            });
+
+            const { qupts, cursor } = await Promise.race([collectPromise, timeoutPromise]) as any;
 
             // Insert qupts
             if (qupts.length > 0) {
