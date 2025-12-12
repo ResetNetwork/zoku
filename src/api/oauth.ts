@@ -1,6 +1,8 @@
 // OAuth endpoints for Google Drive/Docs integration
+// Now using Arctic library for OAuth 2.1 compliance with PKCE
 
 import { Hono } from 'hono';
+import { Google, generateState, generateCodeVerifier } from 'arctic';
 import type { Bindings } from '../types';
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -124,6 +126,7 @@ app.get('/google/callback-page', async (c) => {
 });
 
 // Start OAuth flow - requires client_id from user's Google Cloud project
+// Arctic automatically handles PKCE (OAuth 2.1 requirement)
 app.post('/google/authorize', async (c) => {
   const body = await c.req.json();
   const { client_id, client_secret } = body;
@@ -139,30 +142,40 @@ app.post('/google/authorize', async (c) => {
 
   const redirectUri = `${new URL(c.req.url).origin}/api/oauth/google/callback`;
 
-  // Generate state parameter for CSRF protection
-  // Include both client_id and client_secret in state so callback can use them
-  const state = JSON.stringify({
-    nonce: crypto.randomUUID(),
+  // Initialize Arctic Google provider
+  const google = new Google(client_id, client_secret, redirectUri);
+
+  // Generate state and code_verifier for PKCE
+  const state = generateState();
+  const codeVerifier = generateCodeVerifier();
+
+  // Store credentials and code_verifier in state for callback
+  const stateData = JSON.stringify({
+    nonce: state,
     client_id,
-    client_secret
+    client_secret,
+    code_verifier: codeVerifier
   });
 
-  const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-  authUrl.searchParams.set('client_id', client_id);
-  authUrl.searchParams.set('redirect_uri', redirectUri);
-  authUrl.searchParams.set('response_type', 'code');
-  authUrl.searchParams.set('scope', GOOGLE_OAUTH_SCOPES.join(' '));
-  authUrl.searchParams.set('access_type', 'offline'); // Get refresh token
-  authUrl.searchParams.set('prompt', 'consent'); // Force consent to get refresh token
-  authUrl.searchParams.set('state', btoa(state)); // Base64 encode state
+  // Arctic automatically adds PKCE parameters (code_challenge, code_challenge_method)
+  // and configures for offline access (refresh token)
+  const authUrl = google.createAuthorizationURL(
+    state,
+    codeVerifier,
+    GOOGLE_OAUTH_SCOPES
+  );
+
+  // Add extra parameters for refresh token
+  authUrl.searchParams.set('access_type', 'offline');
+  authUrl.searchParams.set('prompt', 'consent');
 
   return c.json({
     authorization_url: authUrl.toString(),
-    state: btoa(state)
+    state: btoa(stateData)
   });
 });
 
-// Handle OAuth callback - exchange code for tokens
+// Handle OAuth callback - Arctic validates PKCE and exchanges code for tokens
 app.get('/google/callback', async (c) => {
   const code = c.req.query('code');
   const error = c.req.query('error');
@@ -170,84 +183,67 @@ app.get('/google/callback', async (c) => {
 
   if (error) {
     // Redirect to error page
-    const errorUrl = new URL('/oauth-callback.html', new URL(c.req.url).origin);
+    const errorUrl = new URL('/api/oauth/google/callback-page', new URL(c.req.url).origin);
     errorUrl.hash = `error=${encodeURIComponent(error)}`;
     return c.redirect(errorUrl.toString());
   }
 
   if (!code || !encodedState) {
-    const errorUrl = new URL('/oauth-callback.html', new URL(c.req.url).origin);
+    const errorUrl = new URL('/api/oauth/google/callback-page', new URL(c.req.url).origin);
     errorUrl.hash = 'error=missing_code_or_state';
     return c.redirect(errorUrl.toString());
   }
 
-  // Decode state to get client_secret
+  // Decode state to get credentials and code_verifier
   let stateData: any;
   try {
     stateData = JSON.parse(atob(encodedState));
   } catch (e) {
-    const errorUrl = new URL('/oauth-callback.html', new URL(c.req.url).origin);
+    const errorUrl = new URL('/api/oauth/google/callback-page', new URL(c.req.url).origin);
     errorUrl.hash = 'error=invalid_state';
     return c.redirect(errorUrl.toString());
   }
 
-  const { client_secret } = stateData;
-  const redirectUri = `${new URL(c.req.url).origin}/api/oauth/google/callback`;
+  const { client_id, client_secret, code_verifier } = stateData;
 
-  // We need to extract client_id from the original auth URL
-  // Since we don't have it here, we'll need to get it from the query params Google sends back
-  // Or we need to include it in the state
-
-  // Actually, let's include client_id in the state as well
-  const { client_id } = stateData;
-
-  if (!client_id || !client_secret) {
-    const errorUrl = new URL('/oauth-callback.html', new URL(c.req.url).origin);
+  if (!client_id || !client_secret || !code_verifier) {
+    const errorUrl = new URL('/api/oauth/google/callback-page', new URL(c.req.url).origin);
     errorUrl.hash = 'error=missing_credentials_in_state';
     return c.redirect(errorUrl.toString());
   }
 
-  // Exchange code for tokens
+  const redirectUri = `${new URL(c.req.url).origin}/api/oauth/google/callback`;
+
+  // Arctic validates PKCE and exchanges code for tokens
   try {
-    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        code,
-        client_id,
-        client_secret,
-        redirect_uri: redirectUri,
-        grant_type: 'authorization_code'
-      })
-    });
+    const google = new Google(client_id, client_secret, redirectUri);
 
-    const tokens = await tokenResponse.json();
-
-    if (!tokens.access_token) {
-      throw new Error(`Token exchange failed: ${tokens.error_description || tokens.error}`);
-    }
+    // validateAuthorizationCode automatically:
+    // 1. Validates the PKCE code_verifier against the challenge
+    // 2. Exchanges the authorization code for tokens
+    // 3. Returns { access_token, refresh_token, expires_in, ... }
+    const tokens = await google.validateAuthorizationCode(code, code_verifier);
 
     // Redirect to backend callback page with tokens in URL hash
     const callbackUrl = new URL('/api/oauth/google/callback-page', new URL(c.req.url).origin);
     callbackUrl.hash = new URLSearchParams({
-      refresh_token: tokens.refresh_token,
-      access_token: tokens.access_token,
+      refresh_token: tokens.refreshToken || '',
+      access_token: tokens.accessToken,
       client_id,
       client_secret,
-      expires_in: tokens.expires_in.toString(),
-      scope: tokens.scope
+      expires_in: tokens.accessTokenExpiresAt ?
+        Math.floor((tokens.accessTokenExpiresAt.getTime() - Date.now()) / 1000).toString() :
+        '3600',
+      scope: tokens.scopes?.join(' ') || GOOGLE_OAUTH_SCOPES.join(' ')
     }).toString();
 
     return c.redirect(callbackUrl.toString());
 
   } catch (error) {
     console.error('OAuth token exchange failed:', error);
-    return c.json({
-      error: {
-        code: 'TOKEN_EXCHANGE_FAILED',
-        message: error instanceof Error ? error.message : 'Failed to exchange authorization code for tokens'
-      }
-    }, 500);
+    const errorUrl = new URL('/api/oauth/google/callback-page', new URL(c.req.url).origin);
+    errorUrl.hash = `error=${encodeURIComponent(error instanceof Error ? error.message : 'Token exchange failed')}`;
+    return c.redirect(errorUrl.toString());
   }
 });
 
