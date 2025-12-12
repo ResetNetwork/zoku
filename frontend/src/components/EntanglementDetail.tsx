@@ -21,12 +21,12 @@ export default function EntanglementDetail({ entanglementId, onBack }: Entanglem
 
   const { data: volition, isLoading } = useQuery({
     queryKey: ['volition', entanglementId],
-    queryFn: () => api.getVolition(entanglementId, false)
+    queryFn: () => api.getEntanglement(entanglementId, false)
   })
 
   const { data: matrix } = useQuery({
     queryKey: ['matrix', entanglementId],
-    queryFn: () => api.getMatrix(entanglementId)
+    queryFn: () => api.getZokuMatrix(entanglementId)
   })
 
   const { data: qupts = [], isLoading: quptsLoading } = useQuery({

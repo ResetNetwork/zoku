@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/api'
-import type { Volition, Qupt } from '../lib/types'
+import { Entanglement } from '../lib/types'
 import QuptItem from './QuptItem'
 import EntanglementCard from './EntanglementCard'
 

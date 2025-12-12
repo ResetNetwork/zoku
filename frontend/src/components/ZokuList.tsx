@@ -28,7 +28,7 @@ export default function ZokuList({ onSelectZoku, onSelectVolition }: ZokuListPro
         entanglements.map(async v => ({
           entanglement_id: v.id,
           volition_name: v.name,
-          matrix: await api.getMatrix(v.id)
+          matrix: await api.getZokuMatrix(v.id)
         }))
       )
       return results

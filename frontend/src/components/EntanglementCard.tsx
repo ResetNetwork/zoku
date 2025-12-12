@@ -1,4 +1,4 @@
-import type { Volition } from '../lib/types'
+import { Entanglement } from '../lib/types'
 
 interface EntanglementCardProps {
   volition: Volition
