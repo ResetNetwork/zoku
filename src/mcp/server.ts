@@ -696,8 +696,8 @@ function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServ
               break;
             case 'gdocs':
             case 'gdrive':
-              // For Google, just validate OAuth credentials work
-              validationResult = await validateGoogleDocsSource({ document_id: input.data.test_document_id || '' }, input.data);
+              // For Google, just validate OAuth credentials work (no document needed)
+              validationResult = await validateGoogleDocsSource({}, input.data);
               break;
           }
 
@@ -794,7 +794,7 @@ function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServ
                 break;
               case 'gdocs':
               case 'gdrive':
-                validationResult = await validateGoogleDocsSource({ document_id: input.data.test_document_id || '' }, input.data);
+                validationResult = await validateGoogleDocsSource({}, input.data);
                 break;
             }
 

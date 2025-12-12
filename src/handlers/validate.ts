@@ -88,14 +88,14 @@ export async function validateGitHubSource(config: any, credentials: any): Promi
   const errors: string[] = [];
   const metadata: Record<string, any> = {};
 
-  // First validate the credential itself
-  const credentialValidation = await validateGitHubCredential(credentials);
-  if (!credentialValidation.valid) {
-    return credentialValidation;
+  // First validate the jewel itself
+  const jewelValidation = await validateGitHubCredential(credentials);
+  if (!jewelValidation.valid) {
+    return jewelValidation;
   }
 
-  warnings.push(...credentialValidation.warnings);
-  Object.assign(metadata, credentialValidation.metadata);
+  warnings.push(...jewelValidation.warnings);
+  Object.assign(metadata, jewelValidation.metadata);
 
   // Only validate repo access if owner/repo are provided
   if (!owner || !repo) {
@@ -228,7 +228,7 @@ export async function validateZammadSource(config: any, credentials: any): Promi
     return {
       valid: false,
       warnings: [],
-      errors: ['Zammad URL must be stored in credential'],
+      errors: ['Zammad URL must be stored in jewel'],
       metadata: {}
     };
   }
@@ -381,9 +381,9 @@ export async function validateGoogleDocsSource(config: any, credentials: any): P
     const tokenData = await tokenResponse.json();
     const accessToken = tokenData.access_token;
 
-    // Get user info from Google Drive API
+    // Get user info and storage quota from Google Drive API
     try {
-      const aboutResponse = await fetch('https://www.googleapis.com/drive/v3/about?fields=user', {
+      const aboutResponse = await fetch('https://www.googleapis.com/drive/v3/about?fields=kind,user,storageQuota', {
         headers: { 'Authorization': `Bearer ${accessToken}` }
       });
       if (aboutResponse.ok) {
@@ -392,35 +392,44 @@ export async function validateGoogleDocsSource(config: any, credentials: any): P
           metadata.email = aboutData.user.emailAddress;
           metadata.name = aboutData.user.displayName;
         }
+        if (aboutData.storageQuota) {
+          metadata.storage_limit = aboutData.storageQuota.limit;
+          metadata.storage_usage = aboutData.storageQuota.usage;
+        }
       }
     } catch (e) {
       // User info is optional
     }
 
-    // Test document access
-    const docResponse = await fetch(
-      `https://docs.googleapis.com/v1/documents/${document_id}?fields=title`,
-      {
-        headers: { 'Authorization': `Bearer ${accessToken}` }
-      }
-    );
+    // Test document access only if document_id is provided
+    if (document_id) {
+      const docResponse = await fetch(
+        `https://docs.googleapis.com/v1/documents/${document_id}?fields=title`,
+        {
+          headers: { 'Authorization': `Bearer ${accessToken}` }
+        }
+      );
 
-    if (!docResponse.ok) {
-      const accountInfo = metadata.email || 'your Google account';
-      if (docResponse.status === 404) {
-        errors.push(`Document not found. The document ID may be incorrect, or ${accountInfo} does not have access.`);
+      if (!docResponse.ok) {
+        const accountInfo = metadata.email || 'your Google account';
+        if (docResponse.status === 404) {
+          errors.push(`Document not found. The document ID may be incorrect, or ${accountInfo} does not have access.`);
+          return { valid: false, warnings, errors, metadata };
+        }
+        if (docResponse.status === 403) {
+          errors.push(`Access denied. Please share the document with ${accountInfo} or update OAuth scopes.`);
+          return { valid: false, warnings, errors, metadata };
+        }
+        errors.push(`Google Docs API error: ${docResponse.status}`);
         return { valid: false, warnings, errors, metadata };
       }
-      if (docResponse.status === 403) {
-        errors.push(`Access denied. Please share the document with ${accountInfo} or update OAuth scopes.`);
-        return { valid: false, warnings, errors, metadata };
-      }
-      errors.push(`Google Docs API error: ${docResponse.status}`);
-      return { valid: false, warnings, errors, metadata };
+
+      const doc = await docResponse.json();
+      metadata.document_title = doc.title;
+    } else {
+      // No document ID provided - just validating account access
+      warnings.push('No test document provided - validated account only');
     }
-
-    const doc = await docResponse.json();
-    metadata.document_title = doc.title;
 
     return {
       valid: true,
