@@ -172,9 +172,10 @@ add_source: z.object({
 })
 ```
 
-### 6. Unused Schema Fields
+### 6. Unused Schema Fields ✅ FIXED
 **Location:** Line 14, 202-206
 **Severity:** HIGH - Code Quality
+**Status:** Fixed in commit [pending]
 
 **Problem:**
 `list_entanglements` schema includes `status` and `function` filters but they're never used in the handler. Parsed but ignored.

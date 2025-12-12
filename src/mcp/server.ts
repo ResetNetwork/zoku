@@ -202,6 +202,8 @@ function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServ
           const entanglementsWithCounts = await db.listEntanglementsWithCounts({
             parent_id: input.parent_id,
             root_only: input.root_only,
+            status: input.status,
+            function: input.function,
             limit: input.limit
           });
 

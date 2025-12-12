@@ -67,6 +67,8 @@ export class DB {
   async listEntanglementsWithCounts(filters: {
     parent_id?: string;
     root_only?: boolean;
+    status?: string;
+    function?: string;
     limit?: number;
     offset?: number;
   } = {}): Promise<Array<Entanglement & { qupts_count: number; sources_count: number }>> {
@@ -89,6 +91,34 @@ export class DB {
     `;
     const conditions: string[] = [];
     const params: any[] = [];
+
+    // Add joins for attribute filtering
+    let joins = '';
+    if (filters.status) {
+      joins += `
+        JOIN entanglement_attributes ea_status ON e.id = ea_status.entanglement_id
+        JOIN dimensions d_status ON ea_status.dimension_id = d_status.id
+        JOIN dimension_values dv_status ON ea_status.value_id = dv_status.id
+      `;
+      conditions.push("d_status.name = 'status' AND dv_status.value = ?");
+      params.push(filters.status);
+    }
+
+    if (filters.function) {
+      joins += `
+        JOIN entanglement_attributes ea_function ON e.id = ea_function.entanglement_id
+        JOIN dimensions d_function ON ea_function.dimension_id = d_function.id
+        JOIN dimension_values dv_function ON ea_function.value_id = dv_function.id
+      `;
+      conditions.push("d_function.name = 'function' AND dv_function.value = ?");
+      params.push(filters.function);
+    }
+
+    // Insert joins after FROM clause
+    if (joins) {
+      const fromIndex = query.indexOf('FROM entanglements e');
+      query = query.slice(0, fromIndex + 'FROM entanglements e'.length) + joins + query.slice(fromIndex + 'FROM entanglements e'.length);
+    }
 
     if (filters.root_only) {
       conditions.push('e.parent_id IS NULL');
