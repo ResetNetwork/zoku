@@ -180,7 +180,7 @@ export class DB {
   }
 
   // Entangled
-  async getEntangled(id: string): Promise<Entangled | null> {
+  async getZoku(id: string): Promise<Entangled | null> {
     const result = await this.d1
       .prepare('SELECT * FROM zoku WHERE id = ?')
       .bind(id)
@@ -213,7 +213,7 @@ export class DB {
     return result.results || [];
   }
 
-  async createEntangled(data: {
+  async createZoku(data: {
     name: string;
     description?: string;
     type: 'human' | 'agent';
@@ -228,7 +228,7 @@ export class DB {
     return (await this.getEntangled(id))!;
   }
 
-  async updateEntangled(
+  async updateZoku(
     id: string,
     data: { name?: string; description?: string; metadata?: Record<string, any> }
   ): Promise<void> {
@@ -257,7 +257,7 @@ export class DB {
     }
   }
 
-  async deleteEntangled(id: string): Promise<void> {
+  async deleteZoku(id: string): Promise<void> {
     await this.d1.prepare('DELETE FROM zoku WHERE id = ?').bind(id).run();
   }
 
