@@ -136,9 +136,10 @@ server.tool('get_entanglement', ...);
 server.tool('get_volition', 'DEPRECATED: Use get_entanglement instead', ...);
 ```
 
-### 5. Missing Source Config Validation
+### 5. Missing Source Config Validation ✅ FIXED
 **Location:** Line 126
 **Severity:** HIGH - Data Quality
+**Status:** Fixed in commit [pending]
 
 **Problem:**
 `config: z.record(z.any())` accepts any object. No validation that GitHub sources have `owner`/`repo`, Zammad has `url`/`tag`, etc.

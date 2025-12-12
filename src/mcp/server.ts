@@ -120,13 +120,70 @@ const schemas = {
     entanglement_id: z.string()
   }),
 
-  add_source: z.object({
-    entanglement_id: z.string(),
-    type: z.enum(['github', 'gmail', 'zammad', 'gdrive', 'gdocs', 'webhook']),
-    config: z.record(z.any()),
-    credentials: z.record(z.any()).optional(),
-    jewel_id: z.string().optional()
-  }),
+  add_source: z.discriminatedUnion('type', [
+    z.object({
+      entanglement_id: z.string(),
+      type: z.literal('github'),
+      config: z.object({
+        owner: z.string(),
+        repo: z.string(),
+        events: z.array(z.string()).optional()
+      }),
+      credentials: z.record(z.any()).optional(),
+      jewel_id: z.string().optional()
+    }),
+    z.object({
+      entanglement_id: z.string(),
+      type: z.literal('zammad'),
+      config: z.object({
+        url: z.string().url(),
+        tag: z.string(),
+        include_articles: z.boolean().optional()
+      }),
+      credentials: z.record(z.any()).optional(),
+      jewel_id: z.string().optional()
+    }),
+    z.object({
+      entanglement_id: z.string(),
+      type: z.literal('gdocs'),
+      config: z.object({
+        document_id: z.string(),
+        track_suggestions: z.boolean().optional()
+      }),
+      credentials: z.record(z.any()).optional(),
+      jewel_id: z.string().optional()
+    }),
+    z.object({
+      entanglement_id: z.string(),
+      type: z.literal('gdrive'),
+      config: z.object({
+        folder_id: z.string().optional(),
+        file_types: z.array(z.string()).optional()
+      }),
+      credentials: z.record(z.any()).optional(),
+      jewel_id: z.string().optional()
+    }),
+    z.object({
+      entanglement_id: z.string(),
+      type: z.literal('gmail'),
+      config: z.object({
+        query: z.string().optional(),
+        labels: z.array(z.string()).optional()
+      }),
+      credentials: z.record(z.any()).optional(),
+      jewel_id: z.string().optional()
+    }),
+    z.object({
+      entanglement_id: z.string(),
+      type: z.literal('webhook'),
+      config: z.object({
+        url: z.string().url().optional(),
+        secret: z.string().optional()
+      }),
+      credentials: z.record(z.any()).optional(),
+      jewel_id: z.string().optional()
+    })
+  ]),
 
   sync_source: z.object({
     source_id: z.string()
