@@ -12,8 +12,8 @@ app.get('/', async (c) => {
   const limit = c.req.query('limit') ? parseInt(c.req.query('limit')!) : 20;
   const offset = c.req.query('offset') ? parseInt(c.req.query('offset')!) : 0;
 
-  const entangled = await db.listEntangled({ type, limit, offset });
-  return c.json({ entangled });
+  const zoku = await db.listZoku({ type, limit, offset });
+  return c.json({ zoku });
 });
 
 // Get entangled details
