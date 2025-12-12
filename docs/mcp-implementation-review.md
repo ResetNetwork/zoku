@@ -210,9 +210,10 @@ list_entanglements: z.object({
 
 ## Medium Priority Issues
 
-### 7. Initial Sync Window Failure Handling
+### 7. Initial Sync Window Failure Handling ✅ FIXED
 **Location:** Lines 525-531
 **Severity:** MEDIUM - Operations
+**Status:** Fixed in commit [pending]
 
 **Problem:**
 If setting initial `last_sync` to 30 days ago fails (line 527), error is only logged as warning. Source will sync from epoch (1970), pulling decades of data.

@@ -515,14 +515,10 @@ function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServ
             jewel_id: input.jewel_id
           });
 
-          // Set initial sync window to last 30 days
+          // Set initial sync window to last 30 days (mandatory)
           const thirtyDaysAgo = Math.floor(Date.now() / 1000) - (30 * 24 * 60 * 60);
-          try {
-            await db.updateSource(source.id, { last_sync: thirtyDaysAgo });
-            toolLogger.info(`Set initial sync window to last 30 days for source ${source.id}`);
-          } catch (error) {
-            toolLogger.warn(`Failed to set initial sync window for source ${source.id}`, { error });
-          }
+          await db.updateSource(source.id, { last_sync: thirtyDaysAgo });
+          toolLogger.info(`Set initial sync window to last 30 days for source ${source.id}`);
 
           result = { source };
           if (warnings.length > 0) {
