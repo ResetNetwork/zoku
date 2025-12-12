@@ -679,7 +679,7 @@ export class DB {
   }
 
   // Credentials management
-  async createCredential(params: {
+  async createJewel(params: {
     name: string;
     type: string;
     data: string;  // Already encrypted
@@ -718,7 +718,7 @@ export class DB {
     return result || null;
   }
 
-  async listCredentials(params?: {
+  async listJewels(params?: {
     type?: string;
     limit?: number;
   }): Promise<Jewel[]> {
@@ -741,7 +741,7 @@ export class DB {
     return result.results || [];
   }
 
-  async updateCredential(id: string, params: {
+  async updateJewel(id: string, params: {
     name?: string;
     data?: string;  // Already encrypted
     last_validated?: number | null;
@@ -783,7 +783,7 @@ export class DB {
       .run();
   }
 
-  async deleteCredential(id: string): Promise<void> {
+  async deleteJewel(id: string): Promise<void> {
     await this.d1
       .prepare('DELETE FROM jewels WHERE id = ?')
       .bind(id)
