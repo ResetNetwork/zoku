@@ -340,9 +340,10 @@ try {
 }
 ```
 
-### 12. Generic Error Codes in mcpHandler
+### 12. Generic Error Codes in mcpHandler ✅ FIXED
 **Location:** Lines 1211-1218
 **Severity:** MEDIUM - Developer Experience
+**Status:** Fixed in commit [pending]
 
 **Problem:**
 All errors return generic -32603 "Internal error" code. No distinction between different error types.

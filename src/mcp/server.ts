@@ -1279,13 +1279,37 @@ export async function mcpHandler(c: Context<{ Bindings: Bindings }>) {
     return response;
   } catch (error) {
     logger.error('MCP request failed', error as Error, logger.withDuration());
+
+    // Map error types to JSON-RPC error codes
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    let code = -32603; // Default: Internal error
+    let httpStatus = 500;
+
+    // Map specific error patterns to appropriate codes
+    if (errorMessage.includes('not found')) {
+      code = -32001; // Resource not found (custom)
+      httpStatus = 404;
+    } else if (errorMessage.includes('validation failed') || errorMessage.includes('Invalid')) {
+      code = -32602; // Invalid params
+      httpStatus = 400;
+    } else if (errorMessage.includes('timeout')) {
+      code = -32002; // Timeout (custom)
+      httpStatus = 504;
+    } else if (errorMessage.includes('Access denied') || errorMessage.includes('permission')) {
+      code = -32003; // Permission denied (custom)
+      httpStatus = 403;
+    } else if (error instanceof Error && error.name === 'ZodError') {
+      code = -32602; // Invalid params
+      httpStatus = 400;
+    }
+
     return c.json({
       jsonrpc: '2.0',
       id: null,
       error: {
-        code: -32603,
-        message: error instanceof Error ? error.message : String(error)
+        code,
+        message: errorMessage
       }
-    }, 500);
+    }, httpStatus);
   }
 }
