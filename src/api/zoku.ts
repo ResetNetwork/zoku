@@ -4,7 +4,7 @@ import { DB } from '../db';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
-// List entangled
+// List zoku
 app.get('/', async (c) => {
   const db = new DB(c.env.DB);
 
@@ -16,26 +16,26 @@ app.get('/', async (c) => {
   return c.json({ zoku });
 });
 
-// Get entangled details
+// Get zoku details
 app.get('/:id', async (c) => {
   const db = new DB(c.env.DB);
   const id = c.req.param('id');
 
-  const entangled = await db.getEntangled(id);
-  if (!entangled) {
-    return c.json({ error: { code: 'NOT_FOUND', message: 'Entangled entity not found' } }, 404);
+  const zoku = await db.getZoku(id);
+  if (!zoku) {
+    return c.json({ error: { code: 'NOT_FOUND', message: 'Zoku not found' } }, 404);
   }
 
-  // Get their volitions and roles
-  const volitions = await db.getZokuEntanglements(id);
+  // Get their entanglements and roles
+  const entanglements = await db.getZokuEntanglements(id);
 
   return c.json({
-    ...entangled,
-    volitions
+    ...zoku,
+    entanglements
   });
 });
 
-// Create entangled
+// Create zoku
 app.post('/', async (c) => {
   const db = new DB(c.env.DB);
   const body = await c.req.json();
@@ -48,28 +48,28 @@ app.post('/', async (c) => {
     return c.json({ error: { code: 'VALIDATION_ERROR', message: 'type must be human or agent' } }, 400);
   }
 
-  const entangled = await db.createEntangled({
+  const zoku = await db.createZoku({
     name: body.name,
     description: body.description,
     type: body.type,
     metadata: body.metadata
   });
 
-  return c.json(entangled, 201);
+  return c.json(zoku, 201);
 });
 
-// Update entangled
+// Update zoku
 app.patch('/:id', async (c) => {
   const db = new DB(c.env.DB);
   const id = c.req.param('id');
   const body = await c.req.json();
 
-  const entangled = await db.getEntangled(id);
-  if (!entangled) {
-    return c.json({ error: { code: 'NOT_FOUND', message: 'Entangled entity not found' } }, 404);
+  const zoku = await db.getZoku(id);
+  if (!zoku) {
+    return c.json({ error: { code: 'NOT_FOUND', message: 'Zoku not found' } }, 404);
   }
 
-  await db.updateEntangled(id, {
+  await db.updateZoku(id, {
     name: body.name,
     description: body.description,
     metadata: body.metadata
@@ -78,17 +78,17 @@ app.patch('/:id', async (c) => {
   return c.json({ success: true });
 });
 
-// Delete entangled
+// Delete zoku
 app.delete('/:id', async (c) => {
   const db = new DB(c.env.DB);
   const id = c.req.param('id');
 
-  const entangled = await db.getEntangled(id);
-  if (!entangled) {
-    return c.json({ error: { code: 'NOT_FOUND', message: 'Entangled entity not found' } }, 404);
+  const zoku = await db.getZoku(id);
+  if (!zoku) {
+    return c.json({ error: { code: 'NOT_FOUND', message: 'Zoku not found' } }, 404);
   }
 
-  await db.deleteEntangled(id);
+  await db.deleteZoku(id);
   return c.json({ success: true });
 });
 

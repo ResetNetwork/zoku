@@ -4,7 +4,7 @@ import { DB } from '../db';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
-// List volitions
+// List entanglements
 app.get('/', async (c) => {
   const db = new DB(c.env.DB);
 
@@ -13,7 +13,7 @@ app.get('/', async (c) => {
   const limit = c.req.query('limit') ? parseInt(c.req.query('limit')!) : 20;
   const offset = c.req.query('offset') ? parseInt(c.req.query('offset')!) : 0;
 
-  const volitions = await db.listVolitions({
+  const entanglements = await db.listEntanglements({
     root_only: rootOnly,
     parent_id: parentId,
     limit,
@@ -21,30 +21,30 @@ app.get('/', async (c) => {
   });
 
   // Fetch all attributes in batch (single query)
-  const attributesMap = await db.getEntanglementsAttributes(volitions.map(v => v.id));
+  const attributesMap = await db.getEntanglementsAttributes(entanglements.map(v => v.id));
 
   // Enrich with counts and attributes
-  const enrichedVolitions = await Promise.all(
-    volitions.map(async (v) => ({
+  const enrichedEntanglements = await Promise.all(
+    entanglements.map(async (v) => ({
       ...v,
       children_count: await db.getEntanglementChildrenCount(v.id),
       qupts_count: await db.getEntanglementQuptsCount(v.id, true),
       sources_count: await db.getEntanglementSourcesCount(v.id),
-      entangled_count: await db.getEntanglementZokuCount(v.id),
+      zoku_count: await db.getEntanglementZokuCount(v.id),
       attributes: attributesMap.get(v.id) || null
     }))
   );
 
-  return c.json({entanglements: enrichedVolitions });
+  return c.json({entanglements: enrichedEntanglements });
 });
 
-// Get volition details
+// Get entanglement details
 app.get('/:id', async (c) => {
   const db = new DB(c.env.DB);
   const id = c.req.param('id');
 
-  const volition = await db.getVolition(id);
-  if (!volition) {
+  const entanglement = await db.getEntanglement(id);
+  if (!entanglement) {
     return c.json({ error: { code: 'NOT_FOUND', message: 'Entanglement not found' } }, 404);
   }
 
@@ -94,10 +94,10 @@ app.get('/:id', async (c) => {
   const children_count = await db.getEntanglementChildrenCount(id);
   const qupts_count = await db.getEntanglementQuptsCount(id, true);
   const sources_count = await db.getEntanglementSourcesCount(id);
-  const entangled_count = await db.getEntanglementZokuCount(id);
+  const zoku_count = await db.getEntanglementZokuCount(id);
 
   return c.json({
-    ...volition,
+    ...entanglement,
     attributes: attributesMap,
     matrix,
     children: children.map(child => ({
@@ -109,11 +109,11 @@ app.get('/:id', async (c) => {
     children_count,
     qupts_count,
     sources_count,
-    entangled_count
+    zoku_count
   });
 });
 
-// Create volition
+// Create entanglement
 app.post('/', async (c) => {
   const db = new DB(c.env.DB);
   const body = await c.req.json();
@@ -124,24 +124,24 @@ app.post('/', async (c) => {
 
   // Validate parent exists if provided
   if (body.parent_id) {
-    const parent = await db.getVolition(body.parent_id);
+    const parent = await db.getEntanglement(body.parent_id);
     if (!parent) {
-      return c.json({ error: { code: 'PARENT_NOT_FOUND', message: 'Parent volition not found' } }, 404);
+      return c.json({ error: { code: 'PARENT_NOT_FOUND', message: 'Parent entanglement not found' } }, 404);
     }
   }
 
-  const volition = await db.createVolition({
+  const entanglement = await db.createEntanglement({
     name: body.name,
     description: body.description,
     parent_id: body.parent_id
   });
 
-  // Add initial entangled assignments if provided
-  if (body.initial_entangled && Array.isArray(body.initial_entangled)) {
-    for (const assignment of body.initial_entangled) {
+  // Add initial zoku assignments if provided
+  if (body.initial_zoku && Array.isArray(body.initial_zoku)) {
+    for (const assignment of body.initial_zoku) {
       if (assignment.zoku_id && assignment.role) {
         try {
-          await db.assignToMatrix(volition.id, assignment.zoku_id, assignment.role);
+          await db.assignToMatrix(entanglement.id, assignment.zoku_id, assignment.role);
         } catch (error) {
           console.warn(`Failed to assign ${assignment.zoku_id} to ${assignment.role}:`, error);
         }
@@ -149,26 +149,26 @@ app.post('/', async (c) => {
     }
   }
 
-  return c.json(volition, 201);
+  return c.json(entanglement, 201);
 });
 
-// Update volition
+// Update entanglement
 app.patch('/:id', async (c) => {
   const db = new DB(c.env.DB);
   const id = c.req.param('id');
   const body = await c.req.json();
 
-  const volition = await db.getVolition(id);
-  if (!volition) {
+  const entanglement = await db.getEntanglement(id);
+  if (!entanglement) {
     return c.json({ error: { code: 'NOT_FOUND', message: 'Entanglement not found' } }, 404);
   }
 
   // Validate parent if being changed
   if (body.parent_id !== undefined && body.parent_id !== null) {
     // Check parent exists
-    const parent = await db.getVolition(body.parent_id);
+    const parent = await db.getEntanglement(body.parent_id);
     if (!parent) {
-      return c.json({ error: { code: 'PARENT_NOT_FOUND', message: 'Parent volition not found' } }, 404);
+      return c.json({ error: { code: 'PARENT_NOT_FOUND', message: 'Parent entanglement not found' } }, 404);
     }
 
     // Check for circular reference
@@ -178,7 +178,7 @@ app.patch('/:id', async (c) => {
     }
   }
 
-  await db.updateVolition(id, {
+  await db.updateEntanglement(id, {
     name: body.name,
     description: body.description,
     parent_id: body.parent_id
@@ -187,17 +187,17 @@ app.patch('/:id', async (c) => {
   return c.json({ success: true });
 });
 
-// Delete volition
+// Delete entanglement
 app.delete('/:id', async (c) => {
   const db = new DB(c.env.DB);
   const id = c.req.param('id');
 
-  const volition = await db.getVolition(id);
-  if (!volition) {
+  const entanglement = await db.getEntanglement(id);
+  if (!entanglement) {
     return c.json({ error: { code: 'NOT_FOUND', message: 'Entanglement not found' } }, 404);
   }
 
-  await db.deleteVolition(id);
+  await db.deleteEntanglement(id);
   return c.json({ success: true });
 });
 
@@ -206,8 +206,8 @@ app.get('/:id/matrix', async (c) => {
   const db = new DB(c.env.DB);
   const id = c.req.param('id');
 
-  const volition = await db.getVolition(id);
-  if (!volition) {
+  const entanglement = await db.getEntanglement(id);
+  if (!entanglement) {
     return c.json({ error: { code: 'NOT_FOUND', message: 'Entanglement not found' } }, 404);
   }
 
@@ -218,7 +218,7 @@ app.get('/:id/matrix', async (c) => {
 // Assign to matrix
 app.post('/:id/matrix', async (c) => {
   const db = new DB(c.env.DB);
-  const volitionId = c.req.param('id');
+  const entanglementId = c.req.param('id');
   const body = await c.req.json();
 
   if (!body.zoku_id || !body.role) {
@@ -230,52 +230,52 @@ app.post('/:id/matrix', async (c) => {
     return c.json({ error: { code: 'VALIDATION_ERROR', message: 'Invalid role' } }, 400);
   }
 
-  // Verify volition exists
-  const volition = await db.getVolition(volitionId);
-  if (!volition) {
+  // Verify entanglement exists
+  const entanglement = await db.getEntanglement(entanglementId);
+  if (!entanglement) {
     return c.json({ error: { code: 'NOT_FOUND', message: 'Entanglement not found' } }, 404);
   }
 
-  // Verify entangled exists
-  const entangled = await db.getEntangled(body.zoku_id);
-  if (!entangled) {
-    return c.json({ error: { code: 'NOT_FOUND', message: 'Entangled entity not found' } }, 404);
+  // Verify zoku exists
+  const zoku = await db.getZoku(body.zoku_id);
+  if (!zoku) {
+    return c.json({ error: { code: 'NOT_FOUND', message: 'Zoku not found' } }, 404);
   }
 
   // Validate accountable constraint
   if (body.role === 'accountable') {
-    const matrix = await db.getMatrix(volitionId);
+    const matrix = await db.getMatrix(entanglementId);
     if (matrix.accountable.length > 0 && !matrix.accountable.some(e => e.id === body.zoku_id)) {
       // Warn but allow (not enforced, just a warning)
-      console.warn(`Multiple accountable entities on volition ${volitionId}`);
+      console.warn(`Multiple accountable entities on entanglement ${entanglementId}`);
     }
   }
 
-  await db.assignToMatrix(volitionId, body.zoku_id, body.role);
+  await db.assignToMatrix(entanglementId, body.zoku_id, body.role);
   return c.json({ success: true });
 });
 
 // Remove from matrix
 app.delete('/:id/matrix/:zoku_id/:role', async (c) => {
   const db = new DB(c.env.DB);
-  const volitionId = c.req.param('id');
-  const entangledId = c.req.param('zoku_id');
+  const entanglementId = c.req.param('id');
+  const zokuId = c.req.param('zoku_id');
   const role = c.req.param('role');
 
   // Check if removing last accountable
   if (role === 'accountable') {
-    const matrix = await db.getMatrix(volitionId);
-    if (matrix.accountable.length === 1 && matrix.accountable[0].id === entangledId) {
+    const matrix = await db.getMatrix(entanglementId);
+    if (matrix.accountable.length === 1 && matrix.accountable[0].id === zokuId) {
       return c.json({
         error: {
           code: 'MATRIX_NO_ACCOUNTABLE',
-          message: 'Cannot remove last Accountable. Volition must have exactly one Accountable.'
+          message: 'Cannot remove last Accountable. Entanglement must have exactly one Accountable.'
         }
       }, 400);
     }
   }
 
-  await db.removeFromMatrix(volitionId, entangledId, role);
+  await db.removeFromMatrix(entanglementId, zokuId, role);
   return c.json({ success: true });
 });
 
@@ -284,8 +284,8 @@ app.get('/:id/attributes', async (c) => {
   const db = new DB(c.env.DB);
   const id = c.req.param('id');
 
-  const volition = await db.getVolition(id);
-  if (!volition) {
+  const entanglement = await db.getEntanglement(id);
+  if (!entanglement) {
     return c.json({ error: { code: 'NOT_FOUND', message: 'Entanglement not found' } }, 404);
   }
 
@@ -326,8 +326,8 @@ app.put('/:id/attributes', async (c) => {
     return c.json({ error: { code: 'VALIDATION_ERROR', message: 'attributes array is required' } }, 400);
   }
 
-  const volition = await db.getVolition(id);
-  if (!volition) {
+  const entanglement = await db.getEntanglement(id);
+  if (!entanglement) {
     return c.json({ error: { code: 'NOT_FOUND', message: 'Entanglement not found' } }, 404);
   }
 
@@ -365,8 +365,8 @@ app.post('/:id/attributes', async (c) => {
     return c.json({ error: { code: 'VALIDATION_ERROR', message: 'dimension and value are required' } }, 400);
   }
 
-  const volition = await db.getVolition(id);
-  if (!volition) {
+  const entanglement = await db.getEntanglement(id);
+  if (!entanglement) {
     return c.json({ error: { code: 'NOT_FOUND', message: 'Entanglement not found' } }, 404);
   }
 
@@ -383,46 +383,46 @@ app.post('/:id/attributes', async (c) => {
     return c.json({ error: { code: 'VALIDATION_ERROR', message: `Unknown value: ${body.value} for dimension ${body.dimension}` } }, 400);
   }
 
-  await db.addVolitionAttribute(id, dimension.id, value.id);
+  await db.addEntanglementAttribute(id, dimension.id, value.id);
   return c.json({ success: true });
 });
 
 // Remove attributes for dimension
 app.delete('/:id/attributes/:dimension_id', async (c) => {
   const db = new DB(c.env.DB);
-  const volitionId = c.req.param('id');
+  const entanglementId = c.req.param('id');
   const dimensionId = c.req.param('dimension_id');
 
-  await db.removeEntanglementAttributes(volitionId, dimensionId);
+  await db.removeEntanglementAttributes(entanglementId, dimensionId);
   return c.json({ success: true });
 });
 
-// List sources for volition
+// List sources for entanglement
 app.get('/:id/sources', async (c) => {
   const db = new DB(c.env.DB);
   const id = c.req.param('id');
 
-  const volition = await db.getVolition(id);
-  if (!volition) {
+  const entanglement = await db.getEntanglement(id);
+  if (!entanglement) {
     return c.json({ error: { code: 'NOT_FOUND', message: 'Entanglement not found' } }, 404);
   }
 
   const sources = await db.listSources(id);
 
-  // Enrich with credential info (without exposing encrypted data)
+  // Enrich with jewel info (without exposing encrypted data)
   const enriched = await Promise.all(sources.map(async (s) => {
     let credentialInfo = null;
 
     if (s.jewel_id) {
-      const credential = await db.getCredential(s.jewel_id);
-      if (credential) {
-        const validationMetadata = credential.validation_metadata
-          ? JSON.parse(credential.validation_metadata)
+      const jewel = await db.getJewel(s.jewel_id);
+      if (jewel) {
+        const validationMetadata = jewel.validation_metadata
+          ? JSON.parse(jewel.validation_metadata)
           : {};
 
         credentialInfo = {
-          id: credential.id,
-          name: credential.name,
+          id: jewel.id,
+          name: jewel.name,
           email: validationMetadata.email || validationMetadata.authenticated_as || null
         };
       }
@@ -447,18 +447,18 @@ app.get('/:id/sources', async (c) => {
   return c.json({ sources: enriched });
 });
 
-// Add source to volition
+// Add source to entanglement
 app.post('/:id/sources', async (c) => {
   const db = new DB(c.env.DB);
-  const volitionId = c.req.param('id');
+  const entanglementId = c.req.param('id');
   const body = await c.req.json();
 
   if (!body.type || !body.config) {
     return c.json({ error: { code: 'VALIDATION_ERROR', message: 'type and config are required' } }, 400);
   }
 
-  const volition = await db.getVolition(volitionId);
-  if (!volition) {
+  const entanglement = await db.getEntanglement(entanglementId);
+  if (!entanglement) {
     return c.json({ error: { code: 'NOT_FOUND', message: 'Entanglement not found' } }, 404);
   }
 
@@ -468,24 +468,24 @@ app.post('/:id/sources', async (c) => {
 
   // If jewel_id is provided, verify it exists, matches type, and has access to the resource
   if (body.jewel_id) {
-    const credential = await db.getCredential(body.jewel_id);
-    if (!credential) {
+    const jewel = await db.getJewel(body.jewel_id);
+    if (!jewel) {
       return c.json({
         error: { code: 'NOT_FOUND', message: 'Jewel not found' }
       }, 404);
     }
-    if (credential.type !== body.type) {
+    if (jewel.type !== body.type) {
       return c.json({
         error: {
           code: 'TYPE_MISMATCH',
-          message: `Credential type mismatch: credential is ${credential.type}, source is ${body.type}`
+          message: `Jewel type mismatch: jewel is ${jewel.type}, source is ${body.type}`
         }
       }, 400);
     }
 
-    // Validate source access with the credential
-    const { decryptCredentials } = await import('../lib/crypto');
-    const decryptedCreds = JSON.parse(await decryptCredentials(credential.data, c.env.ENCRYPTION_KEY));
+    // Validate source access with the jewel
+    const { decryptJewel } = await import('../lib/crypto');
+    const decryptedCreds = JSON.parse(await decryptJewel(jewel.data, c.env.ENCRYPTION_KEY));
 
     // Validate access to the specific resource
     const { validateGitHubSource, validateZammadSource, validateGoogleDocsSource } = await import('../handlers/validate');
@@ -518,9 +518,9 @@ app.post('/:id/sources', async (c) => {
 
         // Get account info from validation metadata
         let accountInfo = '';
-        if (credential.validation_metadata) {
-          const metadata = JSON.parse(credential.validation_metadata);
-          accountInfo = metadata.authenticated_as || metadata.email || 'the credential';
+        if (jewel.validation_metadata) {
+          const metadata = JSON.parse(jewel.validation_metadata);
+          accountInfo = metadata.authenticated_as || metadata.email || 'the jewel';
         }
 
         return c.json({
@@ -579,12 +579,12 @@ app.post('/:id/sources', async (c) => {
   // If credentials provided, encrypt them
   let credentials = body.credentials;
   if (credentials && c.env.ENCRYPTION_KEY) {
-    const { encryptCredentials } = await import('../lib/crypto');
-    credentials = await encryptCredentials(JSON.stringify(credentials), c.env.ENCRYPTION_KEY);
+    const { encryptJewel } = await import('../lib/crypto');
+    credentials = await encryptJewel(JSON.stringify(credentials), c.env.ENCRYPTION_KEY);
   }
 
   const source = await db.createSource({
-    entanglement_id: volitionId,
+    entanglement_id: entanglementId,
     type: body.type,
     config: body.config,
     jewels: credentials ? { encrypted: credentials } : undefined,

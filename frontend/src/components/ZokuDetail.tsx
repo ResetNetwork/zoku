@@ -4,11 +4,10 @@ import { api } from '../lib/api'
 
 interface ZokuDetailProps {
   zokuId: string
-  onBack: () => void
-  onSelectVolition: (id: string) => void
+  onSelectEntanglement: (id: string) => void
 }
 
-export default function ZokuDetail({ zokuId, onBack, onSelectVolition }: ZokuDetailProps) {
+export default function ZokuDetail({ zokuId, onSelectEntanglement }: ZokuDetailProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [formData, setFormData] = useState({
     description: '',
@@ -49,7 +48,7 @@ export default function ZokuDetail({ zokuId, onBack, onSelectVolition }: ZokuDet
     if (!zoku) return
 
     await api.updateZoku(zokuId, {
-      description: formData.description || null,
+      description: formData.description || undefined,
       metadata: {
         github_username: formData.github_username || undefined,
         email: formData.email || undefined,
@@ -279,17 +278,17 @@ export default function ZokuDetail({ zokuId, onBack, onSelectVolition }: ZokuDet
           <div className="text-gray-400 text-center py-8">Not assigned to any entanglements yet</div>
         ) : (
           <div className="space-y-2">
-            {zoku.entanglements.map(vol => (
+            {zoku.entanglements.map((vol: { id: string; name: string; roles: string[] }) => (
               <button
                 key={vol.id}
-                onClick={() => onSelectVolition(vol.id)}
+                onClick={() => onSelectEntanglement(vol.id)}
                 className="w-full text-left p-4 bg-gray-100 dark:bg-quantum-700/50 hover:bg-gray-200 dark:hover:bg-quantum-700 rounded-lg border border-gray-300 dark:border-quantum-600 transition-colors"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <h3 className="font-semibold text-lg mb-2">{vol.name}</h3>
                     <div className="flex items-center gap-2 flex-wrap">
-                      {vol.roles.map(role => (
+                      {vol.roles.map((role: string) => (
                         <span
                           key={role}
                           className={`px-2 py-1 rounded-full text-xs font-medium ${getRoleColor(role)}`}

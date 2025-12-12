@@ -1,38 +1,38 @@
-// Credentials API routes
+// Jewels API routes
 import { Hono } from 'hono';
 import { DB } from '../db';
 import type { Bindings } from '../types';
-import { encryptCredentials, decryptCredentials } from '../lib/crypto';
+import { encryptJewel, decryptJewel } from '../lib/crypto';
 import { validateGitHubCredential, validateZammadCredential, validateGoogleDocsCredential } from '../handlers/validate';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
-// List credentials (without exposing encrypted data)
+// List jewels (without exposing encrypted data)
 app.get('/', async (c) => {
   const db = new DB(c.env.DB);
   const type = c.req.query('type');
   const limit = c.req.query('limit');
 
-  const credentials = await db.listJewels({
+  const jewels = await db.listJewels({
     type: type || undefined,
     limit: limit ? parseInt(limit) : undefined
   });
 
   // Remove encrypted data from response
-  const sanitized = credentials.map(cred => ({
-    id: cred.id,
-    name: cred.name,
-    type: cred.type,
-    last_validated: cred.last_validated,
-    validation_metadata: cred.validation_metadata ? JSON.parse(cred.validation_metadata) : null,
-    created_at: cred.created_at,
-    updated_at: cred.updated_at
+  const sanitized = jewels.map(jewel => ({
+    id: jewel.id,
+    name: jewel.name,
+    type: jewel.type,
+    last_validated: jewel.last_validated,
+    validation_metadata: jewel.validation_metadata ? JSON.parse(jewel.validation_metadata) : null,
+    created_at: jewel.created_at,
+    updated_at: jewel.updated_at
   }));
 
   return c.json({jewels: sanitized });
 });
 
-// Create credential with validation
+// Create jewel with validation
 app.post('/', async (c) => {
   const db = new DB(c.env.DB);
   const body = await c.req.json();
@@ -46,7 +46,7 @@ app.post('/', async (c) => {
     }, 400);
   }
 
-  // Validate credentials before storing
+  // Validate jewel before storing
   const warnings: string[] = [];
   let validationMetadata: Record<string, any> = {};
 
@@ -77,7 +77,7 @@ app.post('/', async (c) => {
         return c.json({
           error: {
             code: 'VALIDATION_FAILED',
-            message: 'Credential validation failed',
+            message: 'Jewel validation failed',
             errors: validationResult.errors,
             warnings: validationResult.warnings
           }
@@ -89,14 +89,14 @@ app.post('/', async (c) => {
     }
   } catch (error) {
     console.error('Validation error:', error);
-    warnings.push('Could not validate credentials, but storing anyway');
+    warnings.push('Could not validate jewel, but storing anyway');
   }
 
-  // Encrypt credentials
-  const encrypted = await encryptCredentials(JSON.stringify(body.data), c.env.ENCRYPTION_KEY);
+  // Encrypt jewel
+  const encrypted = await encryptJewel(JSON.stringify(body.data), c.env.ENCRYPTION_KEY);
 
-  // Store credential
-  const credential = await db.createJewel({
+  // Store jewel
+  const jewel = await db.createJewel({
     name: body.name,
     type: body.type,
     data: encrypted,
@@ -106,13 +106,13 @@ app.post('/', async (c) => {
 
   // Return without encrypted data
   const response: any = {
-    id: credential.id,
-    name: credential.name,
-    type: credential.type,
-    last_validated: credential.last_validated,
+    id: jewel.id,
+    name: jewel.name,
+    type: jewel.type,
+    last_validated: jewel.last_validated,
     validation: validationMetadata,
-    created_at: credential.created_at,
-    updated_at: credential.updated_at
+    created_at: jewel.created_at,
+    updated_at: jewel.updated_at
   };
 
   if (warnings.length > 0) {
@@ -122,35 +122,35 @@ app.post('/', async (c) => {
   return c.json(response, 201);
 });
 
-// Get single credential (without encrypted data)
+// Get single jewel (without encrypted data)
 app.get('/:id', async (c) => {
   const db = new DB(c.env.DB);
   const id = c.req.param('id');
 
-  const credential = await db.getCredential(id);
-  if (!credential) {
+  const jewel = await db.getJewel(id);
+  if (!jewel) {
     return c.json({ error: { code: 'NOT_FOUND', message: 'Jewel not found' } }, 404);
   }
 
   return c.json({
-    id: credential.id,
-    name: credential.name,
-    type: credential.type,
-    last_validated: credential.last_validated,
-    validation_metadata: credential.validation_metadata ? JSON.parse(credential.validation_metadata) : null,
-    created_at: credential.created_at,
-    updated_at: credential.updated_at
+    id: jewel.id,
+    name: jewel.name,
+    type: jewel.type,
+    last_validated: jewel.last_validated,
+    validation_metadata: jewel.validation_metadata ? JSON.parse(jewel.validation_metadata) : null,
+    created_at: jewel.created_at,
+    updated_at: jewel.updated_at
   });
 });
 
-// Update credential
+// Update jewel
 app.patch('/:id', async (c) => {
   const db = new DB(c.env.DB);
   const id = c.req.param('id');
   const body = await c.req.json();
 
-  const credential = await db.getCredential(id);
-  if (!credential) {
+  const jewel = await db.getJewel(id);
+  if (!jewel) {
     return c.json({ error: { code: 'NOT_FOUND', message: 'Jewel not found' } }, 404);
   }
 
@@ -168,7 +168,7 @@ app.patch('/:id', async (c) => {
     try {
       let validationResult;
 
-      switch (credential.type) {
+      switch (jewel.type) {
         case 'github':
           validationResult = await validateGitHubCredential(body.data);
           break;
@@ -189,7 +189,7 @@ app.patch('/:id', async (c) => {
           return c.json({
             error: {
               code: 'VALIDATION_FAILED',
-              message: 'Credential validation failed',
+              message: 'Jewel validation failed',
               errors: validationResult.errors,
               warnings: validationResult.warnings
             }
@@ -203,7 +203,7 @@ app.patch('/:id', async (c) => {
       console.error('Validation error:', error);
     }
 
-    const encrypted = await encryptCredentials(JSON.stringify(body.data), c.env.ENCRYPTION_KEY);
+    const encrypted = await encryptJewel(JSON.stringify(body.data), c.env.ENCRYPTION_KEY);
     updates.data = encrypted;
     updates.last_validated = Math.floor(Date.now() / 1000);
     // Store as object, not stringified - DB layer handles serialization
@@ -217,31 +217,31 @@ app.patch('/:id', async (c) => {
   return c.json({ success: true });
 });
 
-// Re-authorize Google credential (uses existing client_id/secret)
+// Re-authorize Google jewel (uses existing client_id/secret)
 app.post('/:id/reauthorize', async (c) => {
   const db = new DB(c.env.DB);
   const id = c.req.param('id');
 
-  const credential = await db.getCredential(id);
-  if (!credential) {
+  const jewel = await db.getJewel(id);
+  if (!jewel) {
     return c.json({ error: { code: 'NOT_FOUND', message: 'Jewel not found' } }, 404);
   }
 
-  if (credential.type !== 'gdrive') {
+  if (jewel.type !== 'gdrive') {
     return c.json({
-      error: { code: 'INVALID_TYPE', message: 'Re-authorization only supported for Google Drive credentials' }
+      error: { code: 'INVALID_TYPE', message: 'Re-authorization only supported for Google Drive jewels' }
     }, 400);
   }
 
-  // Decrypt existing credential to get client_id/secret
-  const decrypted = JSON.parse(await decryptCredentials(credential.data, c.env.ENCRYPTION_KEY));
+  // Decrypt existing jewel to get client_id/secret
+  const decrypted = JSON.parse(await decryptJewel(jewel.data, c.env.ENCRYPTION_KEY));
 
-  // Generate OAuth URL using existing credentials
+  // Generate OAuth URL using existing jewel data
   const state = JSON.stringify({
     nonce: crypto.randomUUID(),
     client_id: decrypted.client_id,
     client_secret: decrypted.client_secret,
-    jewel_id: id  // Track which credential this is for
+    jewel_id: id  // Track which jewel this is for
   });
 
   const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
@@ -259,23 +259,23 @@ app.post('/:id/reauthorize', async (c) => {
   });
 });
 
-// Delete credential
+// Delete jewel
 app.delete('/:id', async (c) => {
   const db = new DB(c.env.DB);
   const id = c.req.param('id');
 
-  const credential = await db.getCredential(id);
-  if (!credential) {
+  const jewel = await db.getJewel(id);
+  if (!jewel) {
     return c.json({ error: { code: 'NOT_FOUND', message: 'Jewel not found' } }, 404);
   }
 
-  // Check if credential is in use
+  // Check if jewel is in use
   const usage = await db.getJewelUsage(id);
   if (usage.length > 0) {
     return c.json({
       error: {
-        code: 'CREDENTIAL_IN_USE',
-        message: `Cannot delete credential: used by ${usage.length} source(s)`,
+        code: 'JEWEL_IN_USE',
+        message: `Cannot delete jewel: used by ${usage.length} source(s)`,
         usage: usage
       }
     }, 400);
@@ -285,13 +285,13 @@ app.delete('/:id', async (c) => {
   return c.json({ success: true });
 });
 
-// Get credential usage
+// Get jewel usage
 app.get('/:id/usage', async (c) => {
   const db = new DB(c.env.DB);
   const id = c.req.param('id');
 
-  const credential = await db.getCredential(id);
-  if (!credential) {
+  const jewel = await db.getJewel(id);
+  if (!jewel) {
     return c.json({ error: { code: 'NOT_FOUND', message: 'Jewel not found' } }, 404);
   }
 

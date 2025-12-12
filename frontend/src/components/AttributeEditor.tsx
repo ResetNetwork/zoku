@@ -47,7 +47,7 @@ export default function AttributeEditor({ entanglementId }: AttributeEditorProps
       await api.setEntanglementAttributes(entanglementId, attributes)
       addNotification('success', 'Categories updated')
       queryClient.invalidateQueries({ queryKey: ['attributes', entanglementId] })
-      queryClient.invalidateQueries({ queryKey: ['volition', entanglementId] })
+      queryClient.invalidateQueries({ queryKey: ['entanglement', entanglementId] })
       setEditing(false)
     } catch (error) {
       console.error('Failed to update attributes:', error)

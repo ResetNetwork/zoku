@@ -3,7 +3,7 @@ import { api } from '../lib/api'
 import { useNotifications } from '../lib/notifications'
 
 interface GoogleOAuthButtonProps {
-  onSuccess: (credential: { id: string; name: string }) => void
+  onSuccess: (jewel: { id: string; name: string }) => void
   onCancel?: () => void
   initialValues?: {
     name?: string
@@ -90,11 +90,11 @@ export default function GoogleOAuthButton({ onSuccess, onCancel, initialValues }
               throw new Error('Missing client_id or client_secret from callback')
             }
 
-            console.log('🎫 Creating credential with tokens...')
-            console.log('Credential data:', { name, type: 'gdrive' })
+            console.log('🎫 Creating jewel with tokens...')
+            console.log('Jewel data:', { name, type: 'gdrive' })
 
-            // Create credential with the tokens + client jewels
-            const credential = await api.createJewel({
+            // Create jewel with the tokens + client credentials
+            const jewel = await api.createJewel({
               name: name,
               type: 'gdrive',
               data: {
@@ -104,9 +104,9 @@ export default function GoogleOAuthButton({ onSuccess, onCancel, initialValues }
               }
             })
 
-            console.log(`✅ Credential created: ${credential.id}`)
+            console.log(`✅ Jewel created: ${jewel.id}`)
             addNotification('success', 'Google Drive connected successfully')
-            onSuccess(credential)
+            onSuccess(jewel)
             setAuthorizing(false)
 
             // Close popup if still open
@@ -118,8 +118,8 @@ export default function GoogleOAuthButton({ onSuccess, onCancel, initialValues }
             window.removeEventListener('message', handleMessage)
 
           } catch (error) {
-            console.error('❌ Failed to create credential:', error)
-            addNotification('error', error instanceof Error ? error.message : 'Failed to create credential')
+            console.error('❌ Failed to create jewel:', error)
+            addNotification('error', error instanceof Error ? error.message : 'Failed to create jewel')
             setAuthorizing(false)
           }
         }
@@ -165,7 +165,7 @@ export default function GoogleOAuthButton({ onSuccess, onCancel, initialValues }
       </div>
 
       <div>
-        <label className="block text-sm text-gray-400 mb-2">Credential Name</label>
+        <label className="block text-sm text-gray-400 mb-2">Jewel Name</label>
         <input
           type="text"
           value={name}

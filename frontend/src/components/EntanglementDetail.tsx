@@ -10,17 +10,16 @@ import AttributeEditor from './AttributeEditor'
 
 interface EntanglementDetailProps {
   entanglementId: string
-  onBack: () => void
 }
 
-export default function EntanglementDetail({ entanglementId, onBack }: EntanglementDetailProps) {
+export default function EntanglementDetail({ entanglementId }: EntanglementDetailProps) {
   const [showAddSource, setShowAddSource] = useState(false)
   const [editingSource, setEditingSource] = useState<any>(null)
   const queryClient = useQueryClient()
   const { addNotification } = useNotifications()
 
-  const { data: volition, isLoading } = useQuery({
-    queryKey: ['volition', entanglementId],
+  const { data: entanglement, isLoading } = useQuery({
+    queryKey: ['entanglement', entanglementId],
     queryFn: () => api.getEntanglement(entanglementId, false)
   })
 
@@ -51,8 +50,8 @@ export default function EntanglementDetail({ entanglementId, onBack }: Entanglem
     return <div className="text-center text-gray-400 py-12">Loading...</div>
   }
 
-  if (!volition) {
-    return <div className="text-center text-gray-400 py-12">Volition not found</div>
+  if (!entanglement) {
+    return <div className="text-center text-gray-400 py-12">Entanglement not found</div>
   }
 
   const pasciRoles = [
@@ -67,18 +66,18 @@ export default function EntanglementDetail({ entanglementId, onBack }: Entanglem
     <div className="space-y-6">
       {/* Header */}
       <div className="card">
-        <h1 className="text-3xl font-bold text-quantum-400 mb-2">{volition.name}</h1>
-        {volition.description && (
-          <p className="text-gray-400">{volition.description}</p>
+        <h1 className="text-3xl font-bold text-quantum-400 mb-2">{entanglement.name}</h1>
+        {entanglement.description && (
+          <p className="text-gray-400">{entanglement.description}</p>
         )}
         <div className="flex gap-6 mt-4 text-sm text-gray-500">
-          <div>Created {formatDate(volition.created_at)}</div>
+          <div>Created {formatDate(entanglement.created_at)}</div>
           <div>•</div>
-          <div>{volition.zoku_count || 0} zoku</div>
+          <div>{entanglement.zoku_count || 0} zoku</div>
           <div>•</div>
-          <div>{volition.qupts_count || 0} qupts</div>
+          <div>{entanglement.qupts_count || 0} qupts</div>
           <div>•</div>
-          <div>{volition.sources_count || 0} sources</div>
+          <div>{entanglement.sources_count || 0} sources</div>
         </div>
       </div>
 

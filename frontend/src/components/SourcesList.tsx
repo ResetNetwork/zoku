@@ -4,11 +4,7 @@ import { api } from '../lib/api'
 import { useNotifications } from '../lib/notifications'
 import EditSourceForm from './EditSourceForm'
 
-interface SourcesListProps {
-  onBack: () => void
-}
-
-export default function SourcesList({ onBack }: SourcesListProps) {
+export default function SourcesList() {
   const [editingSource, setEditingSource] = useState<any>(null)
   const queryClient = useQueryClient()
   const { addNotification } = useNotifications()

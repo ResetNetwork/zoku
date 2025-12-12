@@ -1,12 +1,11 @@
-import { useState } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { api } from '../lib/api'
-import { Entanglement } from '../lib/types'
+import type { Qupt } from '../lib/types'
 import QuptItem from './QuptItem'
 import EntanglementCard from './EntanglementCard'
 
 interface DashboardProps {
-  onSelectVolition: (id: string) => void
+  onSelectEntanglement: (id: string) => void
   onShowEntanglementsList?: () => void
   onShowZokuList?: () => void
   onShowActivityList?: () => void
@@ -15,7 +14,7 @@ interface DashboardProps {
 }
 
 export default function Dashboard({
-  onSelectVolition,
+  onSelectEntanglement,
   onShowEntanglementsList,
   onShowZokuList,
   onShowActivityList,
@@ -114,8 +113,8 @@ export default function Dashboard({
           {sortedEntanglements.slice(0, 5).map(vol => (
             <EntanglementCard
               key={vol.id}
-              volition={vol}
-              onClick={onSelectVolition}
+              entanglement={vol}
+              onClick={onSelectEntanglement}
             />
           ))}
         </div>

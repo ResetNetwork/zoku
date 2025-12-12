@@ -4,10 +4,10 @@ import { api } from '../lib/api'
 
 interface ZokuListProps {
   onSelectZoku: (id: string) => void
-  onSelectVolition: (id: string) => void
+  onSelectEntanglement: (id: string) => void
 }
 
-export default function ZokuList({ onSelectZoku, onSelectVolition }: ZokuListProps) {
+export default function ZokuList({ onSelectZoku, onSelectEntanglement }: ZokuListProps) {
   const [showAllMatrix, setShowAllMatrix] = useState(false)
 
   const { data: zoku = [], isLoading } = useQuery({
@@ -27,7 +27,7 @@ export default function ZokuList({ onSelectZoku, onSelectVolition }: ZokuListPro
       const results = await Promise.all(
         entanglements.map(async v => ({
           entanglement_id: v.id,
-          volition_name: v.name,
+          entanglement_name: v.name,
           matrix: await api.getZokuMatrix(v.id)
         }))
       )
@@ -48,9 +48,9 @@ export default function ZokuList({ onSelectZoku, onSelectVolition }: ZokuListPro
     { key: 'informed', label: 'Informed', color: 'text-green-400' }
   ]
 
-  // Sort matrices alphabetically by volition name
+  // Sort matrices alphabetically by entanglement name
   const sortedMatrices = [...matrices].sort((a, b) =>
-    a.volition_name.localeCompare(b.volition_name)
+    a.entanglement_name.localeCompare(b.entanglement_name)
   )
 
   const displayedMatrices = showAllMatrix ? sortedMatrices : sortedMatrices.slice(0, 5)
@@ -95,7 +95,7 @@ export default function ZokuList({ onSelectZoku, onSelectVolition }: ZokuListPro
             <thead>
               <tr className="border-b border-gray-300 dark:border-quantum-600">
                 <th className="text-left p-3 text-sm font-semibold text-gray-600 dark:text-gray-400">
-                  Volition
+                  Entanglement
                 </th>
                 {pasciRoles.map(role => (
                   <th
@@ -108,17 +108,17 @@ export default function ZokuList({ onSelectZoku, onSelectVolition }: ZokuListPro
               </tr>
             </thead>
             <tbody>
-              {displayedMatrices.map(({ entanglement_id, volition_name, matrix }) => (
+              {displayedMatrices.map(({ entanglement_id, entanglement_name, matrix }) => (
                 <tr
                   key={entanglement_id}
                   className="border-b border-gray-200 dark:border-quantum-700 hover:bg-gray-50 dark:hover:bg-quantum-800/30"
                 >
                   <td className="p-3">
                     <button
-                      onClick={() => onSelectVolition(entanglement_id)}
+                      onClick={() => onSelectEntanglement(entanglement_id)}
                       className="font-medium text-quantum-500 hover:text-quantum-400 transition-colors text-left"
                     >
-                      {volition_name}
+                      {entanglement_name}
                     </button>
                   </td>
                   {pasciRoles.map(role => {

@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS dimensions (
   name TEXT NOT NULL UNIQUE,        -- 'function', 'pillar', 'service_area'
   label TEXT NOT NULL,              -- 'Function', 'Pillar', 'Service Area'
   description TEXT,
-  allow_multiple INTEGER DEFAULT 0, -- Can volition have multiple values?
+  allow_multiple INTEGER DEFAULT 0, -- Can entanglement have multiple values?
   parent_dimension_id TEXT REFERENCES dimensions(id),
   created_at INTEGER NOT NULL DEFAULT (unixepoch())
 );

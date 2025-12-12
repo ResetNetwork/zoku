@@ -23,9 +23,9 @@ export default function App() {
     }
     return 'dashboard'
   })
-  const [selectedEntanglementId, setSelectedVolitionId] = useState<string | null>(() => {
+  const [selectedEntanglementId, setSelectedEntanglementId] = useState<string | null>(() => {
     const params = new URLSearchParams(window.location.search)
-    return params.get('volition')
+    return params.get('entanglement')
   })
   const [selectedZokuId, setSelectedEntangledId] = useState<string | null>(() => {
     const params = new URLSearchParams(window.location.search)
@@ -40,7 +40,7 @@ export default function App() {
   useEffect(() => {
     const params = new URLSearchParams()
     if (selectedEntanglementId) {
-      params.set('volition', selectedEntanglementId)
+      params.set('entanglement', selectedEntanglementId)
     } else if (selectedZokuId) {
       params.set('zoku', selectedZokuId)
     } else if (currentView !== 'dashboard') {
@@ -54,7 +54,7 @@ export default function App() {
   useEffect(() => {
     const handlePopState = () => {
       const params = new URLSearchParams(window.location.search)
-      setSelectedVolitionId(params.get('volition'))
+      setSelectedEntanglementId(params.get('entanglement'))
       setSelectedEntangledId(params.get('zoku'))
       const view = params.get('view')
       if (view === 'entanglements' || view === 'zoku' || view === 'activity' || view === 'sources' || view === 'jewels') {
@@ -68,55 +68,55 @@ export default function App() {
   }, [])
 
   const handleSelectEntanglement = (id: string) => {
-    setSelectedVolitionId(id)
+    setSelectedEntanglementId(id)
     setSelectedEntangledId(null)
     setCurrentView('dashboard')
   }
 
   const handleSelectZoku = (id: string) => {
     setSelectedEntangledId(id)
-    setSelectedVolitionId(null)
+    setSelectedEntanglementId(null)
     setCurrentView('zoku')
   }
 
   const handleBack = () => {
-    setSelectedVolitionId(null)
+    setSelectedEntanglementId(null)
     setSelectedEntangledId(null)
   }
 
   const handleShowZokuList = () => {
     setCurrentView('zoku')
-    setSelectedVolitionId(null)
+    setSelectedEntanglementId(null)
     setSelectedEntangledId(null)
   }
 
   const handleShowDashboard = () => {
     setCurrentView('dashboard')
-    setSelectedVolitionId(null)
+    setSelectedEntanglementId(null)
     setSelectedEntangledId(null)
   }
 
   const handleShowEntanglementsList = () => {
     setCurrentView('entanglements')
-    setSelectedVolitionId(null)
+    setSelectedEntanglementId(null)
     setSelectedEntangledId(null)
   }
 
   const handleShowActivityList = () => {
     setCurrentView('activity')
-    setSelectedVolitionId(null)
+    setSelectedEntanglementId(null)
     setSelectedEntangledId(null)
   }
 
   const handleShowSourcesList = () => {
     setCurrentView('sources')
-    setSelectedVolitionId(null)
+    setSelectedEntanglementId(null)
     setSelectedEntangledId(null)
   }
 
   const handleShowJewelsList = () => {
     setCurrentView('jewels')
-    setSelectedVolitionId(null)
+    setSelectedEntanglementId(null)
     setSelectedEntangledId(null)
   }
 
@@ -216,13 +216,11 @@ export default function App() {
       <main className="max-w-7xl mx-auto px-4 py-8">
         {selectedEntanglementId ? (
           <EntanglementDetail
-            volitionId={selectedEntanglementId}
-            onBack={handleBack}
+            entanglementId={selectedEntanglementId}
           />
         ) : selectedZokuId ? (
           <ZokuDetail
-            entangledId={selectedZokuId}
-            onBack={handleBack}
+            zokuId={selectedZokuId}
             onSelectEntanglement={handleSelectEntanglement}
           />
         ) : currentView === 'entanglements' ? (
@@ -233,11 +231,11 @@ export default function App() {
             onSelectEntanglement={handleSelectEntanglement}
           />
         ) : currentView === 'activity' ? (
-          <ActivityList onBack={handleShowDashboard} />
+          <ActivityList />
         ) : currentView === 'sources' ? (
-          <SourcesList onBack={handleShowDashboard} />
+          <SourcesList />
         ) : currentView === 'jewels' ? (
-          <JewelsList onBack={handleShowDashboard} />
+          <JewelsList />
         ) : (
           <Dashboard
             onSelectEntanglement={handleSelectEntanglement}

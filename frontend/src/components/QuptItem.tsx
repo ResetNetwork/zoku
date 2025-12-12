@@ -76,17 +76,6 @@ export default function QuptItem({ qupt, showVolitionName = false }: QuptItemPro
     }
   }
 
-  const getGoogleDriveIcon = (type: string) => {
-    switch (type) {
-      case 'revision':
-        return '📝' // Edit/revision
-      case 'comment':
-        return '💬' // Comment bubble
-      default:
-        return '📄' // Generic document
-    }
-  }
-
   // Format content dynamically from metadata for all sources
   const formatContent = () => {
     if (!metadata) return qupt.content;
@@ -171,9 +160,9 @@ export default function QuptItem({ qupt, showVolitionName = false }: QuptItemPro
             </div>
             <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
               <div className="flex items-center gap-1">
-                {showVolitionName && qupt.volition_name && (
+                {showVolitionName && qupt.entanglement_name && (
                   <span className="px-2 py-0.5 rounded-full bg-quantum-500/20 text-quantum-300 font-medium">
-                    {qupt.volition_name}
+                    {qupt.entanglement_name}
                   </span>
                 )}
                 <span className={`px-2 py-0.5 rounded-full ${getSourceColor(qupt.source)}`}>

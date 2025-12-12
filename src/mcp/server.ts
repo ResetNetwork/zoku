@@ -129,7 +129,7 @@ const schemas = {
         repo: z.string(),
         events: z.array(z.string()).optional()
       }),
-      credentials: z.record(z.any()).optional(),
+      jewels: z.record(z.any()).optional(),  // Inline jewels (renamed from credentials)
       jewel_id: z.string().optional()
     }),
     z.object({
@@ -140,7 +140,7 @@ const schemas = {
         tag: z.string(),
         include_articles: z.boolean().optional()
       }),
-      credentials: z.record(z.any()).optional(),
+      jewels: z.record(z.any()).optional(),
       jewel_id: z.string().optional()
     }),
     z.object({
@@ -150,7 +150,7 @@ const schemas = {
         document_id: z.string(),
         track_suggestions: z.boolean().optional()
       }),
-      credentials: z.record(z.any()).optional(),
+      jewels: z.record(z.any()).optional(),
       jewel_id: z.string().optional()
     }),
     z.object({
@@ -160,7 +160,7 @@ const schemas = {
         folder_id: z.string().optional(),
         file_types: z.array(z.string()).optional()
       }),
-      credentials: z.record(z.any()).optional(),
+      jewels: z.record(z.any()).optional(),
       jewel_id: z.string().optional()
     }),
     z.object({
@@ -170,7 +170,7 @@ const schemas = {
         query: z.string().optional(),
         labels: z.array(z.string()).optional()
       }),
-      credentials: z.record(z.any()).optional(),
+      jewels: z.record(z.any()).optional(),
       jewel_id: z.string().optional()
     }),
     z.object({
@@ -180,7 +180,7 @@ const schemas = {
         url: z.string().url().optional(),
         secret: z.string().optional()
       }),
-      credentials: z.record(z.any()).optional(),
+      jewels: z.record(z.any()).optional(),
       jewel_id: z.string().optional()
     })
   ]),
@@ -210,7 +210,7 @@ const schemas = {
     limit: z.number().optional()
   }),
 
-  get_credential: z.object({
+  get_jewel: z.object({
     id: z.string()
   }),
 
@@ -520,7 +520,7 @@ function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServ
         case 'add_source': {
           const input = schemas.add_source.parse(args);
 
-          // Validate source configuration if credentials are provided
+          // Validate source configuration if jewels are provided
           const warnings: string[] = [];
           let validationMetadata: Record<string, any> = {};
 
@@ -533,21 +533,21 @@ function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServ
             if (jewel.type !== input.type) {
               throw new Error(`Jewel type mismatch: jewel is ${jewel.type}, source is ${input.type}`);
             }
-          } else if (input.credentials) {
-            // Validate inline credentials
+          } else if (input.jewels) {
+            // Validate inline jewels
             const { validateGitHubSource, validateZammadSource, validateGoogleDocsSource } = await import('../handlers/validate');
 
             let validationResult;
             switch (input.type) {
               case 'github':
-                validationResult = await validateGitHubSource(input.config, input.credentials);
+                validationResult = await validateGitHubSource(input.config, input.jewels);
                 break;
               case 'zammad':
-                validationResult = await validateZammadSource(input.config, input.credentials);
+                validationResult = await validateZammadSource(input.config, input.jewels);
                 break;
               case 'gdocs':
               case 'gdrive':
-                validationResult = await validateGoogleDocsSource(input.config, input.credentials);
+                validationResult = await validateGoogleDocsSource(input.config, input.jewels);
                 break;
               default:
                 // Other source types don't have validation yet
@@ -568,7 +568,7 @@ function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServ
             entanglement_id: input.entanglement_id,
             type: input.type,
             config: input.config,
-            credentials: input.credentials,
+            credentials: input.jewels,  // Store as credentials in DB for backward compat
             jewel_id: input.jewel_id
           });
 
@@ -759,8 +759,8 @@ function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServ
           break;
         }
 
-        case 'get_credential': {
-          const input = schemas.get_credential.parse(args);
+        case 'get_jewel': {
+          const input = schemas.get_jewel.parse(args);
           const jewel = await db.getJewel(input.id);
           if (!jewel) throw new Error('Jewel not found');
 
@@ -1141,13 +1141,13 @@ function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServ
 
   server.tool(
     'add_source',
-    'Add an activity source to an entanglement. Can use stored jewels (via jewel_id) or provide inline credentials.',
+    'Add an activity source to an entanglement. Can use stored jewels (via jewel_id) or provide inline jewels.',
     {
       entanglement_id: { type: 'string' },
       type: { type: 'string', enum: ['github', 'gmail', 'zammad', 'gdrive', 'gdocs', 'webhook'] },
       config: { type: 'object', description: 'Source-specific configuration (e.g., owner, repo for GitHub)' },
-      credentials: { type: 'object', description: 'Inline authentication credentials (will be validated and encrypted). Omit if using jewel_id.' },
-      jewel_id: { type: 'string', description: 'ID of stored jewel to use. Omit if providing inline credentials.' }
+      jewels: { type: 'object', description: 'Inline authentication jewels (will be validated and encrypted). Omit if using jewel_id.' },
+      jewel_id: { type: 'string', description: 'ID of stored jewel to use. Omit if providing inline jewels.' }
     },
     (args) => handleToolCall('add_source', args)
   );
@@ -1202,12 +1202,12 @@ function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServ
   );
 
   server.tool(
-    'get_credential',
+    'get_jewel',
     'Get jewel details (without exposing sensitive data)',
     {
       id: { type: 'string' }
     },
-    (args) => handleToolCall('get_credential', args)
+    (args) => handleToolCall('get_jewel', args)
   );
 
   server.tool(

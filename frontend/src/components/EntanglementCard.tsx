@@ -1,29 +1,29 @@
 import { Entanglement } from '../lib/types'
 
 interface EntanglementCardProps {
-  volition: Volition
+  entanglement: Entanglement
   onClick: (id: string) => void
 }
 
-export default function EntanglementCard({ volition, onClick }: EntanglementCardProps) {
+export default function EntanglementCard({ entanglement, onClick }: EntanglementCardProps) {
   return (
     <button
-      onClick={() => onClick(volition.id)}
+      onClick={() => onClick(entanglement.id)}
       className="w-full text-left p-4 bg-gray-100 dark:bg-quantum-700/50 hover:bg-gray-200 dark:hover:bg-quantum-700 rounded-lg border border-gray-300 dark:border-quantum-600 transition-colors"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1">
-          <h3 className="font-semibold text-lg mb-1">{volition.name}</h3>
-          {volition.description && (
+          <h3 className="font-semibold text-lg mb-1">{entanglement.name}</h3>
+          {entanglement.description && (
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-              {volition.description}
+              {entanglement.description}
             </p>
           )}
 
           {/* Categories as badges */}
-          {volition.attributes && Object.keys(volition.attributes).length > 0 && (
+          {entanglement.attributes && Object.keys(entanglement.attributes).length > 0 && (
             <div className="flex flex-wrap gap-1 mb-2">
-              {Object.entries(volition.attributes).map(([key, value]) => (
+              {Object.entries(entanglement.attributes).map(([key, value]) => (
                 <span
                   key={key}
                   className="px-2 py-0.5 rounded-full bg-quantum-500/20 text-quantum-300 text-xs font-medium"
@@ -36,11 +36,11 @@ export default function EntanglementCard({ volition, onClick }: EntanglementCard
           )}
 
           <div className="flex gap-4 text-xs text-gray-500">
-            <div>{volition.zoku_count || 0} zoku</div>
+            <div>{entanglement.zoku_count || 0} zoku</div>
             <div>•</div>
-            <div>{volition.qupts_count || 0} qupts</div>
+            <div>{entanglement.qupts_count || 0} qupts</div>
             <div>•</div>
-            <div>{volition.sources_count || 0} sources</div>
+            <div>{entanglement.sources_count || 0} sources</div>
           </div>
         </div>
         <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -247,7 +247,7 @@ app.get('/google/callback', async (c) => {
   }
 });
 
-// Verify Google OAuth token (used for credential validation)
+// Verify Google OAuth token (used for jewel validation)
 app.post('/google/verify', async (c) => {
   const body = await c.req.json();
   const { refresh_token, client_id, client_secret } = body;

@@ -11,7 +11,7 @@ interface AddSourceFormProps {
 
 export default function AddSourceForm({ entanglementId, onSuccess, onCancel }: AddSourceFormProps) {
   const [sourceType, setSourceType] = useState<'github' | 'zammad' | 'gdrive'>('github')
-  const [selectedCredential, setSelectedCredential] = useState('')
+  const [selectedJewel, setSelectedJewel] = useState('')
   const [config, setConfig] = useState<any>({
     // GitHub defaults
     owner: '',
@@ -27,11 +27,11 @@ export default function AddSourceForm({ entanglementId, onSuccess, onCancel }: A
   })
 
   // Filter jewels by type
-  const availableJewels = jewels.filter(c => c.type === sourceType)
+  const availableJewels = jewels.filter((c: any) => c.type === sourceType)
 
   const handleTypeChange = (type: 'github' | 'zammad' | 'gdrive') => {
     setSourceType(type)
-    setSelectedCredential('')
+    setSelectedJewel('')
     // Reset config based on type
     if (type === 'github') {
       setConfig({ owner: '', repo: '', events: ['push', 'pull_request', 'issues'] })
@@ -43,8 +43,8 @@ export default function AddSourceForm({ entanglementId, onSuccess, onCancel }: A
   }
 
   const handleAddSource = async () => {
-    if (!selectedCredential) {
-      addNotification('error', 'Please select a credential')
+    if (!selectedJewel) {
+      addNotification('error', 'Please select a jewel')
       return
     }
 
@@ -69,7 +69,7 @@ export default function AddSourceForm({ entanglementId, onSuccess, onCancel }: A
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: sourceType,
-          jewel_id: selectedCredential,
+          jewel_id: selectedJewel,
           config
         })
       })
@@ -118,21 +118,21 @@ export default function AddSourceForm({ entanglementId, onSuccess, onCancel }: A
         </select>
       </div>
 
-      {/* Credential Selector */}
+      {/* Jewel Selector */}
       <div>
-        <label className="block text-sm text-gray-400 mb-2">Credential</label>
+        <label className="block text-sm text-gray-400 mb-2">Jewel</label>
         {availableJewels.length === 0 ? (
           <div className="text-sm text-gray-400 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-md">
             No {sourceType} jewels found. Create one in the Jewels page first.
           </div>
         ) : (
           <select
-            value={selectedCredential}
-            onChange={(e) => setSelectedCredential(e.target.value)}
+            value={selectedJewel}
+            onChange={(e) => setSelectedJewel(e.target.value)}
             className="w-full px-3 py-2 rounded-md bg-gray-100 dark:bg-quantum-700 border border-gray-300 dark:border-quantum-600 text-gray-900 dark:text-gray-100"
           >
-            <option value="">Select credential...</option>
-            {availableJewels.map(cred => (
+            <option value="">Select jewel...</option>
+            {availableJewels.map((cred: any) => (
               <option key={cred.id} value={cred.id}>{cred.name}</option>
             ))}
           </select>
@@ -237,7 +237,7 @@ export default function AddSourceForm({ entanglementId, onSuccess, onCancel }: A
       <div className="flex gap-2">
         <button
           onClick={handleAddSource}
-          disabled={adding || !selectedCredential}
+          disabled={adding || !selectedJewel}
           className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed flex-1"
         >
           {adding ? 'Adding Source...' : 'Add Source'}

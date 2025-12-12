@@ -4,12 +4,8 @@ import { api } from '../lib/api'
 import QuptItem from './QuptItem'
 import type { Qupt } from '../lib/types'
 
-interface ActivityListProps {
-  onBack: () => void
-}
-
-export default function ActivityList({ onBack }: ActivityListProps) {
-  const [selectedEntanglement, setSelectedVolition] = useState<string>('all')
+export default function ActivityList() {
+  const [selectedEntanglement, setSelectedEntanglement] = useState<string>('all')
   const [selectedSource, setSelectedSource] = useState<string>('all')
 
   const { data: entanglements = [] } = useQuery({
@@ -55,10 +51,10 @@ export default function ActivityList({ onBack }: ActivityListProps) {
         <h2 className="text-lg font-semibold mb-3">Filters</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm text-gray-400 mb-2">Volition</label>
+            <label className="block text-sm text-gray-400 mb-2">Entanglement</label>
             <select
               value={selectedEntanglement}
-              onChange={(e) => setSelectedVolition(e.target.value)}
+              onChange={(e) => setSelectedEntanglement(e.target.value)}
               className="w-full px-3 py-2 rounded-md bg-gray-100 dark:bg-quantum-700 border border-gray-300 dark:border-quantum-600 text-gray-900 dark:text-gray-100"
             >
               <option value="all">All Entanglements</option>

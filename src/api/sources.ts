@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Bindings } from '../types';
 import { DB } from '../db';
-import { encryptCredentials } from '../lib/crypto';
+import { encryptJewel } from '../lib/crypto';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -15,7 +15,7 @@ app.get('/:id', async (c) => {
     return c.json({ error: { code: 'NOT_FOUND', message: 'Source not found' } }, 404);
   }
 
-  // Don't expose credentials
+  // Don't expose jewels
   return c.json({
     id: source.id,
     entanglement_id: source.entanglement_id,
@@ -38,15 +38,15 @@ app.patch('/:id', async (c) => {
     return c.json({ error: { code: 'NOT_FOUND', message: 'Source not found' } }, 404);
   }
 
-  // If updating credentials, encrypt them
-  let credentials = body.credentials;
-  if (credentials && c.env.ENCRYPTION_KEY) {
-    credentials = await encryptCredentials(JSON.stringify(credentials), c.env.ENCRYPTION_KEY);
+  // If updating jewels, encrypt them
+  let jewels = body.credentials;
+  if (jewels && c.env.ENCRYPTION_KEY) {
+    jewels = await encryptJewel(JSON.stringify(jewels), c.env.ENCRYPTION_KEY);
   }
 
   await db.updateSource(id, {
     config: body.config,
-    jewels: credentials ? { encrypted: credentials } : undefined,
+    jewels: jewels ? { encrypted: jewels } : undefined,
     enabled: body.enabled
   });
 
@@ -79,7 +79,7 @@ app.post('/:id/sync', async (c) => {
 
   // Import sync dependencies
   const { handlers } = await import('../handlers');
-  const { decryptCredentials } = await import('../lib/crypto');
+  const { decryptJewel } = await import('../lib/crypto');
 
   const handler = handlers[source.type];
   if (!handler) {
@@ -91,18 +91,18 @@ app.post('/:id/sync', async (c) => {
   try {
     const config = JSON.parse(source.config);
 
-    // Get credentials
+    // Get jewels
     let credentials = {};
     if (source.jewel_id) {
-      const credential = await db.getCredential(source.jewel_id);
-      if (!credential) {
+      const jewel = await db.getJewel(source.jewel_id);
+      if (!jewel) {
         return c.json({
-          error: { code: 'CREDENTIAL_NOT_FOUND', message: 'Jewel not found' }
+          error: { code: 'JEWEL_NOT_FOUND', message: 'Jewel not found' }
         }, 404);
       }
-      credentials = JSON.parse(await decryptCredentials(credential.data, c.env.ENCRYPTION_KEY));
+      credentials = JSON.parse(await decryptJewel(jewel.data, c.env.ENCRYPTION_KEY));
     } else if (source.credentials) {
-      credentials = JSON.parse(await decryptCredentials(source.credentials, c.env.ENCRYPTION_KEY));
+      credentials = JSON.parse(await decryptJewel(source.credentials, c.env.ENCRYPTION_KEY));
     }
 
     // Fetch new activity
@@ -143,13 +143,13 @@ app.post('/:id/sync', async (c) => {
 
     // Clean up Google Docs errors to be user-friendly
     if (errorMessage.includes('403') && errorMessage.includes('does not have permission')) {
-      // Get email from credential for helpful message
+      // Get email from jewel for helpful message
       let accountEmail = 'your account';
       if (source.jewel_id) {
-        const credential = await db.getCredential(source.jewel_id);
-        if (credential && credential.validation_metadata) {
+        const jewel = await db.getJewel(source.jewel_id);
+        if (jewel && jewel.validation_metadata) {
           try {
-            const metadata = JSON.parse(credential.validation_metadata);
+            const metadata = JSON.parse(jewel.validation_metadata);
             accountEmail = metadata.email || metadata.authenticated_as || 'your account';
           } catch (e) {
             // Use default

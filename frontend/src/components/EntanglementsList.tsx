@@ -4,10 +4,10 @@ import { api } from '../lib/api'
 import EntanglementCard from './EntanglementCard'
 
 interface EntanglementsListProps {
-  onSelectVolition: (id: string) => void
+  onSelectEntanglement: (id: string) => void
 }
 
-export default function EntanglementsList({ onSelectVolition }: EntanglementsListProps) {
+export default function EntanglementsList({ onSelectEntanglement }: EntanglementsListProps) {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [functionFilter, setFunctionFilter] = useState<string>('all')
 
@@ -34,10 +34,6 @@ export default function EntanglementsList({ onSelectVolition }: EntanglementsLis
     const bActivity = b.updated_at || b.created_at
     return bActivity - aActivity
   })
-
-  const formatDate = (timestamp: number) => {
-    return new Date(timestamp * 1000).toLocaleDateString()
-  }
 
   if (isLoading) {
     return <div className="text-center text-gray-400 py-12">Loading...</div>
@@ -112,8 +108,8 @@ export default function EntanglementsList({ onSelectVolition }: EntanglementsLis
             {sortedEntanglements.map(vol => (
               <EntanglementCard
                 key={vol.id}
-                volition={vol}
-                onClick={onSelectVolition}
+                entanglement={vol}
+                onClick={onSelectEntanglement}
               />
             ))}
           </div>

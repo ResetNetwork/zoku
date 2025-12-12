@@ -1,6 +1,6 @@
-// Credential encryption/decryption using AES-GCM
+// Jewel encryption/decryption using AES-GCM
 
-export async function encryptCredentials(
+export async function encryptJewel(
   plaintext: string,
   key: string
 ): Promise<string> {
@@ -33,7 +33,7 @@ export async function encryptCredentials(
   return btoa(String.fromCharCode(...combined));
 }
 
-export async function decryptCredentials(
+export async function decryptJewel(
   encrypted: string,
   key: string
 ): Promise<string> {

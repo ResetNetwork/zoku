@@ -2,7 +2,7 @@
 
 -- Dimensions
 INSERT INTO dimensions (id, name, label, description, allow_multiple) VALUES
-  ('dim_status', 'status', 'Status', 'Current status of the volition', 0),
+  ('dim_status', 'status', 'Status', 'Current status of the entanglement', 0),
   ('dim_function', 'function', 'Function', 'Primary organizational function', 0),
   ('dim_pillar', 'pillar', 'Pillar', 'Innovation pillar (Technology Innovation only)', 0),
   ('dim_service', 'service_area', 'Service Area', 'IT service area (Information Technology only)', 0);

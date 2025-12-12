@@ -1,4 +1,4 @@
-export interface Volition {
+export interface Entanglement {
   id: string
   name: string
   description?: string
@@ -9,7 +9,7 @@ export interface Volition {
   qupts_count?: number
   sources_count?: number
   zoku_count?: number
-  children?: Volition[]
+  children?: Entanglement[]
   matrix?: PASCIMatrix
   attributes?: Record<string, any>
   qupts?: Qupt[]
@@ -18,7 +18,7 @@ export interface Volition {
 export interface Qupt {
   id: string
   entanglement_id: string
-  volition_name?: string | null
+  entanglement_name?: string | null
   zoku_id?: string | null
   content: string
   source: string
@@ -27,7 +27,7 @@ export interface Qupt {
   created_at: number
 }
 
-export interface Entangled {
+export interface Zoku {
   id: string
   name: string
   description?: string | null
@@ -42,7 +42,7 @@ export interface Entangled {
     [key: string]: any
   }
   created_at: number
-  volitions?: Array<{
+  entanglements?: Array<{
     id: string
     name: string
     created_at: number

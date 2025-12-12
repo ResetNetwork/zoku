@@ -232,9 +232,10 @@ await db.updateSource(source.id, { last_sync: thirtyDaysAgo });
 // Don't catch - let it fail if updateSource fails
 ```
 
-### 8. Credentials vs Jewels Naming Inconsistency
+### 8. Credentials vs Jewels Naming Inconsistency ✅ FIXED
 **Location:** Line 127, 1134
 **Severity:** MEDIUM - Developer Experience
+**Status:** Fixed in commit [pending]
 
 **Problem:**
 Tool uses `get_credential` but everywhere else calls them "jewels". Schema field is `credentials` but CLAUDE.md shows `jewels`.

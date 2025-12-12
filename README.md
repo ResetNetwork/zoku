@@ -1,4 +1,4 @@
-# Zoku
+# The Great Game
 
 A project/initiative tracking system inspired by the Quantum Thief trilogy. Stateless Cloudflare Worker with D1 database, web frontend, and MCP interface.
 
@@ -86,7 +86,7 @@ cd frontend && npm run dev  # Frontend on :5173
 ```json
 {
   "mcpServers": {
-    "zoku": {
+    "the-great-game": {
       "url": "http://localhost:8787/mcp",
       "transport": {
         "type": "http"
@@ -221,7 +221,7 @@ npm run db:seed:remote
 ## Project Structure
 
 ```
-zoku/
+the-great-game/
 ├── src/
 │   ├── index.ts              # Worker entry point
 │   ├── types.ts              # TypeScript types

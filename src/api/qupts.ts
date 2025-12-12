@@ -8,17 +8,17 @@ const app = new Hono<{ Bindings: Bindings }>();
 app.get('/', async (c) => {
   const db = new DB(c.env.DB);
 
-  const volitionId = c.req.query('entanglement_id');
+  const entanglementId = c.req.query('entanglement_id');
   const recursive = c.req.query('recursive') === 'true';
-  const entangledId = c.req.query('zoku_id');
+  const zokuId = c.req.query('zoku_id');
   const source = c.req.query('source');
   const limit = c.req.query('limit') ? parseInt(c.req.query('limit')!) : 20;
   const offset = c.req.query('offset') ? parseInt(c.req.query('offset')!) : 0;
 
   const qupts = await db.listQupts({
-    entanglement_id: volitionId,
+    entanglement_id: entanglementId,
     recursive,
-    zoku_id: entangledId,
+    zoku_id: zokuId,
     source,
     limit,
     offset
@@ -49,17 +49,17 @@ app.post('/', async (c) => {
     return c.json({ error: { code: 'VALIDATION_ERROR', message: 'entanglement_id and content are required' } }, 400);
   }
 
-  // Verify volition exists
-  const volition = await db.getVolition(body.entanglement_id);
-  if (!volition) {
+  // Verify entanglement exists
+  const entanglement = await db.getEntanglement(body.entanglement_id);
+  if (!entanglement) {
     return c.json({ error: { code: 'NOT_FOUND', message: 'Entanglement not found' } }, 404);
   }
 
-  // Verify entangled exists if provided
+  // Verify zoku exists if provided
   if (body.zoku_id) {
-    const entangled = await db.getEntangled(body.zoku_id);
-    if (!entangled) {
-      return c.json({ error: { code: 'NOT_FOUND', message: 'Entangled entity not found' } }, 404);
+    const zoku = await db.getZoku(body.zoku_id);
+    if (!zoku) {
+      return c.json({ error: { code: 'NOT_FOUND', message: 'Zoku not found' } }, 404);
     }
   }
 

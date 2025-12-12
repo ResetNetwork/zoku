@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import type { Bindings } from './types';
+import { loggingMiddleware } from './middleware/logging';
 
 import entanglementsRoutes from './api/entanglements';
 import zokuRoutes from './api/zoku';
@@ -14,6 +15,9 @@ const app = new Hono<{ Bindings: Bindings }>();
 
 // Enable CORS for frontend
 app.use('/*', cors());
+
+// Enable logging for all requests
+app.use('/*', loggingMiddleware());
 
 // API routes
 app.route('/api/entanglements', entanglementsRoutes);

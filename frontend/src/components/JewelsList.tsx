@@ -4,13 +4,9 @@ import { api } from '../lib/api'
 import { useNotifications } from '../lib/notifications'
 import GoogleOAuthButton from './GoogleOAuthButton'
 
-interface JewelsListProps {
-  onBack: () => void
-}
-
-export default function JewelsList({ onBack }: JewelsListProps) {
+export default function JewelsList() {
   const [showAddForm, setShowAddForm] = useState<'github' | 'zammad' | 'gdrive' | null>(null)
-  const [editingCredential, setEditingCredential] = useState<any>(null)
+  const [editingJewel, setEditingJewel] = useState<any>(null)
   const [formData, setFormData] = useState<any>({ name: '', token: '', url: '' })
   const [saving, setSaving] = useState(false)
   const { addNotification } = useNotifications()
@@ -43,7 +39,7 @@ export default function JewelsList({ onBack }: JewelsListProps) {
     return colors[type] || 'bg-gray-500/20 text-gray-300'
   }
 
-  const handleAddCredential = async () => {
+  const handleAddJewel = async () => {
     if (!formData.name || !formData.token) {
       addNotification('error', 'Please provide a name and token')
       return
@@ -56,57 +52,57 @@ export default function JewelsList({ onBack }: JewelsListProps) {
 
     setSaving(true)
     try {
-      const credentialData = showAddForm === 'zammad'
+      const jewelData = showAddForm === 'zammad'
         ? { token: formData.token, url: (formData as any).url }
         : { token: formData.token };
 
-      const credential = await api.createJewel({
+      const jewel = await api.createJewel({
         name: formData.name,
         type: showAddForm!,
-        data: credentialData
+        data: jewelData
       })
 
-      console.log(`✅ Credential created: ${credential.id}`)
-      addNotification('success', `${getTypeLabel(showAddForm!)} credential added`)
+      console.log(`✅ Jewel created: ${jewel.id}`)
+      addNotification('success', `${getTypeLabel(showAddForm!)} jewel added`)
       queryClient.invalidateQueries({ queryKey: ['jewels'] })
       setShowAddForm(null)
       setFormData({ name: '', token: '', url: '' } as any)
     } catch (error) {
-      console.error('Failed to create credential:', error)
-      addNotification('error', error instanceof Error ? error.message : 'Failed to create credential')
+      console.error('Failed to create jewel:', error)
+      addNotification('error', error instanceof Error ? error.message : 'Failed to create jewel')
     } finally {
       setSaving(false)
     }
   }
 
-  const handleDeleteCredential = async (id: string, name: string) => {
-    if (!confirm(`Delete credential "${name}"? This will break any sources using it.`)) {
+  const handleDeleteJewel = async (id: string, name: string) => {
+    if (!confirm(`Delete jewel "${name}"? This will break any sources using it.`)) {
       return
     }
 
     try {
       await api.deleteJewel(id)
-      addNotification('success', 'Credential deleted')
+      addNotification('success', 'Jewel deleted')
       queryClient.invalidateQueries({ queryKey: ['jewels'] })
     } catch (error) {
-      console.error('Failed to delete credential:', error)
-      addNotification('error', error instanceof Error ? error.message : 'Failed to delete credential')
+      console.error('Failed to delete jewel:', error)
+      addNotification('error', error instanceof Error ? error.message : 'Failed to delete jewel')
     }
   }
 
-  const handleGoogleOAuthSuccess = (credential: any) => {
+  const handleGoogleOAuthSuccess = () => {
     queryClient.invalidateQueries({ queryKey: ['jewels'] })
     setShowAddForm(null)
-    setEditingCredential(null)
+    setEditingJewel(null)
   }
 
-  const handleUpdateCredential = async () => {
-    if (!editingCredential || !formData.name) {
+  const handleUpdateJewel = async () => {
+    if (!editingJewel || !formData.name) {
       addNotification('error', 'Please provide a name')
       return
     }
 
-    if (editingCredential.type === 'zammad' && !(formData as any).url) {
+    if (editingJewel.type === 'zammad' && !(formData as any).url) {
       addNotification('error', 'Please provide Zammad URL')
       return
     }
@@ -117,37 +113,37 @@ export default function JewelsList({ onBack }: JewelsListProps) {
 
       // Only update token/data if provided
       if (formData.token) {
-        if (editingCredential.type === 'zammad') {
+        if (editingJewel.type === 'zammad') {
           updateData.data = { token: formData.token, url: (formData as any).url };
         } else {
           updateData.data = { token: formData.token };
         }
-      } else if (editingCredential.type === 'zammad' && (formData as any).url) {
+      } else if (editingJewel.type === 'zammad' && (formData as any).url) {
         // URL changed but token didn't - still need to update with URL
         updateData.data = { url: (formData as any).url };
       }
 
-      await api.updateJewel(editingCredential.id, updateData)
+      await api.updateJewel(editingJewel.id, updateData)
 
-      console.log(`✅ Credential updated: ${editingCredential.id}`)
-      addNotification('success', `${getTypeLabel(editingCredential.type)} credential updated`)
+      console.log(`✅ Jewel updated: ${editingJewel.id}`)
+      addNotification('success', `${getTypeLabel(editingJewel.type)} jewel updated`)
       queryClient.invalidateQueries({ queryKey: ['jewels'] })
-      setEditingCredential(null)
+      setEditingJewel(null)
       setFormData({ name: '', token: '' })
     } catch (error) {
-      console.error('Failed to update credential:', error)
-      addNotification('error', error instanceof Error ? error.message : 'Failed to update credential')
+      console.error('Failed to update jewel:', error)
+      addNotification('error', error instanceof Error ? error.message : 'Failed to update jewel')
     } finally {
       setSaving(false)
     }
   }
 
-  const startEdit = (credential: any) => {
-    setEditingCredential(credential)
+  const startEdit = (jewel: any) => {
+    setEditingJewel(jewel)
     setFormData({
-      name: credential.name,
+      name: jewel.name,
       token: '',
-      url: credential.validation_metadata?.url || ''
+      url: jewel.validation_metadata?.url || ''
     })
     setShowAddForm(null)
   }
@@ -169,21 +165,21 @@ export default function JewelsList({ onBack }: JewelsListProps) {
         <div className="card">
           <div className="text-sm text-gray-400 mb-1">GitHub</div>
           <div className="text-3xl font-bold text-quantum-400">
-            {jewels.filter(c => c.type === 'github').length}
+            {jewels.filter((c: any) => c.type === 'github').length}
           </div>
         </div>
         <div className="card">
           <div className="text-sm text-gray-400 mb-1">Google Drive</div>
           <div className="text-3xl font-bold text-quantum-400">
-            {jewels.filter(c => c.type === 'gdrive').length}
+            {jewels.filter((c: any) => c.type === 'gdrive').length}
           </div>
         </div>
       </div>
 
-      {/* Add Credential Buttons */}
+      {/* Add Jewel Buttons */}
       {!showAddForm && (
         <div className="card">
-          <h2 className="text-xl font-bold mb-4">Add Credential</h2>
+          <h2 className="text-xl font-bold mb-4">Add Jewel</h2>
           <div className="flex flex-wrap gap-3">
             <button
               onClick={() => setShowAddForm('github')}
@@ -223,7 +219,7 @@ export default function JewelsList({ onBack }: JewelsListProps) {
       {showAddForm && showAddForm !== 'gdrive' && (
         <div className="card space-y-4">
           <div>
-            <h3 className="text-lg font-semibold mb-2">Add {getTypeLabel(showAddForm)} Credential</h3>
+            <h3 className="text-lg font-semibold mb-2">Add {getTypeLabel(showAddForm)} Jewel</h3>
             <p className="text-sm text-gray-400">
               {showAddForm === 'github' && 'Create a personal access token at github.com/settings/tokens'}
               {showAddForm === 'zammad' && 'Get your API token from Zammad admin settings'}
@@ -267,11 +263,11 @@ export default function JewelsList({ onBack }: JewelsListProps) {
 
           <div className="flex gap-2">
             <button
-              onClick={handleAddCredential}
+              onClick={handleAddJewel}
               disabled={saving || !formData.name || !formData.token}
               className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed flex-1"
             >
-              {saving ? 'Saving...' : 'Save Credential'}
+              {saving ? 'Saving...' : 'Save Jewel'}
             </button>
             <button
               onClick={() => {
@@ -288,7 +284,7 @@ export default function JewelsList({ onBack }: JewelsListProps) {
       )}
 
       {/* Google OAuth Form (Add) */}
-      {showAddForm === 'gdrive' && !editingCredential && (
+      {showAddForm === 'gdrive' && !editingJewel && (
         <GoogleOAuthButton
           onSuccess={handleGoogleOAuthSuccess}
           onCancel={() => setShowAddForm(null)}
@@ -296,17 +292,17 @@ export default function JewelsList({ onBack }: JewelsListProps) {
       )}
 
       {/* Google OAuth Re-auth (Edit) */}
-      {editingCredential && editingCredential.type === 'gdrive' && (
+      {editingJewel && editingJewel.type === 'gdrive' && (
         <div className="card space-y-4">
           <div>
             <h3 className="text-lg font-semibold mb-2">Re-authorize Google Drive</h3>
             <p className="text-sm text-gray-400 mb-4">
-              Update the credential name or re-authorize to refresh the access token
+              Update the jewel name or re-authorize to refresh the access token
             </p>
           </div>
 
           <div>
-            <label className="block text-sm text-gray-400 mb-2">Credential Name</label>
+            <label className="block text-sm text-gray-400 mb-2">Jewel Name</label>
             <input
               type="text"
               value={formData.name}
@@ -322,7 +318,7 @@ export default function JewelsList({ onBack }: JewelsListProps) {
                 setSaving(true)
                 try {
                   // Get fresh OAuth URL using existing jewels
-                  const response = await fetch(`/api/jewels/${editingCredential.id}/reauthorize`, {
+                  const response = await fetch(`/api/jewels/${editingJewel.id}/reauthorize`, {
                     method: 'POST'
                   })
                   const data = await response.json()
@@ -339,14 +335,14 @@ export default function JewelsList({ onBack }: JewelsListProps) {
                   }
 
                   // Listen for callback
-                  let checkClosed: NodeJS.Timeout | null = null
+                  let checkClosed: ReturnType<typeof setInterval> | null = null
 
                   const handleMessage = async (event: MessageEvent) => {
                     if (event.data.type === 'google-oauth-callback') {
                       const tokens = event.data.tokens
                       if (tokens.refresh_token) {
-                        // Update credential with new tokens
-                        await api.updateJewel(editingCredential.id, {
+                        // Update jewel with new tokens
+                        await api.updateJewel(editingJewel.id, {
                           name: formData.name,
                           data: {
                             refresh_token: tokens.refresh_token,
@@ -354,9 +350,9 @@ export default function JewelsList({ onBack }: JewelsListProps) {
                             client_secret: tokens.client_secret
                           }
                         })
-                        addNotification('success', 'Google Drive credential updated')
+                        addNotification('success', 'Google Drive jewel updated')
                         queryClient.invalidateQueries({ queryKey: ['jewels'] })
-                        setEditingCredential(null)
+                        setEditingJewel(null)
                         setSaving(false)
 
                         // Cleanup
@@ -372,7 +368,7 @@ export default function JewelsList({ onBack }: JewelsListProps) {
                   // Check if popup closes without completing
                   checkClosed = setInterval(() => {
                     if (popup.closed) {
-                      clearInterval(checkClosed)
+                      if (checkClosed) clearInterval(checkClosed)
                       window.removeEventListener('message', handleMessage)
                       setSaving(false)
                       console.log('❌ OAuth popup closed without completing')
@@ -392,7 +388,7 @@ export default function JewelsList({ onBack }: JewelsListProps) {
             </button>
             <button
               onClick={() => {
-                setEditingCredential(null)
+                setEditingJewel(null)
                 setFormData({ name: '', token: '' })
               }}
               className="btn btn-secondary"
@@ -405,11 +401,11 @@ export default function JewelsList({ onBack }: JewelsListProps) {
       )}
 
       {/* Edit GitHub/Zammad Token Form */}
-      {editingCredential && editingCredential.type !== 'gdrive' && (
+      {editingJewel && editingJewel.type !== 'gdrive' && (
         <div className="card space-y-4">
           <div>
-            <h3 className="text-lg font-semibold mb-2">Update {getTypeLabel(editingCredential.type)} Credential</h3>
-            <p className="text-sm text-gray-400">Update the credential name or token</p>
+            <h3 className="text-lg font-semibold mb-2">Update {getTypeLabel(editingJewel.type)} Jewel</h3>
+            <p className="text-sm text-gray-400">Update the jewel name or token</p>
           </div>
 
           <div>
@@ -418,12 +414,12 @@ export default function JewelsList({ onBack }: JewelsListProps) {
               type="text"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder={`My ${getTypeLabel(editingCredential.type)}`}
+              placeholder={`My ${getTypeLabel(editingJewel.type)}`}
               className="w-full px-3 py-2 rounded-md bg-gray-100 dark:bg-quantum-700 border border-gray-300 dark:border-quantum-600 text-gray-900 dark:text-gray-100"
             />
           </div>
 
-          {editingCredential.type === 'zammad' && (
+          {editingJewel.type === 'zammad' && (
             <div>
               <label className="block text-sm text-gray-400 mb-2">Zammad URL</label>
               <input
@@ -449,15 +445,15 @@ export default function JewelsList({ onBack }: JewelsListProps) {
 
           <div className="flex gap-2">
             <button
-              onClick={handleUpdateCredential}
+              onClick={handleUpdateJewel}
               disabled={saving || !formData.name}
               className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed flex-1"
             >
-              {saving ? 'Saving...' : 'Update Credential'}
+              {saving ? 'Saving...' : 'Update Jewel'}
             </button>
             <button
               onClick={() => {
-                setEditingCredential(null)
+                setEditingJewel(null)
                 setFormData({ name: '', token: '' })
               }}
               className="btn btn-secondary"
@@ -478,7 +474,7 @@ export default function JewelsList({ onBack }: JewelsListProps) {
           <div className="text-gray-400 text-center py-8">No jewels yet</div>
         ) : (
           <div className="space-y-2">
-            {jewels.map(cred => (
+            {jewels.map((cred: any) => (
               <div
                 key={cred.id}
                 className="p-4 bg-gray-100 dark:bg-quantum-700/50 rounded-lg border border-gray-300 dark:border-quantum-600"
@@ -533,16 +529,16 @@ export default function JewelsList({ onBack }: JewelsListProps) {
                     <button
                       onClick={() => startEdit(cred)}
                       className="p-2 rounded-md hover:bg-quantum-500/20 text-quantum-400 hover:text-quantum-300 transition-colors"
-                      title="Update credential"
+                      title="Update jewel"
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                       </svg>
                     </button>
                     <button
-                      onClick={() => handleDeleteCredential(cred.id, cred.name)}
+                      onClick={() => handleDeleteJewel(cred.id, cred.name)}
                       className="p-2 rounded-md hover:bg-red-500/20 text-red-400 hover:text-red-300 transition-colors"
-                      title="Delete credential"
+                      title="Delete jewel"
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
