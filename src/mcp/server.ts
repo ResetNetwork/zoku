@@ -18,7 +18,7 @@ const schemas = {
     detailed: z.boolean().optional()
   }),
 
-  get_volition: z.object({
+  get_entanglement: z.object({
     id: z.string(),
     include_children_qupts: z.boolean().optional(),
     detailed: z.boolean().optional()
@@ -224,8 +224,8 @@ function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServ
           break;
         }
 
-        case 'get_volition': {
-          const input = schemas.get_volition.parse(args);
+        case 'get_entanglement': {
+          const input = schemas.get_entanglement.parse(args);
           const entanglement = await db.getEntanglement(input.id);
           if (!entanglement) throw new Error('Entanglement not found');
 
@@ -833,7 +833,7 @@ function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServ
   );
 
   server.tool(
-    'get_volition',
+    'get_entanglement',
     'Get entanglement details. By default returns minimal info (counts only). Use detailed=true for full nested data.',
     {
       id: { type: 'string', description: 'Entanglement ID' },
@@ -848,7 +848,7 @@ function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServ
         default: false
       }
     },
-    (args) => handleToolCall('get_volition', args)
+    (args) => handleToolCall('get_entanglement', args)
   );
 
   server.tool(

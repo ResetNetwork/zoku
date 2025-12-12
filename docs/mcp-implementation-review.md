@@ -113,9 +113,10 @@ try {
 }
 ```
 
-### 4. Tool Name Inconsistency: get_volition
+### 4. Tool Name Inconsistency: get_volition ✅ FIXED
 **Location:** Lines 21, 234, 828
 **Severity:** HIGH - Developer Experience
+**Status:** Fixed in commit [pending]
 
 **Problem:**
 Tool is named `get_volition` but "volition" is the old terminology. Should be `get_entanglement` to match the renamed domain model.
