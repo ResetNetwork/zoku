@@ -173,8 +173,7 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <button onClick={handleShowDashboard} className="text-left hover:opacity-80 transition-opacity">
-              <h1 className="text-2xl font-bold text-quantum-500 dark:text-quantum-400">Zoku</h1>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Project Tracking System</p>
+              <h1 className="text-2xl font-bold text-quantum-500 dark:text-quantum-400">The Great Game</h1>
             </button>
             <div className="flex items-center gap-2">
               <button
