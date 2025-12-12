@@ -25,8 +25,8 @@ export interface Entangled {
 
 export interface Qupt {
   id: string;
-  volition_id: string;
-  entangled_id: string | null;
+  entanglement_id: string;
+  zoku_id: string | null;
   content: string;
   source: string;
   external_id: string | null;
@@ -47,11 +47,11 @@ export interface Credential {
 
 export interface Source {
   id: string;
-  volition_id: string;
+  entanglement_id: string;
   type: string;
   config: string;
   credentials: string | null;  // Inline credentials (backward compat)
-  credential_id: string | null;  // Reference to credentials table
+  jewel_id: string | null;  // Reference to credentials table
   enabled: number;
   last_sync: number | null;
   sync_cursor: string | null;
@@ -81,7 +81,7 @@ export interface DimensionValue {
 }
 
 export interface VolitionAttribute {
-  volition_id: string;
+  entanglement_id: string;
   dimension_id: string;
   value_id: string;
   assigned_at: number;
@@ -90,15 +90,15 @@ export interface VolitionAttribute {
 export type PASCIRole = 'perform' | 'accountable' | 'control' | 'support' | 'informed';
 
 export interface MatrixAssignment {
-  volition_id: string;
-  entangled_id: string;
+  entanglement_id: string;
+  zoku_id: string;
   role: PASCIRole;
-  entangled_at: number;
+  linked_at: number;
 }
 
 export interface QuptInput {
-  volition_id: string;
-  entangled_id?: string;
+  entanglement_id: string;
+  zoku_id?: string;
   content: string;
   source: string;
   external_id?: string;

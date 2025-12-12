@@ -12,40 +12,40 @@ A project/initiative tracking system inspired by the Quantum Thief trilogy. Stat
 
 ## Core Concepts
 
-- **Volition**: A project or initiative — an act of collective will
-- **Entangled**: A partner/entity doing work (human or AI agent)
+- **Entanglement**: A project or initiative — an act of collective will
+- **Zoku**: A partner/entity doing work (human or AI agent)
 - **Qupt**: Activity record — updates flowing from any source
 - **PASCI Matrix**: Responsibility assignment (Perform, Accountable, Control, Support, Informed)
-- **Dimensions**: Taxonomy for categorizing volitions (status, function, pillar, service area)
+- **Dimensions**: Taxonomy for categorizing entanglements (status, function, pillar, service area)
 
 ## Features
 
 ### Web Frontend ✅
 
 **8 Pages:**
-1. **Dashboard** - Clickable metrics, top 5 volitions, recent activity
-2. **All Volitions** - Complete list sorted by activity
-3. **All Entangled** - Team members with PASCI responsibility matrix
+1. **Dashboard** - Clickable metrics, top 5 entanglements, recent activity
+2. **All Entanglements** - Complete list sorted by activity
+3. **All Zoku** - Team members with PASCI responsibility matrix
 4. **All Activity** - Complete activity stream with filtering
 5. **All Sources** - Configured sources with sync status and health monitoring
-6. **All Credentials** - API tokens and OAuth connections management
-7. **Volition Detail** - Individual project view with source management
-8. **Entangled Detail** - Individual team member with editable metadata
+6. **All Jewels** - API tokens and OAuth connections management
+7. **Entanglement Detail** - Individual project view with source management
+8. **Zoku Detail** - Individual team member with editable metadata
 
 **Key Features:**
 - **Clickable Metrics**: Navigate to detail pages from dashboard stats (5 metrics)
-- **Responsibility Matrix**: Volitions × PASCI roles grid (first 5, expandable)
-- **Entangled Metadata**: GitHub username, email, role, org, timezone, deal_id (editable)
+- **Responsibility Matrix**: Entanglements × PASCI roles grid (first 5, expandable)
+- **Zoku Metadata**: GitHub username, email, role, org, timezone, deal_id (editable)
 - **Deal Integration**: Deal IDs link to deals.reset.tech
-- **Activity Display**: Type-specific icons, expandable details, volition badges, client-side formatting
-- **Activity Filtering**: Filter by volition and source type
+- **Activity Display**: Type-specific icons, expandable details, entanglement badges, client-side formatting
+- **Activity Filtering**: Filter by entanglement and source type
 - **Toast Notifications**: Bottom-right notifications for sync results and system events
 - **Light/Dark Mode**: Theme switching with persistent preference
 - **URL Routing**: Direct links to any page or entity
-- **Smart Sorting**: Volitions by activity, entangled alphabetically
+- **Smart Sorting**: Entanglements by activity, zoku alphabetically
 - **Source Management**: Add/Edit/Delete sources with validation and access checking
-- **Credential Management**: Full CRUD for GitHub tokens, Zammad tokens, Google OAuth
-- **Google OAuth**: Per-credential OAuth flow with re-authorization
+- **Jewel Management**: Full CRUD for GitHub tokens, Zammad tokens, Google OAuth
+- **Google OAuth**: Per-jewel OAuth flow with re-authorization
 - **Health Monitoring**: Red/green/gray dots show source status with error messages
 - **Manual Sync**: Functional sync button (previously TODO)
 - **Console Logging**: Detailed logs for all operations
@@ -98,20 +98,20 @@ cd frontend && npm run dev  # Frontend on :5173
 
 3. Restart Claude Desktop
 4. MCP tools will be available for:
-   - Managing volitions (create, list, update, delete, nest)
+   - Managing entanglements (create, list, update, delete, nest)
    - Recording activity (qupts)
    - Assigning responsibilities (PASCI matrix)
-   - Managing entangled entities
+   - Managing zoku entities
    - Configuring activity sources (GitHub, Zammad, Google Docs)
    - Setting taxonomy attributes
 
 ### API Endpoints
 
 - `GET /health` - Health check
-- `GET /api/volitions` - List volitions
-- `POST /api/volitions` - Create volition
-- `GET /api/volitions/:id` - Get volition details
-- `GET /api/entangled` - List entangled entities
+- `GET /api/entanglements` - List entanglements
+- `POST /api/entanglements` - Create entanglement
+- `GET /api/entanglements/:id` - Get entanglement details
+- `GET /api/zoku` - List zoku entities
 - `GET /api/qupts` - List activity records
 - `GET /api/dimensions` - List taxonomy dimensions
 - `POST /mcp` - MCP server endpoint
@@ -133,43 +133,43 @@ Qupts are automatically collected from:
   - Ticket state and priority
   - Article bodies with formatting
   - Type indicators (email, note, phone) using consistent icons
-  - URL stored in credential
+  - URL stored in jewel
 - **Google Drive**: Document revisions and comments ✅ Tested & Working
   - Revision history with author and email
   - Comments with quoted/highlighted text
   - Resolved status tracking
-  - Per-credential OAuth (no system-wide config)
+  - Per-jewel OAuth (no system-wide config)
   - Health monitoring with access validation
 
-Sources are configured per-volition and run on a 5-minute cron schedule.
+Sources are configured per-entanglement and run on a 5-minute cron schedule.
 
-### Credential Store (Recommended)
+### Jewel Store (Recommended)
 
-Store credentials once, reuse across multiple sources:
+Store jewels once, reuse across multiple sources:
 
 ```javascript
-// 1. Store credential with validation
-add_credential({
+// 1. Store jewel with validation
+add_jewel({
   name: "GitHub - Personal",
   type: "github",
   data: { token: "ghp_xxx" }
 })
 // Returns: { id: "cred-123", validation: { authenticated_as: "user", scopes: [...] } }
 
-// 2. Create source using stored credential
+// 2. Create source using stored jewel
 add_source({
-  volition_id: "vol-1",
+  entanglement_id: "vol-1",
   type: "github",
   config: { owner: "ResetNetwork", repo: "zoku", events: ["push", "pull_request"] },
-  credential_id: "cred-123"
+  jewel_id: "cred-123"
 })
 ```
 
 **Benefits:**
-- Validate credentials before storage
+- Validate jewels before storage
 - Reuse across multiple repos/sources
-- Easy credential rotation
-- Track which sources use each credential
+- Easy jewel rotation
+- Track which sources use each jewel
 
 **Zammad Tag-Based Filtering:**
 Zammad sources require a `tag` field to filter tickets:
@@ -181,20 +181,20 @@ add_source({
     tag: "zoku",  // REQUIRED - only tickets with this tag
     include_articles: true
   },
-  credential_id: "cred-123"
+  jewel_id: "cred-123"
 })
 ```
 
 ### MCP Tools
 
 29 tools available via MCP interface at `/mcp`:
-- 7 Volition management
+- 7 Entanglement management
 - 3 Activity (qupts)
-- 3 Entangled entities
+- 3 Zoku entities
 - 3 PASCI matrix
 - 3 Taxonomy
 - 4 Sources
-- 6 Credentials (store, validate, rotate)
+- 6 Jewels (store, validate, rotate)
 
 **Simplified Responses:**
 All list/get tools support optional `detailed` parameter:
@@ -203,8 +203,8 @@ All list/get tools support optional `detailed` parameter:
 
 Example:
 ```javascript
-get_volition({ id: "..." })  // Returns: { name, children_count, qupts_count }
-get_volition({ id: "...", detailed: true })  // Returns: { name, children: [...], matrix, qupts: [...] }
+get_entanglement({ id: "..." })  // Returns: { name, children_count, qupts_count }
+get_entanglement({ id: "...", detailed: true })  // Returns: { name, children: [...], matrix, qupts: [...] }
 ```
 
 ## Deployment
@@ -228,10 +228,10 @@ zoku/
 │   ├── db.ts                 # Database helpers
 │   ├── scheduled.ts          # Cron handler
 │   ├── lib/
-│   │   └── crypto.ts         # Credential encryption
+│   │   └── crypto.ts         # Jewel encryption
 │   ├── api/                  # REST API routes
-│   │   ├── volitions.ts
-│   │   ├── entangled.ts
+│   │   ├── entanglements.ts
+│   │   ├── zoku.ts
 │   │   ├── qupts.ts
 │   │   ├── sources.ts
 │   │   └── dimensions.ts
@@ -247,8 +247,8 @@ zoku/
 │   ├── src/
 │   │   ├── App.tsx          # Main app with routing
 │   │   ├── components/
-│   │   │   ├── Dashboard.tsx      # Root volitions + recent activity
-│   │   │   ├── VolitionDetail.tsx # Nested view with sources
+│   │   │   ├── Dashboard.tsx      # Root entanglements + recent activity
+│   │   │   ├── EntanglementDetail.tsx # Nested view with sources
 │   │   │   └── QuptItem.tsx       # Expandable activity items
 │   │   └── lib/
 │   │       ├── api.ts       # API client

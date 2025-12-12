@@ -2,13 +2,13 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/api'
 
-interface EntangledDetailProps {
-  entangledId: string
+interface ZokuDetailProps {
+  zokuId: string
   onBack: () => void
   onSelectVolition: (id: string) => void
 }
 
-export default function EntangledDetail({ entangledId, onBack, onSelectVolition }: EntangledDetailProps) {
+export default function ZokuDetail({ zokuId, onBack, onSelectVolition }: ZokuDetailProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [formData, setFormData] = useState({
     description: '',
@@ -21,9 +21,9 @@ export default function EntangledDetail({ entangledId, onBack, onSelectVolition 
   })
   const queryClient = useQueryClient()
 
-  const { data: entangled, isLoading } = useQuery({
-    queryKey: ['entangled', entangledId],
-    queryFn: () => api.getEntangled(entangledId)
+  const { data: zoku, isLoading } = useQuery({
+    queryKey: ['zoku', zokuId],
+    queryFn: () => api.getZoku(zokuId)
   })
 
   const formatDate = (timestamp: number) => {
@@ -31,24 +31,24 @@ export default function EntangledDetail({ entangledId, onBack, onSelectVolition 
   }
 
   const handleEdit = () => {
-    if (entangled) {
+    if (zoku) {
       setFormData({
-        description: entangled.description || '',
-        github_username: entangled.metadata?.github_username || '',
-        email: entangled.metadata?.email || '',
-        role: entangled.metadata?.role || '',
-        org: entangled.metadata?.org || '',
-        timezone: entangled.metadata?.timezone || '',
-        deal_id: entangled.metadata?.deal_id || ''
+        description: zoku.description || '',
+        github_username: zoku.metadata?.github_username || '',
+        email: zoku.metadata?.email || '',
+        role: zoku.metadata?.role || '',
+        org: zoku.metadata?.org || '',
+        timezone: zoku.metadata?.timezone || '',
+        deal_id: zoku.metadata?.deal_id || ''
       })
       setIsEditing(true)
     }
   }
 
   const handleSave = async () => {
-    if (!entangled) return
+    if (!zoku) return
 
-    await api.updateEntangled(entangledId, {
+    await api.updateZoku(zokuId, {
       description: formData.description || null,
       metadata: {
         github_username: formData.github_username || undefined,
@@ -60,7 +60,7 @@ export default function EntangledDetail({ entangledId, onBack, onSelectVolition 
       }
     })
 
-    queryClient.invalidateQueries({ queryKey: ['entangled', entangledId] })
+    queryClient.invalidateQueries({ queryKey: ['zoku', zokuId] })
     setIsEditing(false)
   }
 
@@ -90,8 +90,8 @@ export default function EntangledDetail({ entangledId, onBack, onSelectVolition 
     return <div className="text-center text-gray-400 py-12">Loading...</div>
   }
 
-  if (!entangled) {
-    return <div className="text-center text-gray-400 py-12">Entangled partner not found</div>
+  if (!zoku) {
+    return <div className="text-center text-gray-400 py-12">Zoku partner not found</div>
   }
 
   return (
@@ -101,11 +101,11 @@ export default function EntangledDetail({ entangledId, onBack, onSelectVolition 
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-4">
             <span className="text-5xl">
-              {entangled.type === 'human' ? '👤' : '🤖'}
+              {zoku.type === 'human' ? '👤' : '🤖'}
             </span>
             <div className="flex-1">
-              <h1 className="text-3xl font-bold text-quantum-400 mb-1">{entangled.name}</h1>
-              <p className="text-gray-400">{entangled.type === 'human' ? 'Human Partner' : 'AI Agent'}</p>
+              <h1 className="text-3xl font-bold text-quantum-400 mb-1">{zoku.name}</h1>
+              <p className="text-gray-400">{zoku.type === 'human' ? 'Human Partner' : 'AI Agent'}</p>
             </div>
           </div>
           {isEditing ? (
@@ -123,11 +123,11 @@ export default function EntangledDetail({ entangledId, onBack, onSelectVolition 
             </button>
           )}
         </div>
-        {entangled.description && (
-          <p className="text-gray-600 dark:text-gray-300 mb-3">{entangled.description}</p>
+        {zoku.description && (
+          <p className="text-gray-600 dark:text-gray-300 mb-3">{zoku.description}</p>
         )}
         <div className="text-sm text-gray-500">
-          Created {formatDate(entangled.created_at)}
+          Created {formatDate(zoku.created_at)}
         </div>
       </div>
 
@@ -211,52 +211,52 @@ export default function EntangledDetail({ entangledId, onBack, onSelectVolition 
           </div>
         ) : (
           <div className="space-y-4">
-            {entangled.description && (
-              <p className="text-gray-600 dark:text-gray-300">{entangled.description}</p>
+            {zoku.description && (
+              <p className="text-gray-600 dark:text-gray-300">{zoku.description}</p>
             )}
-            {entangled.metadata && Object.keys(entangled.metadata).length > 0 ? (
+            {zoku.metadata && Object.keys(zoku.metadata).length > 0 ? (
               <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {entangled.metadata.github_username && (
+                {zoku.metadata.github_username && (
                   <div>
                     <dt className="text-sm text-gray-500 mb-1">GitHub Username</dt>
-                    <dd className="text-gray-900 dark:text-gray-100">@{entangled.metadata.github_username}</dd>
+                    <dd className="text-gray-900 dark:text-gray-100">@{zoku.metadata.github_username}</dd>
                   </div>
                 )}
-                {entangled.metadata.email && (
+                {zoku.metadata.email && (
                   <div>
                     <dt className="text-sm text-gray-500 mb-1">Email</dt>
-                    <dd className="text-gray-900 dark:text-gray-100">{entangled.metadata.email}</dd>
+                    <dd className="text-gray-900 dark:text-gray-100">{zoku.metadata.email}</dd>
                   </div>
                 )}
-                {entangled.metadata.role && (
+                {zoku.metadata.role && (
                   <div>
                     <dt className="text-sm text-gray-500 mb-1">Role</dt>
-                    <dd className="text-gray-900 dark:text-gray-100">{entangled.metadata.role}</dd>
+                    <dd className="text-gray-900 dark:text-gray-100">{zoku.metadata.role}</dd>
                   </div>
                 )}
-                {entangled.metadata.org && (
+                {zoku.metadata.org && (
                   <div>
                     <dt className="text-sm text-gray-500 mb-1">Organization</dt>
-                    <dd className="text-gray-900 dark:text-gray-100">{entangled.metadata.org}</dd>
+                    <dd className="text-gray-900 dark:text-gray-100">{zoku.metadata.org}</dd>
                   </div>
                 )}
-                {entangled.metadata.timezone && (
+                {zoku.metadata.timezone && (
                   <div>
                     <dt className="text-sm text-gray-500 mb-1">Timezone</dt>
-                    <dd className="text-gray-900 dark:text-gray-100">{entangled.metadata.timezone}</dd>
+                    <dd className="text-gray-900 dark:text-gray-100">{zoku.metadata.timezone}</dd>
                   </div>
                 )}
-                {entangled.metadata.deal_id && (
+                {zoku.metadata.deal_id && (
                   <div>
                     <dt className="text-sm text-gray-500 mb-1">Deal</dt>
                     <dd className="text-gray-900 dark:text-gray-100">
                       <a
-                        href={`https://deals.reset.tech/?deal_id=${entangled.metadata.deal_id}`}
+                        href={`https://deals.reset.tech/?deal_id=${zoku.metadata.deal_id}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-quantum-500 hover:text-quantum-400 underline inline-flex items-center gap-1"
                       >
-                        {entangled.metadata.deal_id}
+                        {zoku.metadata.deal_id}
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                         </svg>
@@ -272,14 +272,14 @@ export default function EntangledDetail({ entangledId, onBack, onSelectVolition 
         )}
       </div>
 
-      {/* Volitions */}
+      {/* Entanglements */}
       <div className="card">
-        <h2 className="text-xl font-bold mb-4">Volitions</h2>
-        {!entangled.volitions || entangled.volitions.length === 0 ? (
-          <div className="text-gray-400 text-center py-8">Not assigned to any volitions yet</div>
+        <h2 className="text-xl font-bold mb-4">Entanglements</h2>
+        {!zoku.entanglements || zoku.entanglements.length === 0 ? (
+          <div className="text-gray-400 text-center py-8">Not assigned to any entanglements yet</div>
         ) : (
           <div className="space-y-2">
-            {entangled.volitions.map(vol => (
+            {zoku.entanglements.map(vol => (
               <button
                 key={vol.id}
                 onClick={() => onSelectVolition(vol.id)}

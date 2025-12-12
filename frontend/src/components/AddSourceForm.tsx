@@ -4,12 +4,12 @@ import { api } from '../lib/api'
 import { useNotifications } from '../lib/notifications'
 
 interface AddSourceFormProps {
-  volitionId: string
+  entanglementId: string
   onSuccess: () => void
   onCancel: () => void
 }
 
-export default function AddSourceForm({ volitionId, onSuccess, onCancel }: AddSourceFormProps) {
+export default function AddSourceForm({ entanglementId, onSuccess, onCancel }: AddSourceFormProps) {
   const [sourceType, setSourceType] = useState<'github' | 'zammad' | 'gdrive'>('github')
   const [selectedCredential, setSelectedCredential] = useState('')
   const [config, setConfig] = useState<any>({
@@ -21,13 +21,13 @@ export default function AddSourceForm({ volitionId, onSuccess, onCancel }: AddSo
   const [adding, setAdding] = useState(false)
   const { addNotification } = useNotifications()
 
-  const { data: credentials = [] } = useQuery({
-    queryKey: ['credentials'],
-    queryFn: () => api.listCredentials()
+  const { data: jewels = [] } = useQuery({
+    queryKey: ['jewels'],
+    queryFn: () => api.listJewels()
   })
 
-  // Filter credentials by type
-  const availableCredentials = credentials.filter(c => c.type === sourceType)
+  // Filter jewels by type
+  const availableJewels = jewels.filter(c => c.type === sourceType)
 
   const handleTypeChange = (type: 'github' | 'zammad' | 'gdrive') => {
     setSourceType(type)
@@ -64,12 +64,12 @@ export default function AddSourceForm({ volitionId, onSuccess, onCancel }: AddSo
 
     setAdding(true)
     try {
-      const response = await fetch(`/api/volitions/${volitionId}/sources`, {
+      const response = await fetch(`/api/entanglements/${entanglementId}/sources`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: sourceType,
-          credential_id: selectedCredential,
+          jewel_id: selectedCredential,
           config
         })
       })
@@ -121,9 +121,9 @@ export default function AddSourceForm({ volitionId, onSuccess, onCancel }: AddSo
       {/* Credential Selector */}
       <div>
         <label className="block text-sm text-gray-400 mb-2">Credential</label>
-        {availableCredentials.length === 0 ? (
+        {availableJewels.length === 0 ? (
           <div className="text-sm text-gray-400 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-md">
-            No {sourceType} credentials found. Create one in the Credentials page first.
+            No {sourceType} jewels found. Create one in the Jewels page first.
           </div>
         ) : (
           <select
@@ -132,7 +132,7 @@ export default function AddSourceForm({ volitionId, onSuccess, onCancel }: AddSo
             className="w-full px-3 py-2 rounded-md bg-gray-100 dark:bg-quantum-700 border border-gray-300 dark:border-quantum-600 text-gray-900 dark:text-gray-100"
           >
             <option value="">Select credential...</option>
-            {availableCredentials.map(cred => (
+            {availableJewels.map(cred => (
               <option key={cred.id} value={cred.id}>{cred.name}</option>
             ))}
           </select>

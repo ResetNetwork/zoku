@@ -4,11 +4,11 @@ import { api } from '../lib/api'
 import { useNotifications } from '../lib/notifications'
 import GoogleOAuthButton from './GoogleOAuthButton'
 
-interface CredentialsListProps {
+interface JewelsListProps {
   onBack: () => void
 }
 
-export default function CredentialsList({ onBack }: CredentialsListProps) {
+export default function JewelsList({ onBack }: JewelsListProps) {
   const [showAddForm, setShowAddForm] = useState<'github' | 'zammad' | 'gdrive' | null>(null)
   const [editingCredential, setEditingCredential] = useState<any>(null)
   const [formData, setFormData] = useState<any>({ name: '', token: '', url: '' })
@@ -16,9 +16,9 @@ export default function CredentialsList({ onBack }: CredentialsListProps) {
   const { addNotification } = useNotifications()
   const queryClient = useQueryClient()
 
-  const { data: credentials = [], isLoading } = useQuery({
-    queryKey: ['credentials'],
-    queryFn: () => api.listCredentials()
+  const { data: jewels = [], isLoading } = useQuery({
+    queryKey: ['jewels'],
+    queryFn: () => api.listJewels()
   })
 
   const formatDate = (timestamp: number) => {
@@ -60,7 +60,7 @@ export default function CredentialsList({ onBack }: CredentialsListProps) {
         ? { token: formData.token, url: (formData as any).url }
         : { token: formData.token };
 
-      const credential = await api.createCredential({
+      const credential = await api.createJewel({
         name: formData.name,
         type: showAddForm!,
         data: credentialData
@@ -68,7 +68,7 @@ export default function CredentialsList({ onBack }: CredentialsListProps) {
 
       console.log(`✅ Credential created: ${credential.id}`)
       addNotification('success', `${getTypeLabel(showAddForm!)} credential added`)
-      queryClient.invalidateQueries({ queryKey: ['credentials'] })
+      queryClient.invalidateQueries({ queryKey: ['jewels'] })
       setShowAddForm(null)
       setFormData({ name: '', token: '', url: '' } as any)
     } catch (error) {
@@ -85,9 +85,9 @@ export default function CredentialsList({ onBack }: CredentialsListProps) {
     }
 
     try {
-      await api.deleteCredential(id)
+      await api.deleteJewel(id)
       addNotification('success', 'Credential deleted')
-      queryClient.invalidateQueries({ queryKey: ['credentials'] })
+      queryClient.invalidateQueries({ queryKey: ['jewels'] })
     } catch (error) {
       console.error('Failed to delete credential:', error)
       addNotification('error', error instanceof Error ? error.message : 'Failed to delete credential')
@@ -95,7 +95,7 @@ export default function CredentialsList({ onBack }: CredentialsListProps) {
   }
 
   const handleGoogleOAuthSuccess = (credential: any) => {
-    queryClient.invalidateQueries({ queryKey: ['credentials'] })
+    queryClient.invalidateQueries({ queryKey: ['jewels'] })
     setShowAddForm(null)
     setEditingCredential(null)
   }
@@ -127,11 +127,11 @@ export default function CredentialsList({ onBack }: CredentialsListProps) {
         updateData.data = { url: (formData as any).url };
       }
 
-      await api.updateCredential(editingCredential.id, updateData)
+      await api.updateJewel(editingCredential.id, updateData)
 
       console.log(`✅ Credential updated: ${editingCredential.id}`)
       addNotification('success', `${getTypeLabel(editingCredential.type)} credential updated`)
-      queryClient.invalidateQueries({ queryKey: ['credentials'] })
+      queryClient.invalidateQueries({ queryKey: ['jewels'] })
       setEditingCredential(null)
       setFormData({ name: '', token: '' })
     } catch (error) {
@@ -156,26 +156,26 @@ export default function CredentialsList({ onBack }: CredentialsListProps) {
     <div className="space-y-6">
       {/* Header */}
       <div className="card">
-        <h1 className="text-3xl font-bold text-quantum-400 mb-2">Credentials</h1>
+        <h1 className="text-3xl font-bold text-quantum-400 mb-2">Jewels</h1>
         <p className="text-gray-400">Manage API tokens and OAuth connections</p>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="card">
-          <div className="text-sm text-gray-400 mb-1">Total Credentials</div>
-          <div className="text-3xl font-bold text-quantum-400">{credentials.length}</div>
+          <div className="text-sm text-gray-400 mb-1">Total Jewels</div>
+          <div className="text-3xl font-bold text-quantum-400">{jewels.length}</div>
         </div>
         <div className="card">
           <div className="text-sm text-gray-400 mb-1">GitHub</div>
           <div className="text-3xl font-bold text-quantum-400">
-            {credentials.filter(c => c.type === 'github').length}
+            {jewels.filter(c => c.type === 'github').length}
           </div>
         </div>
         <div className="card">
           <div className="text-sm text-gray-400 mb-1">Google Drive</div>
           <div className="text-3xl font-bold text-quantum-400">
-            {credentials.filter(c => c.type === 'gdrive').length}
+            {jewels.filter(c => c.type === 'gdrive').length}
           </div>
         </div>
       </div>
@@ -321,8 +321,8 @@ export default function CredentialsList({ onBack }: CredentialsListProps) {
                 // Re-authorize using existing client_id/secret from backend
                 setSaving(true)
                 try {
-                  // Get fresh OAuth URL using existing credentials
-                  const response = await fetch(`/api/credentials/${editingCredential.id}/reauthorize`, {
+                  // Get fresh OAuth URL using existing jewels
+                  const response = await fetch(`/api/jewels/${editingCredential.id}/reauthorize`, {
                     method: 'POST'
                   })
                   const data = await response.json()
@@ -346,7 +346,7 @@ export default function CredentialsList({ onBack }: CredentialsListProps) {
                       const tokens = event.data.tokens
                       if (tokens.refresh_token) {
                         // Update credential with new tokens
-                        await api.updateCredential(editingCredential.id, {
+                        await api.updateJewel(editingCredential.id, {
                           name: formData.name,
                           data: {
                             refresh_token: tokens.refresh_token,
@@ -355,7 +355,7 @@ export default function CredentialsList({ onBack }: CredentialsListProps) {
                           }
                         })
                         addNotification('success', 'Google Drive credential updated')
-                        queryClient.invalidateQueries({ queryKey: ['credentials'] })
+                        queryClient.invalidateQueries({ queryKey: ['jewels'] })
                         setEditingCredential(null)
                         setSaving(false)
 
@@ -469,16 +469,16 @@ export default function CredentialsList({ onBack }: CredentialsListProps) {
         </div>
       )}
 
-      {/* Credentials List */}
+      {/* Jewels List */}
       <div className="card">
-        <h2 className="text-xl font-bold mb-4">Stored Credentials ({credentials.length})</h2>
+        <h2 className="text-xl font-bold mb-4">Stored Jewels ({jewels.length})</h2>
         {isLoading ? (
           <div className="text-gray-400 text-center py-8">Loading...</div>
-        ) : credentials.length === 0 ? (
-          <div className="text-gray-400 text-center py-8">No credentials yet</div>
+        ) : jewels.length === 0 ? (
+          <div className="text-gray-400 text-center py-8">No jewels yet</div>
         ) : (
           <div className="space-y-2">
-            {credentials.map(cred => (
+            {jewels.map(cred => (
               <div
                 key={cred.id}
                 className="p-4 bg-gray-100 dark:bg-quantum-700/50 rounded-lg border border-gray-300 dark:border-quantum-600"
@@ -506,7 +506,7 @@ export default function CredentialsList({ onBack }: CredentialsListProps) {
                       </div>
                     )}
 
-                    {/* Show Zammad info for Zammad credentials */}
+                    {/* Show Zammad info for Zammad jewels */}
                     {cred.type === 'zammad' && (
                       <div className="text-sm space-y-1 mb-2">
                         {cred.validation_metadata?.email && (

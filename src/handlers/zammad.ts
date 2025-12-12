@@ -62,7 +62,7 @@ export const zammadHandler: SourceHandler = {
 
           // Create qupt for ticket update
           qupts.push({
-            volition_id: source.volition_id,
+            entanglement_id: source.entanglement_id,
             content: formatTicketContent(ticket),
             source: 'zammad',
             external_id: `zammad:ticket:${ticket.id}:${ticket.updated_at}`,
@@ -105,7 +105,7 @@ export const zammadHandler: SourceHandler = {
                 if (since && articleTime <= since) continue;
 
                 qupts.push({
-                  volition_id: source.volition_id,
+                  entanglement_id: source.entanglement_id,
                   content: formatArticleContent(article, ticket),
                   source: 'zammad',
                   external_id: `zammad:article:${article.id}`,

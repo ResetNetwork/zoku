@@ -93,8 +93,8 @@ export default function GoogleOAuthButton({ onSuccess, onCancel, initialValues }
             console.log('🎫 Creating credential with tokens...')
             console.log('Credential data:', { name, type: 'gdrive' })
 
-            // Create credential with the tokens + client credentials
-            const credential = await api.createCredential({
+            // Create credential with the tokens + client jewels
+            const credential = await api.createJewel({
               name: name,
               type: 'gdrive',
               data: {
@@ -152,14 +152,14 @@ export default function GoogleOAuthButton({ onSuccess, onCancel, initialValues }
       <div>
         <h3 className="text-lg font-semibold mb-2">Connect Google Drive</h3>
         <p className="text-sm text-gray-400 mb-4">
-          Enter your Google Cloud project OAuth credentials.
+          Enter your Google Cloud project OAuth jewels.
           <a
-            href="https://console.cloud.google.com/apis/credentials"
+            href="https://console.cloud.google.com/apis/jewels"
             target="_blank"
             rel="noopener noreferrer"
             className="text-quantum-500 hover:text-quantum-400 ml-1"
           >
-            Get credentials →
+            Get jewels →
           </a>
         </p>
       </div>

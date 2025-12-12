@@ -129,7 +129,7 @@ app.get('/:id', async (c) => {
 
   const credential = await db.getCredential(id);
   if (!credential) {
-    return c.json({ error: { code: 'NOT_FOUND', message: 'Credential not found' } }, 404);
+    return c.json({ error: { code: 'NOT_FOUND', message: 'Jewel not found' } }, 404);
   }
 
   return c.json({
@@ -151,7 +151,7 @@ app.patch('/:id', async (c) => {
 
   const credential = await db.getCredential(id);
   if (!credential) {
-    return c.json({ error: { code: 'NOT_FOUND', message: 'Credential not found' } }, 404);
+    return c.json({ error: { code: 'NOT_FOUND', message: 'Jewel not found' } }, 404);
   }
 
   const updates: any = {};
@@ -224,7 +224,7 @@ app.post('/:id/reauthorize', async (c) => {
 
   const credential = await db.getCredential(id);
   if (!credential) {
-    return c.json({ error: { code: 'NOT_FOUND', message: 'Credential not found' } }, 404);
+    return c.json({ error: { code: 'NOT_FOUND', message: 'Jewel not found' } }, 404);
   }
 
   if (credential.type !== 'gdrive') {
@@ -241,7 +241,7 @@ app.post('/:id/reauthorize', async (c) => {
     nonce: crypto.randomUUID(),
     client_id: decrypted.client_id,
     client_secret: decrypted.client_secret,
-    credential_id: id  // Track which credential this is for
+    jewel_id: id  // Track which credential this is for
   });
 
   const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
@@ -266,11 +266,11 @@ app.delete('/:id', async (c) => {
 
   const credential = await db.getCredential(id);
   if (!credential) {
-    return c.json({ error: { code: 'NOT_FOUND', message: 'Credential not found' } }, 404);
+    return c.json({ error: { code: 'NOT_FOUND', message: 'Jewel not found' } }, 404);
   }
 
   // Check if credential is in use
-  const usage = await db.getCredentialUsage(id);
+  const usage = await db.getJewelUsage(id);
   if (usage.length > 0) {
     return c.json({
       error: {
@@ -292,10 +292,10 @@ app.get('/:id/usage', async (c) => {
 
   const credential = await db.getCredential(id);
   if (!credential) {
-    return c.json({ error: { code: 'NOT_FOUND', message: 'Credential not found' } }, 404);
+    return c.json({ error: { code: 'NOT_FOUND', message: 'Jewel not found' } }, 404);
   }
 
-  const usage = await db.getCredentialUsage(id);
+  const usage = await db.getJewelUsage(id);
   return c.json({ usage });
 });
 

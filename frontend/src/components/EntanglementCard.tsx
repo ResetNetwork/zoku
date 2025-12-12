@@ -1,11 +1,11 @@
 import type { Volition } from '../lib/types'
 
-interface VolitionCardProps {
+interface EntanglementCardProps {
   volition: Volition
   onClick: (id: string) => void
 }
 
-export default function VolitionCard({ volition, onClick }: VolitionCardProps) {
+export default function EntanglementCard({ volition, onClick }: EntanglementCardProps) {
   return (
     <button
       onClick={() => onClick(volition.id)}
@@ -36,7 +36,7 @@ export default function VolitionCard({ volition, onClick }: VolitionCardProps) {
           )}
 
           <div className="flex gap-4 text-xs text-gray-500">
-            <div>{volition.entangled_count || 0} entangled</div>
+            <div>{volition.zoku_count || 0} zoku</div>
             <div>•</div>
             <div>{volition.qupts_count || 0} qupts</div>
             <div>•</div>

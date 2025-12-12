@@ -62,7 +62,7 @@ export const gdriveHandler: SourceHandler = {
         if (since && revisionTime <= since) continue;
 
         qupts.push({
-          volition_id: source.volition_id,
+          entanglement_id: source.entanglement_id,
           content: formatRevisionContent(revision, docTitle),
           source: 'gdrive',
           external_id: `gdrive:${document_id}:rev:${revision.id}`,
@@ -97,7 +97,7 @@ export const gdriveHandler: SourceHandler = {
             if (since && commentTime <= since) continue;
 
             qupts.push({
-              volition_id: source.volition_id,
+              entanglement_id: source.entanglement_id,
               content: formatCommentContent(comment, docTitle),
               source: 'gdrive',
               external_id: `gdrive:${document_id}:comment:${comment.id}`,

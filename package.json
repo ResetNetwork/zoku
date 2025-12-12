@@ -1,14 +1,14 @@
 {
-  "name": "zoku",
+  "name": "the-great-game",
   "version": "1.0.0",
   "scripts": {
     "dev": "wrangler dev",
     "dev:frontend": "cd frontend && npm run dev",
     "deploy": "wrangler deploy",
-    "db:migrate": "wrangler d1 execute zoku --file=./schema.sql",
-    "db:migrate:remote": "wrangler d1 execute zoku --file=./schema.sql --remote",
-    "db:seed": "wrangler d1 execute zoku --file=./seed.sql",
-    "db:seed:remote": "wrangler d1 execute zoku --file=./seed.sql --remote",
+    "db:migrate": "wrangler d1 execute the-great-game --file=./schema.sql",
+    "db:migrate:remote": "wrangler d1 execute the-great-game --file=./schema.sql --remote",
+    "db:seed": "wrangler d1 execute the-great-game --file=./seed.sql",
+    "db:seed:remote": "wrangler d1 execute the-great-game --file=./seed.sql --remote",
     "db:reset": "npm run db:migrate && npm run db:seed",
     "build:frontend": "cd frontend && npm run build",
     "build": "npm run build:frontend"

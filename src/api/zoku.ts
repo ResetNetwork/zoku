@@ -27,7 +27,7 @@ app.get('/:id', async (c) => {
   }
 
   // Get their volitions and roles
-  const volitions = await db.getEntangledVolitions(id);
+  const volitions = await db.getZokuEntanglements(id);
 
   return c.json({
     ...entangled,

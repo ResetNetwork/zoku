@@ -9,26 +9,26 @@ interface ActivityListProps {
 }
 
 export default function ActivityList({ onBack }: ActivityListProps) {
-  const [selectedVolition, setSelectedVolition] = useState<string>('all')
+  const [selectedEntanglement, setSelectedVolition] = useState<string>('all')
   const [selectedSource, setSelectedSource] = useState<string>('all')
 
-  const { data: volitions = [] } = useQuery({
-    queryKey: ['volitions'],
-    queryFn: () => api.listVolitions({ limit: 100 })
+  const { data: entanglements = [] } = useQuery({
+    queryKey: ['entanglements'],
+    queryFn: () => api.listEntanglements({ limit: 100 })
   })
 
   const { data: allQupts = [], isLoading } = useQuery({
-    queryKey: ['all-qupts', volitions.map(v => v.id).join(',')],
+    queryKey: ['all-qupts', entanglements.map(v => v.id).join(',')],
     queryFn: async () => {
-      if (volitions.length === 0) return []
+      if (entanglements.length === 0) return []
       const qupts: Qupt[] = []
-      for (const vol of volitions) {
+      for (const vol of entanglements) {
         const volQupts = await api.listQupts(vol.id, { limit: 50, detailed: true })
         qupts.push(...volQupts)
       }
       return qupts.sort((a, b) => b.created_at - a.created_at)
     },
-    enabled: volitions.length > 0
+    enabled: entanglements.length > 0
   })
 
 
@@ -37,7 +37,7 @@ export default function ActivityList({ onBack }: ActivityListProps) {
 
   // Apply filters
   const filteredQupts = allQupts.filter(qupt => {
-    const matchesVolition = selectedVolition === 'all' || qupt.volition_id === selectedVolition
+    const matchesVolition = selectedEntanglement === 'all' || qupt.entanglement_id === selectedEntanglement
     const matchesSource = selectedSource === 'all' || qupt.source === selectedSource
     return matchesVolition && matchesSource
   })
@@ -47,7 +47,7 @@ export default function ActivityList({ onBack }: ActivityListProps) {
       {/* Header */}
       <div className="card">
         <h1 className="text-3xl font-bold text-quantum-400 mb-2">Qupts</h1>
-        <p className="text-gray-400">Activity across all volitions</p>
+        <p className="text-gray-400">Activity across all entanglements</p>
       </div>
 
       {/* Filters */}
@@ -57,12 +57,12 @@ export default function ActivityList({ onBack }: ActivityListProps) {
           <div>
             <label className="block text-sm text-gray-400 mb-2">Volition</label>
             <select
-              value={selectedVolition}
+              value={selectedEntanglement}
               onChange={(e) => setSelectedVolition(e.target.value)}
               className="w-full px-3 py-2 rounded-md bg-gray-100 dark:bg-quantum-700 border border-gray-300 dark:border-quantum-600 text-gray-900 dark:text-gray-100"
             >
-              <option value="all">All Volitions</option>
-              {volitions.map(v => (
+              <option value="all">All Entanglements</option>
+              {entanglements.map(v => (
                 <option key={v.id} value={v.id}>{v.name}</option>
               ))}
             </select>

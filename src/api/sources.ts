@@ -18,7 +18,7 @@ app.get('/:id', async (c) => {
   // Don't expose credentials
   return c.json({
     id: source.id,
-    volition_id: source.volition_id,
+    entanglement_id: source.entanglement_id,
     type: source.type,
     config: source.config,
     enabled: source.enabled,
@@ -93,11 +93,11 @@ app.post('/:id/sync', async (c) => {
 
     // Get credentials
     let credentials = {};
-    if (source.credential_id) {
-      const credential = await db.getCredential(source.credential_id);
+    if (source.jewel_id) {
+      const credential = await db.getCredential(source.jewel_id);
       if (!credential) {
         return c.json({
-          error: { code: 'CREDENTIAL_NOT_FOUND', message: 'Credential not found' }
+          error: { code: 'CREDENTIAL_NOT_FOUND', message: 'Jewel not found' }
         }, 404);
       }
       credentials = JSON.parse(await decryptCredentials(credential.data, c.env.ENCRYPTION_KEY));
@@ -145,8 +145,8 @@ app.post('/:id/sync', async (c) => {
     if (errorMessage.includes('403') && errorMessage.includes('does not have permission')) {
       // Get email from credential for helpful message
       let accountEmail = 'your account';
-      if (source.credential_id) {
-        const credential = await db.getCredential(source.credential_id);
+      if (source.jewel_id) {
+        const credential = await db.getCredential(source.jewel_id);
         if (credential && credential.validation_metadata) {
           try {
             const metadata = JSON.parse(credential.validation_metadata);

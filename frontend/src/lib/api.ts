@@ -1,10 +1,10 @@
-import type { Volition, Qupt, Entangled, PASCIMatrix, Source } from './types'
+import type { Entanglement, Qupt, Zoku, PASCIMatrix, Source } from './types'
 
 const API_BASE = '/api'
 
 export const api = {
   // Volitions
-  async listVolitions(params?: { root_only?: boolean; limit?: number; detailed?: boolean }) {
+  async listEntanglements(params?: { root_only?: boolean; limit?: number; detailed?: boolean }) {
     const query = new URLSearchParams()
     if (params?.root_only) query.set('root_only', 'true')
     if (params?.limit) query.set('limit', String(params.limit))
@@ -12,17 +12,17 @@ export const api = {
 
     const res = await fetch(`${API_BASE}/volitions?${query}`)
     const data = await res.json()
-    return data.volitions as Volition[]
+    return data.entanglements as Entanglement[]
   },
 
-  async getVolition(id: string, detailed = false) {
+  async getEntanglement(id: string, detailed = false) {
     const res = await fetch(`${API_BASE}/volitions/${id}?detailed=${detailed}`)
-    return await res.json() as Volition
+    return await res.json() as Entanglement
   },
 
   // Qupts
-  async listQupts(volitionId: string, params?: { source?: string; limit?: number; detailed?: boolean }) {
-    const query = new URLSearchParams({ volition_id: volitionId })
+  async listQupts(entanglementId: string, params?: { source?: string; limit?: number; detailed?: boolean }) {
+    const query = new URLSearchParams({ entanglement_id: volitionId })
     if (params?.source) query.set('source', params.source)
     if (params?.limit) query.set('limit', String(params.limit))
     if (params?.detailed) query.set('detailed', 'true')
@@ -33,27 +33,27 @@ export const api = {
   },
 
   // Entangled
-  async listEntangled() {
+  async listZoku() {
     const res = await fetch(`${API_BASE}/entangled`)
     const data = await res.json()
-    return data.entangled as Entangled[]
+    return data.zoku as Zoku[]
   },
 
-  async getEntangled(id: string) {
+  async getZoku(id: string) {
     const res = await fetch(`${API_BASE}/entangled/${id}`)
-    return await res.json() as Entangled
+    return await res.json() as Zoku
   },
 
-  async createEntangled(data: { name: string; type: 'human' | 'agent' }) {
+  async createZoku(data: { name: string; type: 'human' | 'agent' }) {
     const res = await fetch(`${API_BASE}/entangled`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     })
-    return await res.json() as Entangled
+    return await res.json() as Zoku
   },
 
-  async updateEntangled(id: string, data: { name?: string; description?: string; metadata?: any }) {
+  async updateZoku(id: string, data: { name?: string; description?: string; metadata?: any }) {
     const res = await fetch(`${API_BASE}/entangled/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -63,17 +63,17 @@ export const api = {
   },
 
   // Matrix
-  async getMatrix(volitionId: string) {
+  async getZokuMatrix(entanglementId: string) {
     const res = await fetch(`${API_BASE}/volitions/${volitionId}/matrix`)
     const data = await res.json()
     return data.matrix as PASCIMatrix
   },
 
-  async assignToMatrix(volitionId: string, entangledId: string, role: string) {
+  async assignToMatrix(entanglementId: string, zokuId: string, role: string) {
     const res = await fetch(`${API_BASE}/volitions/${volitionId}/matrix`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ entangled_id: entangledId, role })
+      body: JSON.stringify({ zoku_id: entangledId, role })
     })
     return await res.json()
   },
@@ -85,12 +85,12 @@ export const api = {
     return data
   },
 
-  async getVolitionAttributes(volitionId: string) {
+  async getEntanglementAttributes(entanglementId: string) {
     const res = await fetch(`${API_BASE}/volitions/${volitionId}/attributes`)
     return await res.json()
   },
 
-  async setVolitionAttributes(volitionId: string, attributes: Array<{ dimension: string; value: string }>) {
+  async setEntanglementAttributes(entanglementId: string, attributes: Array<{ dimension: string; value: string }>) {
     const res = await fetch(`${API_BASE}/volitions/${volitionId}/attributes`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -100,7 +100,7 @@ export const api = {
   },
 
   // Sources
-  async listSources(volitionId: string) {
+  async listSources(entanglementId: string) {
     const res = await fetch(`${API_BASE}/volitions/${volitionId}/sources`)
     const data = await res.json()
     return data.sources as Source[]
@@ -114,13 +114,13 @@ export const api = {
   },
 
   // Credentials
-  async listCredentials() {
+  async listJewels() {
     const res = await fetch(`${API_BASE}/credentials`)
     const data = await res.json()
-    return data.credentials || []
+    return data.jewels || []
   },
 
-  async createCredential(credential: { name: string; type: string; data: any }) {
+  async createJewel(credential: { name: string; type: string; data: any }) {
     console.log('📡 API: Creating credential...', { name: credential.name, type: credential.type })
     const res = await fetch(`${API_BASE}/credentials`, {
       method: 'POST',
@@ -136,7 +136,7 @@ export const api = {
     return data
   },
 
-  async updateCredential(id: string, data: { name?: string; data?: any }) {
+  async updateJewel(id: string, data: { name?: string; data?: any }) {
     const res = await fetch(`${API_BASE}/credentials/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -149,7 +149,7 @@ export const api = {
     return res.json()
   },
 
-  async deleteCredential(id: string) {
+  async deleteJewel(id: string) {
     const res = await fetch(`${API_BASE}/credentials/${id}`, {
       method: 'DELETE'
     })

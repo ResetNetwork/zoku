@@ -8,7 +8,7 @@ export interface Volition {
   children_count?: number
   qupts_count?: number
   sources_count?: number
-  entangled_count?: number
+  zoku_count?: number
   children?: Volition[]
   matrix?: PASCIMatrix
   attributes?: Record<string, any>
@@ -17,9 +17,9 @@ export interface Volition {
 
 export interface Qupt {
   id: string
-  volition_id: string
+  entanglement_id: string
   volition_name?: string | null
-  entangled_id?: string | null
+  zoku_id?: string | null
   content: string
   source: string
   external_id?: string | null
@@ -51,11 +51,11 @@ export interface Entangled {
 }
 
 export interface PASCIMatrix {
-  perform: Entangled[]
-  accountable: Entangled[]
-  control: Entangled[]
-  support: Entangled[]
-  informed: Entangled[]
+  perform: Zoku[]
+  accountable: Zoku[]
+  control: Zoku[]
+  support: Zoku[]
+  informed: Zoku[]
 }
 
 export interface Source {

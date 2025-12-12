@@ -8,35 +8,35 @@ import AddSourceForm from './AddSourceForm'
 import EditSourceForm from './EditSourceForm'
 import AttributeEditor from './AttributeEditor'
 
-interface VolitionDetailProps {
-  volitionId: string
+interface EntanglementDetailProps {
+  entanglementId: string
   onBack: () => void
 }
 
-export default function VolitionDetail({ volitionId, onBack }: VolitionDetailProps) {
+export default function EntanglementDetail({ entanglementId, onBack }: EntanglementDetailProps) {
   const [showAddSource, setShowAddSource] = useState(false)
   const [editingSource, setEditingSource] = useState<any>(null)
   const queryClient = useQueryClient()
   const { addNotification } = useNotifications()
 
   const { data: volition, isLoading } = useQuery({
-    queryKey: ['volition', volitionId],
-    queryFn: () => api.getVolition(volitionId, false)
+    queryKey: ['volition', entanglementId],
+    queryFn: () => api.getVolition(entanglementId, false)
   })
 
   const { data: matrix } = useQuery({
-    queryKey: ['matrix', volitionId],
-    queryFn: () => api.getMatrix(volitionId)
+    queryKey: ['matrix', entanglementId],
+    queryFn: () => api.getMatrix(entanglementId)
   })
 
   const { data: qupts = [], isLoading: quptsLoading } = useQuery({
-    queryKey: ['qupts', volitionId],
-    queryFn: () => api.listQupts(volitionId, { limit: 50, detailed: true })
+    queryKey: ['qupts', entanglementId],
+    queryFn: () => api.listQupts(entanglementId, { limit: 50, detailed: true })
   })
 
   const { data: sources = [] } = useQuery({
-    queryKey: ['sources', volitionId],
-    queryFn: () => api.listSources(volitionId)
+    queryKey: ['sources', entanglementId],
+    queryFn: () => api.listSources(entanglementId)
   })
 
   const formatRelativeTime = (timestamp: number) => {
@@ -74,7 +74,7 @@ export default function VolitionDetail({ volitionId, onBack }: VolitionDetailPro
         <div className="flex gap-6 mt-4 text-sm text-gray-500">
           <div>Created {formatDate(volition.created_at)}</div>
           <div>•</div>
-          <div>{volition.entangled_count || 0} entangled</div>
+          <div>{volition.zoku_count || 0} zoku</div>
           <div>•</div>
           <div>{volition.qupts_count || 0} qupts</div>
           <div>•</div>
@@ -83,7 +83,7 @@ export default function VolitionDetail({ volitionId, onBack }: VolitionDetailPro
       </div>
 
       {/* Categories/Attributes */}
-      <AttributeEditor volitionId={volitionId} />
+      <AttributeEditor entanglementId={entanglementId} />
 
       {/* PASCI Matrix */}
       {matrix && (
@@ -133,10 +133,10 @@ export default function VolitionDetail({ volitionId, onBack }: VolitionDetailPro
         {showAddSource && (
           <div className="mb-4">
             <AddSourceForm
-              volitionId={volitionId}
+              entanglementId={entanglementId}
               onSuccess={() => {
                 setShowAddSource(false)
-                queryClient.invalidateQueries({ queryKey: ['sources', volitionId] })
+                queryClient.invalidateQueries({ queryKey: ['sources', entanglementId] })
               }}
               onCancel={() => setShowAddSource(false)}
             />
@@ -149,7 +149,7 @@ export default function VolitionDetail({ volitionId, onBack }: VolitionDetailPro
               source={editingSource}
               onSuccess={() => {
                 setEditingSource(null)
-                queryClient.invalidateQueries({ queryKey: ['sources', volitionId] })
+                queryClient.invalidateQueries({ queryKey: ['sources', entanglementId] })
               }}
               onCancel={() => setEditingSource(null)}
             />
@@ -213,7 +213,7 @@ export default function VolitionDetail({ volitionId, onBack }: VolitionDetailPro
                           try {
                             await fetch(`/api/sources/${source.id}`, { method: 'DELETE' })
                             addNotification('success', 'Source deleted')
-                            queryClient.invalidateQueries({ queryKey: ['sources', volitionId] })
+                            queryClient.invalidateQueries({ queryKey: ['sources', entanglementId] })
                           } catch (error) {
                             addNotification('error', 'Failed to delete source')
                           }

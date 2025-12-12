@@ -3,56 +3,56 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import type { Volition, Qupt } from '../lib/types'
 import QuptItem from './QuptItem'
-import VolitionCard from './VolitionCard'
+import EntanglementCard from './EntanglementCard'
 
 interface DashboardProps {
   onSelectVolition: (id: string) => void
-  onShowVolitionsList?: () => void
-  onShowEntangledList?: () => void
+  onShowEntanglementsList?: () => void
+  onShowZokuList?: () => void
   onShowActivityList?: () => void
   onShowSourcesList?: () => void
-  onShowCredentialsList?: () => void
+  onShowJewelsList?: () => void
 }
 
 export default function Dashboard({
   onSelectVolition,
-  onShowVolitionsList,
-  onShowEntangledList,
+  onShowEntanglementsList,
+  onShowZokuList,
   onShowActivityList,
   onShowSourcesList,
-  onShowCredentialsList
+  onShowJewelsList
 }: DashboardProps) {
-  const { data: volitions = [], isLoading: volitionsLoading } = useQuery({
-    queryKey: ['volitions'],
-    queryFn: () => api.listVolitions({ root_only: true, limit: 50 })
+  const { data: entanglements = [], isLoading: entanglementsLoading } = useQuery({
+    queryKey: ['entanglements'],
+    queryFn: () => api.listEntanglements({ root_only: true, limit: 50 })
   })
 
-  const { data: entangled = [] } = useQuery({
-    queryKey: ['entangled'],
-    queryFn: () => api.listEntangled()
+  const { data: zoku = [] } = useQuery({
+    queryKey: ['zoku'],
+    queryFn: () => api.listZoku()
   })
 
-  const { data: credentials = [] } = useQuery({
-    queryKey: ['credentials'],
-    queryFn: () => api.listCredentials()
+  const { data: jewels = [] } = useQuery({
+    queryKey: ['jewels'],
+    queryFn: () => api.listJewels()
   })
 
   const { data: recentQupts = [], isLoading: quptsLoading } = useQuery({
-    queryKey: ['recent-qupts', volitions.map(v => v.id).join(',')],
+    queryKey: ['recent-qupts', entanglements.map(v => v.id).join(',')],
     queryFn: async () => {
-      if (volitions.length === 0) return []
+      if (entanglements.length === 0) return []
       const allQupts: Qupt[] = []
-      for (const vol of volitions) {
+      for (const vol of entanglements) {
         const qupts = await api.listQupts(vol.id, { limit: 10, detailed: true })
         allQupts.push(...qupts)
       }
       return allQupts.sort((a, b) => b.created_at - a.created_at).slice(0, 10)
     },
-    enabled: volitions.length > 0
+    enabled: entanglements.length > 0
   })
 
-  // Sort volitions by most recent activity or creation
-  const sortedVolitions = [...volitions].sort((a, b) => {
+  // Sort entanglements by most recent activity or creation
+  const sortedEntanglements = [...entanglements].sort((a, b) => {
     // Prioritize by most recent qupt activity, then by creation date
     const aActivity = a.updated_at || a.created_at
     const bActivity = b.updated_at || b.created_at
@@ -60,7 +60,7 @@ export default function Dashboard({
   })
 
 
-  if (volitionsLoading) {
+  if (entanglementsLoading) {
     return <div className="text-center text-gray-400 py-12">Loading...</div>
   }
 
@@ -69,25 +69,25 @@ export default function Dashboard({
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <button
-          onClick={onShowVolitionsList}
+          onClick={onShowEntanglementsList}
           className="card hover:bg-gray-200 dark:hover:bg-quantum-700/70 transition-colors cursor-pointer text-left"
         >
-          <div className="text-sm text-gray-400 mb-1">Active Volitions</div>
-          <div className="text-3xl font-bold text-quantum-400">{volitions.length}</div>
+          <div className="text-sm text-gray-400 mb-1">Active Entanglements</div>
+          <div className="text-3xl font-bold text-quantum-400">{entanglements.length}</div>
         </button>
         <button
-          onClick={onShowEntangledList}
+          onClick={onShowZokuList}
           className="card hover:bg-gray-200 dark:hover:bg-quantum-700/70 transition-colors cursor-pointer text-left"
         >
-          <div className="text-sm text-gray-400 mb-1">Total Entangled</div>
-          <div className="text-3xl font-bold text-quantum-400">{entangled.length}</div>
+          <div className="text-sm text-gray-400 mb-1">Total Zoku</div>
+          <div className="text-3xl font-bold text-quantum-400">{zoku.length}</div>
         </button>
         <button
-          onClick={onShowCredentialsList}
+          onClick={onShowJewelsList}
           className="card hover:bg-gray-200 dark:hover:bg-quantum-700/70 transition-colors cursor-pointer text-left"
         >
-          <div className="text-sm text-gray-400 mb-1">Credentials</div>
-          <div className="text-3xl font-bold text-quantum-400">{credentials.length}</div>
+          <div className="text-sm text-gray-400 mb-1">Jewels</div>
+          <div className="text-3xl font-bold text-quantum-400">{jewels.length}</div>
         </button>
         <button
           onClick={onShowActivityList}
@@ -102,29 +102,29 @@ export default function Dashboard({
         >
           <div className="text-sm text-gray-400 mb-1">Sources Active</div>
           <div className="text-3xl font-bold text-quantum-400">
-            {volitions.reduce((acc, v) => acc + (v.sources_count || 0), 0)}
+            {entanglements.reduce((acc, v) => acc + (v.sources_count || 0), 0)}
           </div>
         </button>
       </div>
 
-      {/* Volitions List */}
+      {/* Entanglements List */}
       <div className="card">
-        <h2 className="text-xl font-bold mb-4">Volitions</h2>
+        <h2 className="text-xl font-bold mb-4">Entanglements</h2>
         <div className="space-y-2">
-          {sortedVolitions.slice(0, 5).map(vol => (
-            <VolitionCard
+          {sortedEntanglements.slice(0, 5).map(vol => (
+            <EntanglementCard
               key={vol.id}
               volition={vol}
               onClick={onSelectVolition}
             />
           ))}
         </div>
-        {volitions.length > 5 && (
+        {entanglements.length > 5 && (
           <button
-            onClick={onShowVolitionsList}
+            onClick={onShowEntanglementsList}
             className="w-full mt-4 text-center text-quantum-500 hover:text-quantum-400 text-sm font-medium transition-colors"
           >
-            View all {volitions.length} volitions →
+            View all {entanglements.length} entanglements →
           </button>
         )}
       </div>

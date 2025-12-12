@@ -14,7 +14,7 @@ import { DB } from '../db';
 
 // Tool schemas using Zod
 const schemas = {
-  list_volitions: z.object({
+  list_entanglements: z.object({
     status: z.enum(['draft', 'active', 'paused', 'complete', 'archived']).optional(),
     function: z.enum(['tech_innovation', 'info_tech']).optional(),
     parent_id: z.string().optional(),
@@ -29,59 +29,59 @@ const schemas = {
     detailed: z.boolean().optional()
   }),
 
-  get_children: z.object({
+  get_child_entanglements: z.object({
     parent_id: z.string(),
     recursive: z.boolean().optional()
   }),
 
-  create_volition: z.object({
+  create_entanglement: z.object({
     name: z.string(),
     description: z.string().optional(),
     parent_id: z.string().optional(),
-    initial_entangled: z.array(z.object({
-      entangled_id: z.string(),
+    initial_zoku: z.array(z.object({
+      zoku_id: z.string(),
       role: z.enum(['perform', 'accountable', 'control', 'support', 'informed'])
     })).optional()
   }),
 
-  update_volition: z.object({
+  update_entanglement: z.object({
     id: z.string(),
     name: z.string().optional(),
     description: z.string().optional(),
     parent_id: z.string().optional()
   }),
 
-  move_volition: z.object({
+  move_entanglement: z.object({
     id: z.string(),
     new_parent_id: z.string().optional()
   }),
 
-  delete_volition: z.object({
+  delete_entanglement: z.object({
     id: z.string(),
     confirm: z.boolean()
   }),
 
   create_qupt: z.object({
-    volition_id: z.string(),
+    entanglement_id: z.string(),
     content: z.string(),
-    entangled_id: z.string().optional(),
+    zoku_id: z.string().optional(),
     metadata: z.record(z.any()).optional()
   }),
 
   list_qupts: z.object({
-    volition_id: z.string(),
+    entanglement_id: z.string(),
     recursive: z.boolean().optional(),
     source: z.string().optional(),
     limit: z.number().optional(),
     detailed: z.boolean().optional()
   }),
 
-  list_entangled: z.object({
+  list_zoku: z.object({
     type: z.enum(['human', 'agent']).optional(),
     limit: z.number().optional()
   }),
 
-  create_entangled: z.object({
+  create_zoku: z.object({
     name: z.string(),
     type: z.enum(['human', 'agent']),
     metadata: z.record(z.any()).optional()
@@ -92,25 +92,25 @@ const schemas = {
   }),
 
   entangle: z.object({
-    volition_id: z.string(),
-    entangled_id: z.string(),
+    entanglement_id: z.string(),
+    zoku_id: z.string(),
     role: z.enum(['perform', 'accountable', 'control', 'support', 'informed'])
   }),
 
   disentangle: z.object({
-    volition_id: z.string(),
-    entangled_id: z.string(),
+    entanglement_id: z.string(),
+    zoku_id: z.string(),
     role: z.enum(['perform', 'accountable', 'control', 'support', 'informed'])
   }),
 
   get_matrix: z.object({
-    volition_id: z.string()
+    entanglement_id: z.string()
   }),
 
   list_dimensions: z.object({}),
 
   set_attributes: z.object({
-    volition_id: z.string(),
+    entanglement_id: z.string(),
     attributes: z.array(z.object({
       dimension: z.string(),
       value: z.string()
@@ -118,19 +118,19 @@ const schemas = {
   }),
 
   get_attributes: z.object({
-    volition_id: z.string()
+    entanglement_id: z.string()
   }),
 
   list_sources: z.object({
-    volition_id: z.string()
+    entanglement_id: z.string()
   }),
 
   add_source: z.object({
-    volition_id: z.string(),
+    entanglement_id: z.string(),
     type: z.enum(['github', 'gmail', 'zammad', 'gdrive', 'gdrive', 'webhook']),
     config: z.record(z.any()),
     credentials: z.record(z.any()).optional(),
-    credential_id: z.string().optional()
+    jewel_id: z.string().optional()
   }),
 
   sync_source: z.object({
@@ -147,13 +147,13 @@ const schemas = {
   }),
 
   // Credentials
-  add_credential: z.object({
+  add_jewel: z.object({
     name: z.string(),
     type: z.enum(['github', 'gmail', 'zammad', 'gdrive', 'gdrive']),
     data: z.record(z.any())
   }),
 
-  list_credentials: z.object({
+  list_jewels: z.object({
     type: z.enum(['github', 'gmail', 'zammad', 'gdrive', 'gdrive']).optional(),
     limit: z.number().optional()
   }),
@@ -162,17 +162,17 @@ const schemas = {
     id: z.string()
   }),
 
-  update_credential: z.object({
+  update_jewel: z.object({
     id: z.string(),
     name: z.string().optional(),
     data: z.record(z.any()).optional()
   }),
 
-  delete_credential: z.object({
+  delete_jewel: z.object({
     id: z.string()
   }),
 
-  get_credential_usage: z.object({
+  get_jewel_usage: z.object({
     id: z.string()
   })
 };
@@ -180,7 +180,7 @@ const schemas = {
 // Tool definitions
 const tools: Tool[] = [
   {
-    name: 'list_volitions',
+    name: 'list_entanglements',
     description: 'List volitions in the Zoku system',
     inputSchema: {
       type: 'object',
@@ -234,7 +234,7 @@ const tools: Tool[] = [
     }
   },
   {
-    name: 'get_children',
+    name: 'get_child_entanglements',
     description: 'Get child volitions of a parent volition',
     inputSchema: {
       type: 'object',
@@ -250,24 +250,24 @@ const tools: Tool[] = [
     }
   },
   {
-    name: 'create_volition',
-    description: 'Create a new project/initiative, optionally as a child of another volition with initial team assignments',
+    name: 'create_entanglement',
+    description: 'Create a new entanglement/initiative, optionally as a child of another volition with initial team assignments',
     inputSchema: {
       type: 'object',
       properties: {
         name: { type: 'string', description: 'Name of the volition' },
         description: { type: 'string', description: 'Description of the volition' },
         parent_id: { type: 'string', description: 'Parent volition ID for nesting' },
-        initial_entangled: {
+        initial_zoku: {
           type: 'array',
-          description: 'Initial PASCI role assignments (e.g., [{ entangled_id: "ent-1", role: "accountable" }])',
+          description: 'Initial PASCI role assignments (e.g., [{ zoku_id: "ent-1", role: "accountable" }])',
           items: {
             type: 'object',
             properties: {
-              entangled_id: { type: 'string' },
+              zoku_id: { type: 'string' },
               role: { type: 'string', enum: ['perform', 'accountable', 'control', 'support', 'informed'] }
             },
-            required: ['entangled_id', 'role']
+            required: ['zoku_id', 'role']
           }
         }
       },
@@ -275,7 +275,7 @@ const tools: Tool[] = [
     }
   },
   {
-    name: 'update_volition',
+    name: 'update_entanglement',
     description: "Update a volition's name, description, or parent",
     inputSchema: {
       type: 'object',
@@ -289,7 +289,7 @@ const tools: Tool[] = [
     }
   },
   {
-    name: 'move_volition',
+    name: 'move_entanglement',
     description: 'Move a volition to become a child of another volition, or make it a root volition',
     inputSchema: {
       type: 'object',
@@ -304,7 +304,7 @@ const tools: Tool[] = [
     }
   },
   {
-    name: 'delete_volition',
+    name: 'delete_entanglement',
     description: 'Delete a volition. WARNING: Also deletes all child volitions, qupts, sources, and assignments.',
     inputSchema: {
       type: 'object',
@@ -325,12 +325,12 @@ const tools: Tool[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        volition_id: { type: 'string', description: 'ID of the volition' },
+        entanglement_id: { type: 'string', description: 'ID of the volition' },
         content: { type: 'string', description: 'Activity description' },
-        entangled_id: { type: 'string', description: 'ID of the entangled entity creating this qupt' },
+        zoku_id: { type: 'string', description: 'ID of the entangled entity creating this qupt' },
         metadata: { type: 'object', description: 'Additional structured data' }
       },
-      required: ['volition_id', 'content']
+      required: ['entanglement_id', 'content']
     }
   },
   {
@@ -339,7 +339,7 @@ const tools: Tool[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        volition_id: { type: 'string' },
+        entanglement_id: { type: 'string' },
         recursive: {
           type: 'boolean',
           description: 'Include qupts from child volitions',
@@ -356,11 +356,11 @@ const tools: Tool[] = [
           default: false
         }
       },
-      required: ['volition_id']
+      required: ['entanglement_id']
     }
   },
   {
-    name: 'list_entangled',
+    name: 'list_zoku',
     description: 'List all entangled partners (humans and AI agents)',
     inputSchema: {
       type: 'object',
@@ -371,7 +371,7 @@ const tools: Tool[] = [
     }
   },
   {
-    name: 'create_entangled',
+    name: 'create_zoku',
     description: 'Register a new entangled partner (human or AI agent)',
     inputSchema: {
       type: 'object',
@@ -400,15 +400,15 @@ const tools: Tool[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        volition_id: { type: 'string' },
-        entangled_id: { type: 'string' },
+        entanglement_id: { type: 'string' },
+        zoku_id: { type: 'string' },
         role: {
           type: 'string',
           enum: ['perform', 'accountable', 'control', 'support', 'informed'],
           description: 'PASCI role: Perform (does work), Accountable (answerable), Control (veto power), Support (advisory), Informed (notified)'
         }
       },
-      required: ['volition_id', 'entangled_id', 'role']
+      required: ['entanglement_id', 'zoku_id', 'role']
     }
   },
   {
@@ -417,14 +417,14 @@ const tools: Tool[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        volition_id: { type: 'string' },
-        entangled_id: { type: 'string' },
+        entanglement_id: { type: 'string' },
+        zoku_id: { type: 'string' },
         role: {
           type: 'string',
           enum: ['perform', 'accountable', 'control', 'support', 'informed']
         }
       },
-      required: ['volition_id', 'entangled_id', 'role']
+      required: ['entanglement_id', 'zoku_id', 'role']
     }
   },
   {
@@ -433,9 +433,9 @@ const tools: Tool[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        volition_id: { type: 'string' }
+        entanglement_id: { type: 'string' }
       },
-      required: ['volition_id']
+      required: ['entanglement_id']
     }
   },
   {
@@ -452,7 +452,7 @@ const tools: Tool[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        volition_id: { type: 'string' },
+        entanglement_id: { type: 'string' },
         attributes: {
           type: 'array',
           items: {
@@ -465,7 +465,7 @@ const tools: Tool[] = [
           }
         }
       },
-      required: ['volition_id', 'attributes']
+      required: ['entanglement_id', 'attributes']
     }
   },
   {
@@ -474,9 +474,9 @@ const tools: Tool[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        volition_id: { type: 'string' }
+        entanglement_id: { type: 'string' }
       },
-      required: ['volition_id']
+      required: ['entanglement_id']
     }
   },
   {
@@ -485,24 +485,24 @@ const tools: Tool[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        volition_id: { type: 'string' }
+        entanglement_id: { type: 'string' }
       },
-      required: ['volition_id']
+      required: ['entanglement_id']
     }
   },
   {
     name: 'add_source',
-    description: 'Add an activity source to a volition. Can use stored credentials (via credential_id) or provide inline credentials.',
+    description: 'Add an activity source to a volition. Can use stored credentials (via jewel_id) or provide inline credentials.',
     inputSchema: {
       type: 'object',
       properties: {
-        volition_id: { type: 'string' },
+        entanglement_id: { type: 'string' },
         type: { type: 'string', enum: ['github', 'gmail', 'zammad', 'gdrive', 'gdrive', 'webhook'] },
         config: { type: 'object', description: 'Source-specific configuration (e.g., owner, repo for GitHub)' },
-        credentials: { type: 'object', description: 'Inline authentication credentials (will be validated and encrypted). Omit if using credential_id.' },
-        credential_id: { type: 'string', description: 'ID of stored credential to use. Omit if providing inline credentials.' }
+        credentials: { type: 'object', description: 'Inline authentication credentials (will be validated and encrypted). Omit if using jewel_id.' },
+        jewel_id: { type: 'string', description: 'ID of stored credential to use. Omit if providing inline credentials.' }
       },
-      required: ['volition_id', 'type', 'config']
+      required: ['entanglement_id', 'type', 'config']
     }
   },
   {
@@ -540,8 +540,8 @@ const tools: Tool[] = [
     }
   },
   {
-    name: 'add_credential',
-    description: 'Store and validate credentials that can be reused across multiple sources',
+    name: 'add_jewel',
+    description: 'Store and validate jewels that can be reused across multiple sources',
     inputSchema: {
       type: 'object',
       properties: {
@@ -553,7 +553,7 @@ const tools: Tool[] = [
     }
   },
   {
-    name: 'list_credentials',
+    name: 'list_jewels',
     description: 'List stored credentials (without exposing sensitive data)',
     inputSchema: {
       type: 'object',
@@ -575,7 +575,7 @@ const tools: Tool[] = [
     }
   },
   {
-    name: 'update_credential',
+    name: 'update_jewel',
     description: 'Update credential name or data (will re-validate if data is updated)',
     inputSchema: {
       type: 'object',
@@ -588,7 +588,7 @@ const tools: Tool[] = [
     }
   },
   {
-    name: 'delete_credential',
+    name: 'delete_jewel',
     description: 'Delete a stored credential (fails if used by any sources)',
     inputSchema: {
       type: 'object',
@@ -599,7 +599,7 @@ const tools: Tool[] = [
     }
   },
   {
-    name: 'get_credential_usage',
+    name: 'get_jewel_usage',
     description: 'See which sources are using a credential',
     inputSchema: {
       type: 'object',
@@ -614,8 +614,8 @@ const tools: Tool[] = [
 // Tool handler implementations
 async function handleToolCall(name: string, args: any, db: DB, encryptionKey: string): Promise<any> {
   switch (name) {
-    case 'list_volitions': {
-      const input = schemas.list_volitions.parse(args);
+    case 'list_entanglements': {
+      const input = schemas.list_entanglements.parse(args);
       const volitions = await db.listVolitions({
         parent_id: input.parent_id,
         root_only: input.root_only,
@@ -625,7 +625,7 @@ async function handleToolCall(name: string, args: any, db: DB, encryptionKey: st
       // Always include counts (lightweight and useful)
       const volitionsWithCounts = await Promise.all(
         volitions.map(async v => {
-          const qupts_count = (await db.listQupts({ volition_id: v.id, recursive: true, limit: 1000 })).length;
+          const qupts_count = (await db.listQupts({ entanglement_id: v.id, recursive: true, limit: 1000 })).length;
           const sources_count = (await db.listSources(v.id)).length;
 
           if (!input.detailed) {
@@ -651,13 +651,13 @@ async function handleToolCall(name: string, args: any, db: DB, encryptionKey: st
     case 'get_volition': {
       const input = schemas.get_volition.parse(args);
       const volition = await db.getVolition(input.id);
-      if (!volition) throw new Error('Volition not found');
+      if (!volition) throw new Error('Entanglement not found');
 
       // Default: return minimal info
       if (!input.detailed) {
-        const childrenCount = (await db.getVolitionChildren(input.id)).length;
+        const childrenCount = (await db.getEntanglementChildren(input.id)).length;
         const quptsCount = (await db.listQupts({
-          volition_id: input.id,
+          entanglement_id: input.id,
           recursive: input.include_children_qupts ?? true,
           limit: 1000
         })).length;
@@ -671,11 +671,11 @@ async function handleToolCall(name: string, args: any, db: DB, encryptionKey: st
       }
 
       // Detailed: return full nested data
-      const children = await db.getVolitionChildren(input.id);
+      const children = await db.getEntanglementChildren(input.id);
       const matrix = await db.getMatrix(input.id);
       const attributes = await db.getVolitionAttributes(input.id);
       const qupts = await db.listQupts({
-        volition_id: input.id,
+        entanglement_id: input.id,
         recursive: input.include_children_qupts ?? true,
         limit: 20
       });
@@ -683,16 +683,16 @@ async function handleToolCall(name: string, args: any, db: DB, encryptionKey: st
       return { ...volition, children, matrix, attributes, qupts };
     }
 
-    case 'get_children': {
-      const input = schemas.get_children.parse(args);
+    case 'get_child_entanglements': {
+      const input = schemas.get_child_entanglements.parse(args);
       if (input.recursive) {
         return { children: await db.getVolitionDescendants(input.parent_id) };
       }
-      return { children: await db.getVolitionChildren(input.parent_id) };
+      return { children: await db.getEntanglementChildren(input.parent_id) };
     }
 
-    case 'create_volition': {
-      const input = schemas.create_volition.parse(args);
+    case 'create_entanglement': {
+      const input = schemas.create_entanglement.parse(args);
       const volition = await db.createVolition({
         name: input.name,
         description: input.description,
@@ -700,12 +700,12 @@ async function handleToolCall(name: string, args: any, db: DB, encryptionKey: st
       });
 
       // Add initial entangled assignments if provided
-      if (input.initial_entangled && Array.isArray(input.initial_entangled)) {
-        for (const assignment of input.initial_entangled) {
+      if (input.initial_zoku && Array.isArray(input.initial_zoku)) {
+        for (const assignment of input.initial_zoku) {
           try {
-            await db.assignToMatrix(volition.id, assignment.entangled_id, assignment.role);
+            await db.assignToMatrix(volition.id, assignment.zoku_id, assignment.role);
           } catch (error) {
-            console.warn(`Failed to assign ${assignment.entangled_id} to ${assignment.role}:`, error);
+            console.warn(`Failed to assign ${assignment.zoku_id} to ${assignment.role}:`, error);
           }
         }
       }
@@ -713,8 +713,8 @@ async function handleToolCall(name: string, args: any, db: DB, encryptionKey: st
       return volition;
     }
 
-    case 'update_volition': {
-      const input = schemas.update_volition.parse(args);
+    case 'update_entanglement': {
+      const input = schemas.update_entanglement.parse(args);
       await db.updateVolition(input.id, {
         name: input.name,
         description: input.description,
@@ -723,14 +723,14 @@ async function handleToolCall(name: string, args: any, db: DB, encryptionKey: st
       return { success: true };
     }
 
-    case 'move_volition': {
-      const input = schemas.move_volition.parse(args);
+    case 'move_entanglement': {
+      const input = schemas.move_entanglement.parse(args);
       await db.updateVolition(input.id, { parent_id: input.new_parent_id || null });
       return { success: true };
     }
 
-    case 'delete_volition': {
-      const input = schemas.delete_volition.parse(args);
+    case 'delete_entanglement': {
+      const input = schemas.delete_entanglement.parse(args);
       if (!input.confirm) {
         throw new Error('Must set confirm=true to delete volition');
       }
@@ -741,9 +741,9 @@ async function handleToolCall(name: string, args: any, db: DB, encryptionKey: st
     case 'create_qupt': {
       const input = schemas.create_qupt.parse(args);
       const qupt = await db.createQupt({
-        volition_id: input.volition_id,
+        entanglement_id: input.entanglement_id,
         content: input.content,
-        entangled_id: input.entangled_id,
+        zoku_id: input.zoku_id,
         source: 'mcp',
         metadata: input.metadata
       });
@@ -753,7 +753,7 @@ async function handleToolCall(name: string, args: any, db: DB, encryptionKey: st
     case 'list_qupts': {
       const input = schemas.list_qupts.parse(args);
       const qupts = await db.listQupts({
-        volition_id: input.volition_id,
+        entanglement_id: input.entanglement_id,
         recursive: input.recursive ?? true,
         source: input.source,
         limit: input.limit
@@ -764,7 +764,7 @@ async function handleToolCall(name: string, args: any, db: DB, encryptionKey: st
         return {
           qupts: qupts.map(q => ({
             id: q.id,
-            volition_id: q.volition_id,
+            entanglement_id: q.entanglement_id,
             content: q.content,
             source: q.source,
             external_id: q.external_id,
@@ -778,8 +778,8 @@ async function handleToolCall(name: string, args: any, db: DB, encryptionKey: st
       return { qupts };
     }
 
-    case 'list_entangled': {
-      const input = schemas.list_entangled.parse(args);
+    case 'list_zoku': {
+      const input = schemas.list_zoku.parse(args);
       const entangled = await db.listEntangled({
         type: input.type,
         limit: input.limit
@@ -787,8 +787,8 @@ async function handleToolCall(name: string, args: any, db: DB, encryptionKey: st
       return { entangled };
     }
 
-    case 'create_entangled': {
-      const input = schemas.create_entangled.parse(args);
+    case 'create_zoku': {
+      const input = schemas.create_zoku.parse(args);
       const entangled = await db.createEntangled(input);
       return entangled;
     }
@@ -802,19 +802,19 @@ async function handleToolCall(name: string, args: any, db: DB, encryptionKey: st
 
     case 'entangle': {
       const input = schemas.entangle.parse(args);
-      await db.assignToMatrix(input.volition_id, input.entangled_id, input.role);
+      await db.assignToMatrix(input.entanglement_id, input.zoku_id, input.role);
       return { success: true };
     }
 
     case 'disentangle': {
       const input = schemas.disentangle.parse(args);
-      await db.removeFromMatrix(input.volition_id, input.entangled_id, input.role);
+      await db.removeFromMatrix(input.entanglement_id, input.zoku_id, input.role);
       return { success: true };
     }
 
     case 'get_matrix': {
       const input = schemas.get_matrix.parse(args);
-      const matrix = await db.getMatrix(input.volition_id);
+      const matrix = await db.getMatrix(input.entanglement_id);
       return { matrix };
     }
 
@@ -841,19 +841,19 @@ async function handleToolCall(name: string, args: any, db: DB, encryptionKey: st
         return { dimension_id: dim.id, value_id: val.id };
       });
 
-      await db.setVolitionAttributes(input.volition_id, attributesToSet);
+      await db.setVolitionAttributes(input.entanglement_id, attributesToSet);
       return { success: true };
     }
 
     case 'get_attributes': {
       const input = schemas.get_attributes.parse(args);
-      const attributes = await db.getVolitionAttributes(input.volition_id);
+      const attributes = await db.getVolitionAttributes(input.entanglement_id);
       return { attributes };
     }
 
     case 'list_sources': {
       const input = schemas.list_sources.parse(args);
-      const sources = await db.listSources(input.volition_id);
+      const sources = await db.listSources(input.entanglement_id);
       return { sources: sources.map(s => ({
         id: s.id,
         type: s.type,
@@ -870,11 +870,11 @@ async function handleToolCall(name: string, args: any, db: DB, encryptionKey: st
       const warnings: string[] = [];
       let validationMetadata: Record<string, any> = {};
 
-      // If credential_id is provided, verify it exists and matches type
-      if (input.credential_id) {
-        const credential = await db.getCredential(input.credential_id);
+      // If jewel_id is provided, verify it exists and matches type
+      if (input.jewel_id) {
+        const credential = await db.getCredential(input.jewel_id);
         if (!credential) {
-          throw new Error('Credential not found');
+          throw new Error('Jewel not found');
         }
         if (credential.type !== input.type) {
           throw new Error(`Credential type mismatch: credential is ${credential.type}, source is ${input.type}`);
@@ -910,11 +910,11 @@ async function handleToolCall(name: string, args: any, db: DB, encryptionKey: st
       }
 
       const source = await db.createSource({
-        volition_id: input.volition_id,
+        entanglement_id: input.entanglement_id,
         type: input.type,
         config: input.config,
         credentials: input.credentials,
-        credential_id: input.credential_id
+        jewel_id: input.jewel_id
       });
 
       // Set initial sync window to last 30 days (ensures at least 20 items for active sources)
@@ -955,12 +955,12 @@ async function handleToolCall(name: string, args: any, db: DB, encryptionKey: st
 
       const config = JSON.parse(source.config);
 
-      // Get credentials - either from credential_id or inline
+      // Get credentials - either from jewel_id or inline
       let credentials = {};
-      if (source.credential_id) {
-        const credential = await db.getCredential(source.credential_id);
+      if (source.jewel_id) {
+        const credential = await db.getCredential(source.jewel_id);
         if (!credential) {
-          throw new Error('Credential not found');
+          throw new Error('Jewel not found');
         }
         credentials = JSON.parse(await decryptCredentials(credential.data, encryptionKey));
       } else if (source.credentials) {
@@ -1008,8 +1008,8 @@ async function handleToolCall(name: string, args: any, db: DB, encryptionKey: st
     }
 
     // Credential management
-    case 'add_credential': {
-      const input = schemas.add_credential.parse(args);
+    case 'add_jewel': {
+      const input = schemas.add_jewel.parse(args);
       const { encryptCredentials } = await import('../lib/crypto');
       const { validateGitHubCredential, validateZammadCredential, validateGoogleDocsSource } = await import('../handlers/validate');
 
@@ -1058,8 +1058,8 @@ async function handleToolCall(name: string, args: any, db: DB, encryptionKey: st
       };
     }
 
-    case 'list_credentials': {
-      const input = schemas.list_credentials.parse(args);
+    case 'list_jewels': {
+      const input = schemas.list_jewels.parse(args);
       const credentials = await db.listCredentials({
         type: input.type,
         limit: input.limit
@@ -1082,7 +1082,7 @@ async function handleToolCall(name: string, args: any, db: DB, encryptionKey: st
     case 'get_credential': {
       const input = schemas.get_credential.parse(args);
       const credential = await db.getCredential(input.id);
-      if (!credential) throw new Error('Credential not found');
+      if (!credential) throw new Error('Jewel not found');
 
       return {
         id: credential.id,
@@ -1095,8 +1095,8 @@ async function handleToolCall(name: string, args: any, db: DB, encryptionKey: st
       };
     }
 
-    case 'update_credential': {
-      const input = schemas.update_credential.parse(args);
+    case 'update_jewel': {
+      const input = schemas.update_jewel.parse(args);
       const updates: any = {};
 
       if (input.name) {
@@ -1108,7 +1108,7 @@ async function handleToolCall(name: string, args: any, db: DB, encryptionKey: st
         const { validateGitHubCredential, validateZammadCredential, validateGoogleDocsSource } = await import('../handlers/validate');
 
         const credential = await db.getCredential(input.id);
-        if (!credential) throw new Error('Credential not found');
+        if (!credential) throw new Error('Jewel not found');
 
         // Validate new credentials
         let validationResult;
@@ -1138,11 +1138,11 @@ async function handleToolCall(name: string, args: any, db: DB, encryptionKey: st
       return { success: true };
     }
 
-    case 'delete_credential': {
-      const input = schemas.delete_credential.parse(args);
+    case 'delete_jewel': {
+      const input = schemas.delete_jewel.parse(args);
 
       // Check if in use
-      const usage = await db.getCredentialUsage(input.id);
+      const usage = await db.getJewelUsage(input.id);
       if (usage.length > 0) {
         throw new Error(`Cannot delete credential: used by ${usage.length} source(s). Usage: ${usage.map(u => `${u.volition_name} (${u.source_type})`).join(', ')}`);
       }
@@ -1151,9 +1151,9 @@ async function handleToolCall(name: string, args: any, db: DB, encryptionKey: st
       return { success: true };
     }
 
-    case 'get_credential_usage': {
-      const input = schemas.get_credential_usage.parse(args);
-      const usage = await db.getCredentialUsage(input.id);
+    case 'get_jewel_usage': {
+      const input = schemas.get_jewel_usage.parse(args);
+      const usage = await db.getJewelUsage(input.id);
       return { usage };
     }
 

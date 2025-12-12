@@ -2,12 +2,12 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import type { Bindings } from './types';
 
-import volitionsRoutes from './api/volitions';
-import entangledRoutes from './api/entangled';
+import entanglementsRoutes from './api/entanglements';
+import zokuRoutes from './api/zoku';
 import quptsRoutes from './api/qupts';
 import sourcesRoutes from './api/sources';
 import dimensionsRoutes from './api/dimensions';
-import credentialsRoutes from './api/credentials';
+import jewelsRoutes from './api/jewels';
 import oauthRoutes from './api/oauth';
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -16,12 +16,12 @@ const app = new Hono<{ Bindings: Bindings }>();
 app.use('/*', cors());
 
 // API routes
-app.route('/api/volitions', volitionsRoutes);
-app.route('/api/entangled', entangledRoutes);
+app.route(./api/entanglements', entanglementsRoutes);
+app.route(./api/zoku', zokuRoutes);
 app.route('/api/qupts', quptsRoutes);
 app.route('/api/sources', sourcesRoutes);
 app.route('/api/dimensions', dimensionsRoutes);
-app.route('/api/credentials', credentialsRoutes);
+app.route(./api/jewels', jewelsRoutes);
 app.route('/api/oauth', oauthRoutes);
 
 // MCP endpoint

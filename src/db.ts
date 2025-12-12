@@ -19,7 +19,7 @@ export class DB {
   // Volitions
   async getVolition(id: string): Promise<Volition | null> {
     const result = await this.d1
-      .prepare('SELECT * FROM volitions WHERE id = ?')
+      .prepare('SELECT * FROM entanglements WHERE id = ?')
       .bind(id)
       .first<Volition>();
     return result || null;
@@ -30,8 +30,8 @@ export class DB {
     root_only?: boolean;
     limit?: number;
     offset?: number;
-  } = {}): Promise<Volition[]> {
-    let query = 'SELECT * FROM volitions';
+  } = {}): Promise<Entanglement[]> {
+    let query = 'SELECT * FROM entanglements';
     const conditions: string[] = [];
     const params: any[] = [];
 
@@ -71,7 +71,7 @@ export class DB {
     const id = crypto.randomUUID();
     await this.d1
       .prepare(
-        'INSERT INTO volitions (id, name, description, parent_id) VALUES (?, ?, ?, ?)'
+        'INSERT INTO entanglements (id, name, description, parent_id) VALUES (?, ?, ?, ?)'
       )
       .bind(id, data.name, data.description || null, data.parent_id || null)
       .run();
@@ -101,29 +101,29 @@ export class DB {
     if (updates.length > 0) {
       params.push(id);
       await this.d1
-        .prepare(`UPDATE volitions SET ${updates.join(', ')} WHERE id = ?`)
+        .prepare(`UPDATE entanglements SET ${updates.join(', ')} WHERE id = ?`)
         .bind(...params)
         .run();
     }
   }
 
   async deleteVolition(id: string): Promise<void> {
-    await this.d1.prepare('DELETE FROM volitions WHERE id = ?').bind(id).run();
+    await this.d1.prepare('DELETE FROM entanglements WHERE id = ?').bind(id).run();
   }
 
-  async getVolitionChildren(parentId: string): Promise<Volition[]> {
+  async getEntanglementChildren(parentId: string): Promise<Entanglement[]> {
     return this.listVolitions({ parent_id: parentId });
   }
 
-  async getVolitionDescendants(volitionId: string): Promise<Volition[]> {
+  async getEntanglementDescendants(volitionId: string): Promise<Entanglement[]> {
     const query = `
       WITH RECURSIVE descendants AS (
-        SELECT id FROM volitions WHERE id = ?
+        SELECT id FROM entanglements WHERE id = ?
         UNION ALL
-        SELECT v.id FROM volitions v
+        SELECT v.id FROM entanglements v
         JOIN descendants d ON v.parent_id = d.id
       )
-      SELECT v.* FROM volitions v
+      SELECT v.* FROM entanglements v
       JOIN descendants d ON v.id = d.id
       WHERE v.id != ?
     `;
@@ -131,18 +131,18 @@ export class DB {
     return result.results || [];
   }
 
-  async getVolitionChildrenCount(volitionId: string): Promise<number> {
+  async getEntanglementChildrenCount(volitionId: string): Promise<number> {
     const result = await this.d1
-      .prepare('SELECT COUNT(*) as count FROM volitions WHERE parent_id = ?')
+      .prepare('SELECT COUNT(*) as count FROM entanglements WHERE parent_id = ?')
       .bind(volitionId)
       .first<{ count: number }>();
     return result?.count || 0;
   }
 
-  async getVolitionQuptsCount(volitionId: string, recursive = true): Promise<number> {
+  async getEntanglementQuptsCount(volitionId: string, recursive = true): Promise<number> {
     if (!recursive) {
       const result = await this.d1
-        .prepare('SELECT COUNT(*) as count FROM qupts WHERE volition_id = ?')
+        .prepare('SELECT COUNT(*) as count FROM qupts WHERE entanglement_id = ?')
         .bind(volitionId)
         .first<{ count: number }>();
       return result?.count || 0;
@@ -151,29 +151,29 @@ export class DB {
     // Recursive count including descendants
     const query = `
       WITH RECURSIVE descendants AS (
-        SELECT id FROM volitions WHERE id = ?
+        SELECT id FROM entanglements WHERE id = ?
         UNION ALL
-        SELECT v.id FROM volitions v
+        SELECT v.id FROM entanglements v
         JOIN descendants d ON v.parent_id = d.id
       )
       SELECT COUNT(*) as count FROM qupts q
-      JOIN descendants d ON q.volition_id = d.id
+      JOIN descendants d ON q.entanglement_id = d.id
     `;
     const result = await this.d1.prepare(query).bind(volitionId).first<{ count: number }>();
     return result?.count || 0;
   }
 
-  async getVolitionSourcesCount(volitionId: string): Promise<number> {
+  async getEntanglementSourcesCount(volitionId: string): Promise<number> {
     const result = await this.d1
-      .prepare('SELECT COUNT(*) as count FROM sources WHERE volition_id = ?')
+      .prepare('SELECT COUNT(*) as count FROM sources WHERE entanglement_id = ?')
       .bind(volitionId)
       .first<{ count: number }>();
     return result?.count || 0;
   }
 
-  async getVolitionEntangledCount(volitionId: string): Promise<number> {
+  async getEntanglementZokuCount(volitionId: string): Promise<number> {
     const result = await this.d1
-      .prepare('SELECT COUNT(DISTINCT entangled_id) as count FROM volition_entangled WHERE volition_id = ?')
+      .prepare('SELECT COUNT(DISTINCT zoku_id) as count FROM entanglement_zoku WHERE entanglement_id = ?')
       .bind(volitionId)
       .first<{ count: number }>();
     return result?.count || 0;
@@ -182,14 +182,14 @@ export class DB {
   // Entangled
   async getEntangled(id: string): Promise<Entangled | null> {
     const result = await this.d1
-      .prepare('SELECT * FROM entangled WHERE id = ?')
+      .prepare('SELECT * FROM zoku WHERE id = ?')
       .bind(id)
       .first<Entangled>();
     return result || null;
   }
 
-  async listEntangled(filters: { type?: string; limit?: number; offset?: number } = {}): Promise<Entangled[]> {
-    let query = 'SELECT * FROM entangled';
+  async listEntangled(filters: { type?: string; limit?: number; offset?: number } = {}): Promise<Zoku[]> {
+    let query = 'SELECT * FROM zoku';
     const params: any[] = [];
 
     if (filters.type) {
@@ -222,7 +222,7 @@ export class DB {
     const id = crypto.randomUUID();
     const metadata = data.metadata ? JSON.stringify(data.metadata) : null;
     await this.d1
-      .prepare('INSERT INTO entangled (id, name, description, type, metadata) VALUES (?, ?, ?, ?, ?)')
+      .prepare('INSERT INTO zoku (id, name, description, type, metadata) VALUES (?, ?, ?, ?, ?)')
       .bind(id, data.name, data.description || null, data.type, metadata)
       .run();
     return (await this.getEntangled(id))!;
@@ -251,23 +251,23 @@ export class DB {
     if (updates.length > 0) {
       params.push(id);
       await this.d1
-        .prepare(`UPDATE entangled SET ${updates.join(', ')} WHERE id = ?`)
+        .prepare(`UPDATE zoku SET ${updates.join(', ')} WHERE id = ?`)
         .bind(...params)
         .run();
     }
   }
 
   async deleteEntangled(id: string): Promise<void> {
-    await this.d1.prepare('DELETE FROM entangled WHERE id = ?').bind(id).run();
+    await this.d1.prepare('DELETE FROM zoku WHERE id = ?').bind(id).run();
   }
 
-  async getEntangledVolitions(entangledId: string): Promise<any[]> {
+  async getZokuEntanglements(entangledId: string): Promise<any[]> {
     const query = `
       SELECT DISTINCT v.id, v.name, v.created_at,
         GROUP_CONCAT(ve.role) as roles
-      FROM volition_entangled ve
-      JOIN volitions v ON ve.volition_id = v.id
-      WHERE ve.entangled_id = ?
+      FROM entanglement_zoku ve
+      JOIN entanglements v ON ve.entanglement_id = v.id
+      WHERE ve.zoku_id = ?
       GROUP BY v.id, v.name, v.created_at
       ORDER BY v.name
     `;
@@ -282,18 +282,18 @@ export class DB {
   }
 
   // PASCI Matrix
-  async getMatrix(volitionId: string): Promise<Record<string, Entangled[]>> {
+  async getMatrix(volitionId: string): Promise<Record<string, Zoku[]>> {
     const result = await this.d1
       .prepare(`
-        SELECT ve.role, e.* FROM volition_entangled ve
-        JOIN entangled e ON ve.entangled_id = e.id
-        WHERE ve.volition_id = ?
+        SELECT ve.role, e.* FROM entanglement_zoku ve
+        JOIN zoku e ON ve.zoku_id = e.id
+        WHERE ve.entanglement_id = ?
         ORDER BY ve.role, e.name
       `)
       .bind(volitionId)
       .all<MatrixAssignment & Entangled>();
 
-    const matrix: Record<string, Entangled[]> = {
+    const matrix: Record<string, Zoku[]> = {
       perform: [],
       accountable: [],
       control: [],
@@ -317,7 +317,7 @@ export class DB {
   async assignToMatrix(volitionId: string, entangledId: string, role: string): Promise<void> {
     await this.d1
       .prepare(
-        'INSERT OR IGNORE INTO volition_entangled (volition_id, entangled_id, role) VALUES (?, ?, ?)'
+        'INSERT OR IGNORE INTO volition_entangled (entanglement_id, zoku_id, role) VALUES (?, ?, ?)'
       )
       .bind(volitionId, entangledId, role)
       .run();
@@ -326,7 +326,7 @@ export class DB {
   async removeFromMatrix(volitionId: string, entangledId: string, role: string): Promise<void> {
     await this.d1
       .prepare(
-        'DELETE FROM volition_entangled WHERE volition_id = ? AND entangled_id = ? AND role = ?'
+        'DELETE FROM entanglement_zoku WHERE entanglement_id = ? AND zoku_id = ? AND role = ?'
       )
       .bind(volitionId, entangledId, role)
       .run();
@@ -342,9 +342,9 @@ export class DB {
   }
 
   async listQupts(filters: {
-    volition_id?: string;
+    entanglement_id?: string;
     recursive?: boolean;
-    entangled_id?: string;
+    zoku_id?: string;
     source?: string;
     limit?: number;
     offset?: number;
@@ -352,32 +352,32 @@ export class DB {
     let query: string;
     const params: any[] = [];
 
-    if (filters.volition_id && filters.recursive) {
+    if (filters.entanglement_id && filters.recursive) {
       // Get qupts for volition and all descendants
       query = `
         WITH RECURSIVE descendants AS (
-          SELECT id FROM volitions WHERE id = ?
+          SELECT id FROM entanglements WHERE id = ?
           UNION ALL
-          SELECT v.id FROM volitions v
+          SELECT v.id FROM entanglements v
           JOIN descendants d ON v.parent_id = d.id
         )
         SELECT q.*, v.name as volition_name FROM qupts q
-        JOIN descendants d ON q.volition_id = d.id
-        JOIN volitions v ON q.volition_id = v.id
+        JOIN descendants d ON q.entanglement_id = d.id
+        JOIN entanglements v ON q.entanglement_id = v.id
       `;
-      params.push(filters.volition_id);
+      params.push(filters.entanglement_id);
     } else {
-      query = 'SELECT q.*, v.name as volition_name FROM qupts q JOIN volitions v ON q.volition_id = v.id';
+      query = 'SELECT q.*, v.name as volition_name FROM qupts q JOIN entanglements v ON q.entanglement_id = v.id';
       const conditions: string[] = [];
 
-      if (filters.volition_id) {
-        conditions.push('volition_id = ?');
-        params.push(filters.volition_id);
+      if (filters.entanglement_id) {
+        conditions.push('entanglement_id = ?');
+        params.push(filters.entanglement_id);
       }
 
-      if (filters.entangled_id) {
-        conditions.push('entangled_id = ?');
-        params.push(filters.entangled_id);
+      if (filters.zoku_id) {
+        conditions.push('zoku_id = ?');
+        params.push(filters.zoku_id);
       }
 
       if (filters.source) {
@@ -413,13 +413,13 @@ export class DB {
 
     await this.d1
       .prepare(`
-        INSERT INTO qupts (id, volition_id, entangled_id, content, source, external_id, metadata, created_at)
+        INSERT INTO qupts (id, entanglement_id, zoku_id, content, source, external_id, metadata, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `)
       .bind(
         id,
-        data.volition_id,
-        data.entangled_id || null,
+        data.entanglement_id,
+        data.zoku_id || null,
         data.content,
         data.source,
         data.external_id || null,
@@ -439,13 +439,13 @@ export class DB {
 
       return this.d1
         .prepare(`
-          INSERT OR IGNORE INTO qupts (id, volition_id, entangled_id, content, source, external_id, metadata, created_at)
+          INSERT OR IGNORE INTO qupts (id, entanglement_id, zoku_id, content, source, external_id, metadata, created_at)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `)
         .bind(
           id,
-          q.volition_id,
-          q.entangled_id || null,
+          q.entanglement_id,
+          q.zoku_id || null,
           q.content,
           q.source,
           q.external_id || null,
@@ -475,7 +475,7 @@ export class DB {
     const params: any[] = [];
 
     if (volitionId) {
-      query += ' WHERE volition_id = ?';
+      query += ' WHERE entanglement_id = ?';
       params.push(volitionId);
     }
 
@@ -493,11 +493,11 @@ export class DB {
   }
 
   async createSource(data: {
-    volition_id: string;
+    entanglement_id: string;
     type: string;
     config: Record<string, any>;
     credentials?: Record<string, any>;
-    credential_id?: string;
+    jewel_id?: string;
   }): Promise<Source> {
     const id = crypto.randomUUID();
     const config = JSON.stringify(data.config);
@@ -505,10 +505,10 @@ export class DB {
 
     await this.d1
       .prepare(`
-        INSERT INTO sources (id, volition_id, type, config, credentials, credential_id)
+        INSERT INTO sources (id, entanglement_id, type, config, credentials, jewel_id)
         VALUES (?, ?, ?, ?, ?, ?)
       `)
-      .bind(id, data.volition_id, data.type, config, credentials, data.credential_id || null)
+      .bind(id, data.entanglement_id, data.type, config, credentials, data.jewel_id || null)
       .run();
 
     return (await this.getSource(id))!;
@@ -608,48 +608,48 @@ export class DB {
   }
 
   // Volition Attributes (Batch)
-  async getVolitionsAttributes(volitionIds: string[]): Promise<Map<string, Record<string, string>>> {
+  async getEntanglementsAttributes(volitionIds: string[]): Promise<Map<string, Record<string, string>>> {
     if (volitionIds.length === 0) return new Map();
 
     const query = `
       SELECT
-        va.volition_id,
+        va.entanglement_id,
         d.name as dimension_name,
         dv.label as value_label
-      FROM volition_attributes va
+      FROM entanglement_attributes va
       JOIN dimensions d ON va.dimension_id = d.id
       JOIN dimension_values dv ON va.value_id = dv.id
-      WHERE va.volition_id IN (${volitionIds.map(() => '?').join(',')})
-      ORDER BY va.volition_id, d.name
+      WHERE va.entanglement_id IN (${volitionIds.map(() => '?').join(',')})
+      ORDER BY va.entanglement_id, d.name
     `;
 
     const result = await this.d1.prepare(query).bind(...volitionIds).all();
 
-    // Group by volition_id
+    // Group by entanglement_id
     const attributesMap = new Map<string, Record<string, string>>();
     for (const row of result.results as any[]) {
-      if (!attributesMap.has(row.volition_id)) {
-        attributesMap.set(row.volition_id, {});
+      if (!attributesMap.has(row.entanglement_id)) {
+        attributesMap.set(row.entanglement_id, {});
       }
-      attributesMap.get(row.volition_id)![row.dimension_name] = row.value_label;
+      attributesMap.get(row.entanglement_id)![row.dimension_name] = row.value_label;
     }
 
     return attributesMap;
   }
 
   // Volition Attributes (Single)
-  async getVolitionAttributes(volitionId: string): Promise<VolitionAttribute[]> {
+  async getEntanglementAttributes(volitionId: string): Promise<VolitionAttribute[]> {
     const result = await this.d1
-      .prepare('SELECT * FROM volition_attributes WHERE volition_id = ?')
+      .prepare('SELECT * FROM entanglement_attributes WHERE entanglement_id = ?')
       .bind(volitionId)
       .all<VolitionAttribute>();
     return result.results || [];
   }
 
-  async setVolitionAttributes(volitionId: string, attributes: Array<{ dimension_id: string; value_id: string }>): Promise<void> {
+  async setEntanglementAttributes(volitionId: string, attributes: Array<{ dimension_id: string; value_id: string }>): Promise<void> {
     // Delete existing attributes
     await this.d1
-      .prepare('DELETE FROM volition_attributes WHERE volition_id = ?')
+      .prepare('DELETE FROM entanglement_attributes WHERE entanglement_id = ?')
       .bind(volitionId)
       .run();
 
@@ -657,7 +657,7 @@ export class DB {
     if (attributes.length > 0) {
       const batch = attributes.map(attr =>
         this.d1
-          .prepare('INSERT INTO volition_attributes (volition_id, dimension_id, value_id) VALUES (?, ?, ?)')
+          .prepare('INSERT INTO entanglement_attributes (entanglement_id, dimension_id, value_id) VALUES (?, ?, ?)')
           .bind(volitionId, attr.dimension_id, attr.value_id)
       );
       await this.d1.batch(batch);
@@ -666,14 +666,14 @@ export class DB {
 
   async addVolitionAttribute(volitionId: string, dimensionId: string, valueId: string): Promise<void> {
     await this.d1
-      .prepare('INSERT OR IGNORE INTO volition_attributes (volition_id, dimension_id, value_id) VALUES (?, ?, ?)')
+      .prepare('INSERT OR IGNORE INTO volition_attributes (entanglement_id, dimension_id, value_id) VALUES (?, ?, ?)')
       .bind(volitionId, dimensionId, valueId)
       .run();
   }
 
-  async removeVolitionAttributes(volitionId: string, dimensionId: string): Promise<void> {
+  async removeEntanglementAttributes(volitionId: string, dimensionId: string): Promise<void> {
     await this.d1
-      .prepare('DELETE FROM volition_attributes WHERE volition_id = ? AND dimension_id = ?')
+      .prepare('DELETE FROM entanglement_attributes WHERE entanglement_id = ? AND dimension_id = ?')
       .bind(volitionId, dimensionId)
       .run();
   }
@@ -691,7 +691,7 @@ export class DB {
 
     await this.d1
       .prepare(`
-        INSERT INTO credentials (id, name, type, data, last_validated, validation_metadata, created_at, updated_at)
+        INSERT INTO jewels (id, name, type, data, last_validated, validation_metadata, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `)
       .bind(
@@ -711,7 +711,7 @@ export class DB {
 
   async getCredential(id: string): Promise<Credential | null> {
     const result = await this.d1
-      .prepare('SELECT * FROM credentials WHERE id = ?')
+      .prepare('SELECT * FROM jewels WHERE id = ?')
       .bind(id)
       .first<Credential>();
 
@@ -721,8 +721,8 @@ export class DB {
   async listCredentials(params?: {
     type?: string;
     limit?: number;
-  }): Promise<Credential[]> {
-    let query = 'SELECT * FROM credentials';
+  }): Promise<Jewel[]> {
+    let query = 'SELECT * FROM jewels';
     const bindings: any[] = [];
 
     if (params?.type) {
@@ -778,28 +778,28 @@ export class DB {
     bindings.push(id);
 
     await this.d1
-      .prepare(`UPDATE credentials SET ${updates.join(', ')} WHERE id = ?`)
+      .prepare(`UPDATE jewels SET ${updates.join(', ')} WHERE id = ?`)
       .bind(...bindings)
       .run();
   }
 
   async deleteCredential(id: string): Promise<void> {
     await this.d1
-      .prepare('DELETE FROM credentials WHERE id = ?')
+      .prepare('DELETE FROM jewels WHERE id = ?')
       .bind(id)
       .run();
   }
 
-  async getCredentialUsage(credentialId: string): Promise<{ volition_id: string; volition_name: string; source_type: string; source_id: string }[]> {
+  async getJewelUsage(credentialId: string): Promise<{ entanglement_id: string; volition_name: string; source_type: string; source_id: string }[]> {
     const result = await this.d1
       .prepare(`
-        SELECT s.id as source_id, s.volition_id, s.type as source_type, v.name as volition_name
+        SELECT s.id as source_id, s.entanglement_id, s.type as source_type, v.name as volition_name
         FROM sources s
-        JOIN volitions v ON s.volition_id = v.id
-        WHERE s.credential_id = ?
+        JOIN entanglements v ON s.entanglement_id = v.id
+        WHERE s.jewel_id = ?
       `)
       .bind(credentialId)
-      .all<{ source_id: string; volition_id: string; source_type: string; volition_name: string }>();
+      .all<{ source_id: string; entanglement_id: string; source_type: string; volition_name: string }>();
 
     return result.results || [];
   }

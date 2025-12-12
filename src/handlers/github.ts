@@ -113,7 +113,7 @@ export const githubHandler: SourceHandler = {
         }
 
         qupts.push({
-          volition_id: source.volition_id,
+          entanglement_id: source.entanglement_id,
           content,
           source: 'github',
           external_id: `github:${event.id}`,

@@ -2,38 +2,38 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../lib/api'
 
-interface EntangledListProps {
-  onSelectEntangled: (id: string) => void
+interface ZokuListProps {
+  onSelectZoku: (id: string) => void
   onSelectVolition: (id: string) => void
 }
 
-export default function EntangledList({ onSelectEntangled, onSelectVolition }: EntangledListProps) {
+export default function ZokuList({ onSelectZoku, onSelectVolition }: ZokuListProps) {
   const [showAllMatrix, setShowAllMatrix] = useState(false)
 
-  const { data: entangled = [], isLoading } = useQuery({
-    queryKey: ['entangled'],
-    queryFn: () => api.listEntangled()
+  const { data: zoku = [], isLoading } = useQuery({
+    queryKey: ['zoku'],
+    queryFn: () => api.listZoku()
   })
 
-  const { data: volitions = [] } = useQuery({
-    queryKey: ['all-volitions'],
-    queryFn: () => api.listVolitions({ limit: 100 })
+  const { data: entanglements = [] } = useQuery({
+    queryKey: ['all-entanglements'],
+    queryFn: () => api.listEntanglements({ limit: 100 })
   })
 
   const { data: matrices = [] } = useQuery({
-    queryKey: ['all-matrices', volitions.map(v => v.id).join(',')],
+    queryKey: ['all-matrices', entanglements.map(v => v.id).join(',')],
     queryFn: async () => {
-      if (volitions.length === 0) return []
+      if (entanglements.length === 0) return []
       const results = await Promise.all(
-        volitions.map(async v => ({
-          volition_id: v.id,
+        entanglements.map(async v => ({
+          entanglement_id: v.id,
           volition_name: v.name,
           matrix: await api.getMatrix(v.id)
         }))
       )
       return results
     },
-    enabled: volitions.length > 0
+    enabled: entanglements.length > 0
   })
 
   const formatDate = (timestamp: number) => {
@@ -63,26 +63,26 @@ export default function EntangledList({ onSelectEntangled, onSelectVolition }: E
     <div className="space-y-6">
       {/* Header */}
       <div className="card">
-        <h1 className="text-3xl font-bold text-quantum-400 mb-2">Entangled</h1>
-        <p className="text-gray-400">People and AI agents working on volitions</p>
+        <h1 className="text-3xl font-bold text-quantum-400 mb-2">Zoku</h1>
+        <p className="text-gray-400">People and AI agents working on entanglements</p>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="card">
-          <div className="text-sm text-gray-400 mb-1">Total Entangled</div>
-          <div className="text-3xl font-bold text-quantum-400">{entangled.length}</div>
+          <div className="text-sm text-gray-400 mb-1">Total Zoku</div>
+          <div className="text-3xl font-bold text-quantum-400">{zoku.length}</div>
         </div>
         <div className="card">
           <div className="text-sm text-gray-400 mb-1">Humans</div>
           <div className="text-3xl font-bold text-quantum-400">
-            {entangled.filter(e => e.type === 'human').length}
+            {zoku.filter(e => e.type === 'human').length}
           </div>
         </div>
         <div className="card">
           <div className="text-sm text-gray-400 mb-1">AI Agents</div>
           <div className="text-3xl font-bold text-quantum-400">
-            {entangled.filter(e => e.type === 'agent').length}
+            {zoku.filter(e => e.type === 'agent').length}
           </div>
         </div>
       </div>
@@ -108,14 +108,14 @@ export default function EntangledList({ onSelectEntangled, onSelectVolition }: E
               </tr>
             </thead>
             <tbody>
-              {displayedMatrices.map(({ volition_id, volition_name, matrix }) => (
+              {displayedMatrices.map(({ entanglement_id, volition_name, matrix }) => (
                 <tr
-                  key={volition_id}
+                  key={entanglement_id}
                   className="border-b border-gray-200 dark:border-quantum-700 hover:bg-gray-50 dark:hover:bg-quantum-800/30"
                 >
                   <td className="p-3">
                     <button
-                      onClick={() => onSelectVolition(volition_id)}
+                      onClick={() => onSelectVolition(entanglement_id)}
                       className="font-medium text-quantum-500 hover:text-quantum-400 transition-colors text-left"
                     >
                       {volition_name}
@@ -130,7 +130,7 @@ export default function EntangledList({ onSelectEntangled, onSelectVolition }: E
                             {entities.map(e => (
                               <button
                                 key={e.id}
-                                onClick={() => onSelectEntangled(e.id)}
+                                onClick={() => onSelectZoku(e.id)}
                                 className="px-2 py-0.5 rounded-full bg-gray-200 dark:bg-quantum-700 hover:bg-gray-300 dark:hover:bg-quantum-600 text-xs transition-colors"
                                 title={e.name}
                               >
@@ -153,23 +153,23 @@ export default function EntangledList({ onSelectEntangled, onSelectVolition }: E
               onClick={() => setShowAllMatrix(!showAllMatrix)}
               className="w-full mt-4 text-center text-quantum-500 hover:text-quantum-400 text-sm font-medium transition-colors"
             >
-              {showAllMatrix ? '← Show less' : `Show ${sortedMatrices.length - 5} more volitions →`}
+              {showAllMatrix ? '← Show less' : `Show ${sortedMatrices.length - 5} more entanglements →`}
             </button>
           )}
         </div>
       )}
 
-      {/* Entangled List */}
+      {/* Zoku List */}
       <div className="card">
         <h2 className="text-xl font-bold mb-4">All Partners</h2>
-        {entangled.length === 0 ? (
-          <div className="text-gray-400 text-center py-8">No entangled partners yet</div>
+        {zoku.length === 0 ? (
+          <div className="text-gray-400 text-center py-8">No zoku partners yet</div>
         ) : (
           <div className="space-y-2">
-            {entangled.map(entity => (
+            {zoku.map(entity => (
               <button
                 key={entity.id}
-                onClick={() => onSelectEntangled(entity.id)}
+                onClick={() => onSelectZoku(entity.id)}
                 className="w-full text-left p-4 bg-gray-100 dark:bg-quantum-700/50 hover:bg-gray-200 dark:hover:bg-quantum-700 rounded-lg border border-gray-300 dark:border-quantum-600 transition-colors"
               >
                 <div className="flex items-center justify-between">

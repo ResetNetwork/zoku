@@ -1,35 +1,35 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Dashboard from './components/Dashboard'
-import VolitionsList from './components/VolitionsList'
-import VolitionDetail from './components/VolitionDetail'
-import EntangledList from './components/EntangledList'
-import EntangledDetail from './components/EntangledDetail'
+import EntanglementsList from './components/EntanglementsList'
+import EntanglementDetail from './components/EntanglementDetail'
+import ZokuList from './components/ZokuList'
+import ZokuDetail from './components/ZokuDetail'
 import ActivityList from './components/ActivityList'
 import SourcesList from './components/SourcesList'
-import CredentialsList from './components/CredentialsList'
+import JewelsList from './components/JewelsList'
 import { useTheme } from './lib/theme'
 import { useNotifications } from './lib/notifications'
 import { api } from './lib/api'
 
-type View = 'dashboard' | 'volitions' | 'entangled' | 'activity' | 'sources' | 'credentials'
+type View = 'dashboard' | 'entanglements' | 'zoku' | 'activity' | 'sources' | 'jewels'
 
 export default function App() {
   const [currentView, setCurrentView] = useState<View>(() => {
     const params = new URLSearchParams(window.location.search)
     const view = params.get('view')
-    if (view === 'volitions' || view === 'entangled' || view === 'activity' || view === 'sources' || view === 'credentials') {
+    if (view === 'entanglements' || view === 'zoku' || view === 'activity' || view === 'sources' || view === 'jewels') {
       return view
     }
     return 'dashboard'
   })
-  const [selectedVolitionId, setSelectedVolitionId] = useState<string | null>(() => {
+  const [selectedEntanglementId, setSelectedVolitionId] = useState<string | null>(() => {
     const params = new URLSearchParams(window.location.search)
     return params.get('volition')
   })
-  const [selectedEntangledId, setSelectedEntangledId] = useState<string | null>(() => {
+  const [selectedZokuId, setSelectedEntangledId] = useState<string | null>(() => {
     const params = new URLSearchParams(window.location.search)
-    return params.get('entangled')
+    return params.get('zoku')
   })
   const [syncing, setSyncing] = useState(false)
   const { theme, toggleTheme } = useTheme()
@@ -39,25 +39,25 @@ export default function App() {
   // Sync URL with current state
   useEffect(() => {
     const params = new URLSearchParams()
-    if (selectedVolitionId) {
-      params.set('volition', selectedVolitionId)
-    } else if (selectedEntangledId) {
-      params.set('entangled', selectedEntangledId)
+    if (selectedEntanglementId) {
+      params.set('volition', selectedEntanglementId)
+    } else if (selectedZokuId) {
+      params.set('zoku', selectedZokuId)
     } else if (currentView !== 'dashboard') {
       params.set('view', currentView)
     }
     const newUrl = params.toString() ? `?${params}` : window.location.pathname
     window.history.pushState({}, '', newUrl)
-  }, [selectedVolitionId, selectedEntangledId, currentView])
+  }, [selectedEntanglementId, selectedZokuId, currentView])
 
   // Handle browser back/forward buttons
   useEffect(() => {
     const handlePopState = () => {
       const params = new URLSearchParams(window.location.search)
       setSelectedVolitionId(params.get('volition'))
-      setSelectedEntangledId(params.get('entangled'))
+      setSelectedEntangledId(params.get('zoku'))
       const view = params.get('view')
-      if (view === 'volitions' || view === 'entangled' || view === 'activity' || view === 'sources' || view === 'credentials') {
+      if (view === 'entanglements' || view === 'zoku' || view === 'activity' || view === 'sources' || view === 'jewels') {
         setCurrentView(view)
       } else {
         setCurrentView('dashboard')
@@ -67,16 +67,16 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState)
   }, [])
 
-  const handleSelectVolition = (id: string) => {
+  const handleSelectEntanglement = (id: string) => {
     setSelectedVolitionId(id)
     setSelectedEntangledId(null)
     setCurrentView('dashboard')
   }
 
-  const handleSelectEntangled = (id: string) => {
+  const handleSelectZoku = (id: string) => {
     setSelectedEntangledId(id)
     setSelectedVolitionId(null)
-    setCurrentView('entangled')
+    setCurrentView('zoku')
   }
 
   const handleBack = () => {
@@ -84,8 +84,8 @@ export default function App() {
     setSelectedEntangledId(null)
   }
 
-  const handleShowEntangledList = () => {
-    setCurrentView('entangled')
+  const handleShowZokuList = () => {
+    setCurrentView('zoku')
     setSelectedVolitionId(null)
     setSelectedEntangledId(null)
   }
@@ -96,8 +96,8 @@ export default function App() {
     setSelectedEntangledId(null)
   }
 
-  const handleShowVolitionsList = () => {
-    setCurrentView('volitions')
+  const handleShowEntanglementsList = () => {
+    setCurrentView('entanglements')
     setSelectedVolitionId(null)
     setSelectedEntangledId(null)
   }
@@ -114,15 +114,15 @@ export default function App() {
     setSelectedEntangledId(null)
   }
 
-  const handleShowCredentialsList = () => {
-    setCurrentView('credentials')
+  const handleShowJewelsList = () => {
+    setCurrentView('jewels')
     setSelectedVolitionId(null)
     setSelectedEntangledId(null)
   }
 
   const { data: volitions = [] } = useQuery({
-    queryKey: ['volitions'],
-    queryFn: () => api.listVolitions({ root_only: true, limit: 50 })
+    queryKey: ['entanglements'],
+    queryFn: () => api.listEntanglements({ root_only: true, limit: 50 })
   })
 
   const handleSyncAll = async () => {
@@ -201,7 +201,7 @@ export default function App() {
               >
                 {theme === 'dark' ? '☀️' : '🌙'}
               </button>
-              {(selectedVolitionId || selectedEntangledId) && (
+              {(selectedEntanglementId || selectedZokuId) && (
                 <button
                   onClick={handleBack}
                   className="btn btn-secondary"
@@ -215,38 +215,38 @@ export default function App() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-8">
-        {selectedVolitionId ? (
-          <VolitionDetail
-            volitionId={selectedVolitionId}
+        {selectedEntanglementId ? (
+          <EntanglementDetail
+            volitionId={selectedEntanglementId}
             onBack={handleBack}
           />
-        ) : selectedEntangledId ? (
-          <EntangledDetail
-            entangledId={selectedEntangledId}
+        ) : selectedZokuId ? (
+          <ZokuDetail
+            entangledId={selectedZokuId}
             onBack={handleBack}
-            onSelectVolition={handleSelectVolition}
+            onSelectEntanglement={handleSelectEntanglement}
           />
-        ) : currentView === 'volitions' ? (
-          <VolitionsList onSelectVolition={handleSelectVolition} />
-        ) : currentView === 'entangled' ? (
-          <EntangledList
-            onSelectEntangled={handleSelectEntangled}
-            onSelectVolition={handleSelectVolition}
+        ) : currentView === 'entanglements' ? (
+          <EntanglementsList onSelectEntanglement={handleSelectEntanglement} />
+        ) : currentView === 'zoku' ? (
+          <ZokuList
+            onSelectZoku={handleSelectZoku}
+            onSelectEntanglement={handleSelectEntanglement}
           />
         ) : currentView === 'activity' ? (
           <ActivityList onBack={handleShowDashboard} />
         ) : currentView === 'sources' ? (
           <SourcesList onBack={handleShowDashboard} />
-        ) : currentView === 'credentials' ? (
-          <CredentialsList onBack={handleShowDashboard} />
+        ) : currentView === 'jewels' ? (
+          <JewelsList onBack={handleShowDashboard} />
         ) : (
           <Dashboard
-            onSelectVolition={handleSelectVolition}
-            onShowVolitionsList={handleShowVolitionsList}
-            onShowEntangledList={handleShowEntangledList}
+            onSelectEntanglement={handleSelectEntanglement}
+            onShowEntanglementsList={handleShowEntanglementsList}
+            onShowZokuList={handleShowZokuList}
             onShowActivityList={handleShowActivityList}
             onShowSourcesList={handleShowSourcesList}
-            onShowCredentialsList={handleShowCredentialsList}
+            onShowJewelsList={handleShowJewelsList}
           />
         )}
       </main>

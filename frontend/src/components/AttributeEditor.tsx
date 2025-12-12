@@ -4,10 +4,10 @@ import { api } from '../lib/api'
 import { useNotifications } from '../lib/notifications'
 
 interface AttributeEditorProps {
-  volitionId: string
+  entanglementId: string
 }
 
-export default function AttributeEditor({ volitionId }: AttributeEditorProps) {
+export default function AttributeEditor({ entanglementId }: AttributeEditorProps) {
   const [editing, setEditing] = useState(false)
   const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
@@ -20,8 +20,8 @@ export default function AttributeEditor({ volitionId }: AttributeEditorProps) {
   })
 
   const { data: currentAttributes } = useQuery({
-    queryKey: ['attributes', volitionId],
-    queryFn: () => api.getVolitionAttributes(volitionId)
+    queryKey: ['attributes', entanglementId],
+    queryFn: () => api.getEntanglementAttributes(entanglementId)
   })
 
   // Initialize selected attributes from current values
@@ -44,10 +44,10 @@ export default function AttributeEditor({ volitionId }: AttributeEditorProps) {
         .filter(([_, value]) => value) // Only include selected values
         .map(([dimension, value]) => ({ dimension, value }))
 
-      await api.setVolitionAttributes(volitionId, attributes)
+      await api.setEntanglementAttributes(entanglementId, attributes)
       addNotification('success', 'Categories updated')
-      queryClient.invalidateQueries({ queryKey: ['attributes', volitionId] })
-      queryClient.invalidateQueries({ queryKey: ['volition', volitionId] })
+      queryClient.invalidateQueries({ queryKey: ['attributes', entanglementId] })
+      queryClient.invalidateQueries({ queryKey: ['volition', entanglementId] })
       setEditing(false)
     } catch (error) {
       console.error('Failed to update attributes:', error)

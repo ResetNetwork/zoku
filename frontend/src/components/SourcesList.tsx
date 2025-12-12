@@ -12,23 +12,23 @@ export default function SourcesList({ onBack }: SourcesListProps) {
   const [editingSource, setEditingSource] = useState<any>(null)
   const queryClient = useQueryClient()
   const { addNotification } = useNotifications()
-  const { data: volitions = [] } = useQuery({
-    queryKey: ['volitions'],
-    queryFn: () => api.listVolitions({ limit: 100 })
+  const { data: entanglements = [] } = useQuery({
+    queryKey: ['entanglements'],
+    queryFn: () => api.listEntanglements({ limit: 100 })
   })
 
   const { data: allSources = [], isLoading } = useQuery({
-    queryKey: ['all-sources', volitions.map(v => v.id).join(',')],
+    queryKey: ['all-sources', entanglements.map(v => v.id).join(',')],
     queryFn: async () => {
-      if (volitions.length === 0) return []
+      if (entanglements.length === 0) return []
       const sources: any[] = []
-      for (const vol of volitions) {
+      for (const vol of entanglements) {
         const volSources = await api.listSources(vol.id)
-        sources.push(...volSources.map(s => ({ ...s, volition_name: vol.name, volition_id: vol.id })))
+        sources.push(...volSources.map(s => ({ ...s, volition_name: vol.name, entanglement_id: vol.id })))
       }
       return sources
     },
-    enabled: volitions.length > 0
+    enabled: entanglements.length > 0
   })
 
   const formatDate = (timestamp: number | null | undefined) => {
@@ -51,7 +51,7 @@ export default function SourcesList({ onBack }: SourcesListProps) {
       {/* Header */}
       <div className="card">
         <h1 className="text-3xl font-bold text-quantum-400 mb-2">Sources</h1>
-        <p className="text-gray-400">Activity sources across all volitions</p>
+        <p className="text-gray-400">Activity sources across all entanglements</p>
       </div>
 
       {/* Stats */}
@@ -80,7 +80,7 @@ export default function SourcesList({ onBack }: SourcesListProps) {
           source={editingSource}
           onSuccess={() => {
             setEditingSource(null)
-            queryClient.invalidateQueries({ queryKey: ['volitions'] })
+            queryClient.invalidateQueries({ queryKey: ['entanglements'] })
           }}
           onCancel={() => setEditingSource(null)}
         />
@@ -157,7 +157,7 @@ export default function SourcesList({ onBack }: SourcesListProps) {
                         try {
                           await fetch(`/api/sources/${source.id}`, { method: 'DELETE' })
                           addNotification('success', 'Source deleted')
-                          queryClient.invalidateQueries({ queryKey: ['volitions'] })
+                          queryClient.invalidateQueries({ queryKey: ['entanglements'] })
                         } catch (error) {
                           addNotification('error', 'Failed to delete source')
                         }
