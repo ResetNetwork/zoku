@@ -46,7 +46,7 @@ app.patch('/:id', async (c) => {
 
   await db.updateSource(id, {
     config: body.config,
-    credentials: credentials ? { encrypted: credentials } : undefined,
+    jewels: credentials ? { encrypted: credentials } : undefined,
     enabled: body.enabled
   });
 

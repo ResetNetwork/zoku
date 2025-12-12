@@ -35,7 +35,7 @@ app.get('/', async (c) => {
     }))
   );
 
-  return c.json({ volitions: enrichedVolitions });
+  return c.json({entanglements: enrichedVolitions });
 });
 
 // Get volition details
@@ -587,7 +587,7 @@ app.post('/:id/sources', async (c) => {
     entanglement_id: volitionId,
     type: body.type,
     config: body.config,
-    credentials: credentials ? { encrypted: credentials } : undefined,
+    jewels: credentials ? { encrypted: credentials } : undefined,
     jewel_id: body.jewel_id
   });
 

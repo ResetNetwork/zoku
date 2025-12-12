@@ -29,7 +29,7 @@ app.get('/', async (c) => {
     updated_at: cred.updated_at
   }));
 
-  return c.json({ credentials: sanitized });
+  return c.json({jewels: sanitized });
 });
 
 // Create credential with validation
