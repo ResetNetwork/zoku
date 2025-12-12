@@ -16,12 +16,12 @@ const app = new Hono<{ Bindings: Bindings }>();
 app.use('/*', cors());
 
 // API routes
-app.route(./api/entanglements', entanglementsRoutes);
-app.route(./api/zoku', zokuRoutes);
+app.route('/api/entanglements', entanglementsRoutes);
+app.route('/api/zoku', zokuRoutes);
 app.route('/api/qupts', quptsRoutes);
 app.route('/api/sources', sourcesRoutes);
 app.route('/api/dimensions', dimensionsRoutes);
-app.route(./api/jewels', jewelsRoutes);
+app.route('/api/jewels', jewelsRoutes);
 app.route('/api/oauth', oauthRoutes);
 
 // MCP endpoint
