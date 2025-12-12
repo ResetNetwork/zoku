@@ -10,13 +10,13 @@ export const api = {
     if (params?.limit) query.set('limit', String(params.limit))
     if (params?.detailed) query.set('detailed', 'true')
 
-    const res = await fetch(`${API_BASE}/volitions?${query}`)
+    const res = await fetch(`${API_BASE}/entanglements?${query}`)
     const data = await res.json()
     return data.entanglements as Entanglement[]
   },
 
   async getEntanglement(id: string, detailed = false) {
-    const res = await fetch(`${API_BASE}/volitions/${id}?detailed=${detailed}`)
+    const res = await fetch(`${API_BASE}/entanglements/${id}?detailed=${detailed}`)
     return await res.json() as Entanglement
   },
 
@@ -34,18 +34,18 @@ export const api = {
 
   // Entangled
   async listZoku() {
-    const res = await fetch(`${API_BASE}/entangled`)
+    const res = await fetch(`${API_BASE}/zoku`)
     const data = await res.json()
     return data.zoku as Zoku[]
   },
 
   async getZoku(id: string) {
-    const res = await fetch(`${API_BASE}/entangled/${id}`)
+    const res = await fetch(`${API_BASE}/zoku/${id}`)
     return await res.json() as Zoku
   },
 
   async createZoku(data: { name: string; type: 'human' | 'agent' }) {
-    const res = await fetch(`${API_BASE}/entangled`, {
+    const res = await fetch(`${API_BASE}/zoku`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
@@ -54,7 +54,7 @@ export const api = {
   },
 
   async updateZoku(id: string, data: { name?: string; description?: string; metadata?: any }) {
-    const res = await fetch(`${API_BASE}/entangled/${id}`, {
+    const res = await fetch(`${API_BASE}/zoku/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
@@ -64,13 +64,13 @@ export const api = {
 
   // Matrix
   async getZokuMatrix(entanglementId: string) {
-    const res = await fetch(`${API_BASE}/volitions/${volitionId}/matrix`)
+    const res = await fetch(`${API_BASE}/entanglements/${volitionId}/matrix`)
     const data = await res.json()
     return data.matrix as PASCIMatrix
   },
 
   async assignToMatrix(entanglementId: string, zokuId: string, role: string) {
-    const res = await fetch(`${API_BASE}/volitions/${volitionId}/matrix`, {
+    const res = await fetch(`${API_BASE}/entanglements/${volitionId}/matrix`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ zoku_id: entangledId, role })
@@ -86,12 +86,12 @@ export const api = {
   },
 
   async getEntanglementAttributes(entanglementId: string) {
-    const res = await fetch(`${API_BASE}/volitions/${volitionId}/attributes`)
+    const res = await fetch(`${API_BASE}/entanglements/${volitionId}/attributes`)
     return await res.json()
   },
 
   async setEntanglementAttributes(entanglementId: string, attributes: Array<{ dimension: string; value: string }>) {
-    const res = await fetch(`${API_BASE}/volitions/${volitionId}/attributes`, {
+    const res = await fetch(`${API_BASE}/entanglements/${volitionId}/attributes`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ attributes })
@@ -101,7 +101,7 @@ export const api = {
 
   // Sources
   async listSources(entanglementId: string) {
-    const res = await fetch(`${API_BASE}/volitions/${volitionId}/sources`)
+    const res = await fetch(`${API_BASE}/entanglements/${volitionId}/sources`)
     const data = await res.json()
     return data.sources as Source[]
   },
@@ -115,14 +115,14 @@ export const api = {
 
   // Credentials
   async listJewels() {
-    const res = await fetch(`${API_BASE}/credentials`)
+    const res = await fetch(`${API_BASE}/jewels`)
     const data = await res.json()
     return data.jewels || []
   },
 
   async createJewel(credential: { name: string; type: string; data: any }) {
     console.log('📡 API: Creating credential...', { name: credential.name, type: credential.type })
-    const res = await fetch(`${API_BASE}/credentials`, {
+    const res = await fetch(`${API_BASE}/jewels`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(credential)
@@ -137,7 +137,7 @@ export const api = {
   },
 
   async updateJewel(id: string, data: { name?: string; data?: any }) {
-    const res = await fetch(`${API_BASE}/credentials/${id}`, {
+    const res = await fetch(`${API_BASE}/jewels/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
@@ -150,7 +150,7 @@ export const api = {
   },
 
   async deleteJewel(id: string) {
-    const res = await fetch(`${API_BASE}/credentials/${id}`, {
+    const res = await fetch(`${API_BASE}/jewels/${id}`, {
       method: 'DELETE'
     })
     if (!res.ok) {
