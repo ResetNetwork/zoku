@@ -188,7 +188,7 @@ export class DB {
     return result || null;
   }
 
-  async listEntangled(filters: { type?: string; limit?: number; offset?: number } = {}): Promise<Zoku[]> {
+  async listZoku(filters: { type?: string; limit?: number; offset?: number } = {}): Promise<Zoku[]> {
     let query = 'SELECT * FROM zoku';
     const params: any[] = [];
 
