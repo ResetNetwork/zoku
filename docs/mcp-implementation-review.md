@@ -258,9 +258,10 @@ add_source: z.object({
 server.tool('get_jewel', ...)  // was: get_credential
 ```
 
-### 9. Zod Schema Duplication
+### 9. Zod Schema Duplication ✅ DOCUMENTED
 **Location:** Lines 11-173 vs 790-1169
 **Severity:** MEDIUM - Maintainability
+**Status:** Documented with mitigation strategy
 
 **Problem:**
 Tool schemas defined twice - once as Zod schemas, once as SDK tool schemas. Must be kept in sync manually.
@@ -270,7 +271,15 @@ Tool schemas defined twice - once as Zod schemas, once as SDK tool schemas. Must
 - Validation inconsistencies
 - More code to maintain
 
-**Recommendation:**
+**Resolution:**
+After investigation, determined that simple conversion to zodToJsonSchema would lose API documentation (descriptions). The duplication is now:
+1. **Documented** with clear comments in server.ts (lines 861-871)
+2. **Explained**: Zod schemas provide validation, SDK schemas provide documentation
+3. **Mitigated**: Added instructions to update both locations when modifying tools
+
+**Future improvement:** Add .describe() to all Zod schema fields, then use zodToJsonSchema for full automation.
+
+**Recommendation (original):**
 Generate SDK schemas from Zod or use a shared schema generator. Example:
 ```typescript
 import { zodToJsonSchema } from 'zod-to-json-schema';
@@ -279,6 +288,7 @@ const zodSchema = schemas.list_entanglements;
 const sdkSchema = zodToJsonSchema(zodSchema);
 server.tool('list_entanglements', 'Description', sdkSchema, handler);
 ```
+Note: This approach requires adding descriptions to Zod schemas first.
 
 ### 10. Google Docs Validation Without test_document_id ✅ FIXED
 **Location:** Line 637

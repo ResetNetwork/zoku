@@ -858,6 +858,17 @@ function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServ
   };
 
   // Register all 29 tools
+  // NOTE: Tool schemas are duplicated - defined as Zod schemas (lines 11-230) for runtime validation
+  // and as SDK schemas (below) for API documentation. This duplication is intentional because:
+  // 1. Zod schemas provide runtime type safety and validation
+  // 2. SDK schemas include detailed descriptions for API consumers
+  // 3. Converting Zod→SDK via zodToJsonSchema would lose the descriptions
+  //
+  // When adding/modifying tools, update BOTH locations:
+  // - Zod schema in `schemas` object (for validation)
+  // - SDK schema in server.tool() call (for documentation)
+  //
+  // Future improvement: Add .describe() to all Zod schema fields, then use zodToJsonSchema
   server.tool(
     'list_entanglements',
     'List entanglements in the Zoku system',
