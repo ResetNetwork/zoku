@@ -339,6 +339,8 @@ export default function CredentialsList({ onBack }: CredentialsListProps) {
                   }
 
                   // Listen for callback
+                  let checkClosed: NodeJS.Timeout | null = null
+
                   const handleMessage = async (event: MessageEvent) => {
                     if (event.data.type === 'google-oauth-callback') {
                       const tokens = event.data.tokens
@@ -356,6 +358,9 @@ export default function CredentialsList({ onBack }: CredentialsListProps) {
                         queryClient.invalidateQueries({ queryKey: ['credentials'] })
                         setEditingCredential(null)
                         setSaving(false)
+
+                        // Cleanup
+                        if (checkClosed) clearInterval(checkClosed)
                         window.removeEventListener('message', handleMessage)
                         if (popup && !popup.closed) popup.close()
                       }
@@ -363,6 +368,16 @@ export default function CredentialsList({ onBack }: CredentialsListProps) {
                   }
 
                   window.addEventListener('message', handleMessage)
+
+                  // Check if popup closes without completing
+                  checkClosed = setInterval(() => {
+                    if (popup.closed) {
+                      clearInterval(checkClosed)
+                      window.removeEventListener('message', handleMessage)
+                      setSaving(false)
+                      console.log('❌ OAuth popup closed without completing')
+                    }
+                  }, 500)
 
                 } catch (error) {
                   console.error('Failed to re-authorize:', error)
