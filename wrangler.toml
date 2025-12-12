@@ -1,12 +1,16 @@
 name = "the-great-game"
 main = "src/index.ts"
-compatibility_date = "2024-01-01"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
 account_id = "16c42d94e589cc74c99aed7d51687cbc"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "the-great-game"
 database_id = "e4024944-fcdc-420c-86ac-9e35f46e310a"
+
+[vars]
+LOG_LEVEL = "info"
 
 [assets]
 directory = "./frontend/dist"
