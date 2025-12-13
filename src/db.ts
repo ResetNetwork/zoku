@@ -449,13 +449,21 @@ export class DB {
     };
 
     for (const row of result.results || []) {
-      matrix[row.role].push({
+      const zoku: Zoku = {
         id: row.id,
         name: row.name,
+        description: row.description || null,
         type: row.type,
+        email: row.email,
+        access_tier: row.access_tier,
+        cf_access_sub: row.cf_access_sub,
+        last_login: row.last_login,
+        created_by: row.created_by,
+        updated_by: row.updated_by,
         metadata: row.metadata,
         created_at: row.created_at
-      });
+      };
+      matrix[row.role].push(zoku);
     }
 
     return matrix;

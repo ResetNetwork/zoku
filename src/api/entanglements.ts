@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
-import type { Bindings } from '../types';
+import type { Bindings, Zoku } from '../types';
 import { DB } from '../db';
+import { authMiddleware, requireTier } from '../middleware/auth';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -113,8 +114,8 @@ app.get('/:id', async (c) => {
   });
 });
 
-// Create entanglement
-app.post('/', async (c) => {
+// Create entanglement (Entangled and Prime only)
+app.post('/', authMiddleware(), requireTier('entangled'), async (c) => {
   const db = new DB(c.env.DB);
   const body = await c.req.json();
 
@@ -152,8 +153,8 @@ app.post('/', async (c) => {
   return c.json(entanglement, 201);
 });
 
-// Update entanglement
-app.patch('/:id', async (c) => {
+// Update entanglement (Entangled and Prime only)
+app.patch('/:id', authMiddleware(), requireTier('entangled'), async (c) => {
   const db = new DB(c.env.DB);
   const id = c.req.param('id');
   const body = await c.req.json();
@@ -187,8 +188,8 @@ app.patch('/:id', async (c) => {
   return c.json({ success: true });
 });
 
-// Delete entanglement
-app.delete('/:id', async (c) => {
+// Delete entanglement (Entangled and Prime only)
+app.delete('/:id', authMiddleware(), requireTier('entangled'), async (c) => {
   const db = new DB(c.env.DB);
   const id = c.req.param('id');
 
@@ -215,8 +216,8 @@ app.get('/:id/matrix', async (c) => {
   return c.json({ entanglement_id: id, matrix });
 });
 
-// Assign to matrix
-app.post('/:id/matrix', async (c) => {
+// Assign to matrix (Entangled and Prime only)
+app.post('/:id/matrix', authMiddleware(), requireTier('entangled'), async (c) => {
   const db = new DB(c.env.DB);
   const entanglementId = c.req.param('id');
   const body = await c.req.json();
@@ -255,8 +256,8 @@ app.post('/:id/matrix', async (c) => {
   return c.json({ success: true });
 });
 
-// Remove from matrix
-app.delete('/:id/matrix/:zoku_id/:role', async (c) => {
+// Remove from matrix (Entangled and Prime only)
+app.delete('/:id/matrix/:zoku_id/:role', authMiddleware(), requireTier('entangled'), async (c) => {
   const db = new DB(c.env.DB);
   const entanglementId = c.req.param('id');
   const zokuId = c.req.param('zoku_id');
@@ -316,8 +317,8 @@ app.get('/:id/attributes', async (c) => {
   return c.json({ entanglement_id: id, attributes: attributesMap });
 });
 
-// Set attributes (replace all)
-app.put('/:id/attributes', async (c) => {
+// Set attributes (replace all) - Entangled and Prime only
+app.put('/:id/attributes', authMiddleware(), requireTier('entangled'), async (c) => {
   const db = new DB(c.env.DB);
   const id = c.req.param('id');
   const body = await c.req.json();
@@ -355,8 +356,8 @@ app.put('/:id/attributes', async (c) => {
   return c.json({ success: true });
 });
 
-// Add single attribute
-app.post('/:id/attributes', async (c) => {
+// Add single attribute (Entangled and Prime only)
+app.post('/:id/attributes', authMiddleware(), requireTier('entangled'), async (c) => {
   const db = new DB(c.env.DB);
   const id = c.req.param('id');
   const body = await c.req.json();
@@ -387,8 +388,8 @@ app.post('/:id/attributes', async (c) => {
   return c.json({ success: true });
 });
 
-// Remove attributes for dimension
-app.delete('/:id/attributes/:dimension_id', async (c) => {
+// Remove attributes for dimension (Entangled and Prime only)
+app.delete('/:id/attributes/:dimension_id', authMiddleware(), requireTier('entangled'), async (c) => {
   const db = new DB(c.env.DB);
   const entanglementId = c.req.param('id');
   const dimensionId = c.req.param('dimension_id');
@@ -447,8 +448,9 @@ app.get('/:id/sources', async (c) => {
   return c.json({ sources: enriched });
 });
 
-// Add source to entanglement
-app.post('/:id/sources', async (c) => {
+// Add source to entanglement (Entangled and Prime only, must use own jewel)
+app.post('/:id/sources', authMiddleware(), requireTier('entangled'), async (c) => {
+  const user = c.get('user') as Zoku;
   const db = new DB(c.env.DB);
   const entanglementId = c.req.param('id');
   const body = await c.req.json();
@@ -466,7 +468,7 @@ app.post('/:id/sources', async (c) => {
   const warnings: string[] = [];
   let validationMetadata: Record<string, any> = {};
 
-  // If jewel_id is provided, verify it exists, matches type, and has access to the resource
+  // If jewel_id is provided, verify it exists, matches type, and check ownership
   if (body.jewel_id) {
     const jewel = await db.getJewel(body.jewel_id);
     if (!jewel) {
@@ -481,6 +483,14 @@ app.post('/:id/sources', async (c) => {
           message: `Jewel type mismatch: jewel is ${jewel.type}, source is ${body.type}`
         }
       }, 400);
+    }
+
+    // Check jewel ownership (must own it unless Prime)
+    if (jewel.owner_id !== user.id && user.access_tier !== 'prime') {
+      return c.json({
+        error: 'Can only use your own jewels',
+        message: 'Select a jewel you own or ask an admin to add this source'
+      }, 403);
     }
 
     // Validate source access with the jewel

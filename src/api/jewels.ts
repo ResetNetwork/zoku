@@ -1,14 +1,16 @@
 // Jewels API routes
 import { Hono } from 'hono';
 import { DB } from '../db';
-import type { Bindings } from '../types';
+import type { Bindings, Zoku } from '../types';
 import { encryptJewel, decryptJewel } from '../lib/crypto';
 import { validateGitHubCredential, validateZammadCredential, validateGoogleDocsCredential } from '../handlers/validate';
+import { authMiddleware, requireTier } from '../middleware/auth';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
-// List jewels (without exposing encrypted data)
-app.get('/', async (c) => {
+// List jewels (filter by ownership, hide others' encrypted data)
+app.get('/', authMiddleware(), async (c) => {
+  const user = c.get('user') as Zoku;
   const db = new DB(c.env.DB);
   const type = c.req.query('type');
   const limit = c.req.query('limit');
@@ -18,22 +20,45 @@ app.get('/', async (c) => {
     limit: limit ? parseInt(limit) : undefined
   });
 
-  // Remove encrypted data from response
-  const sanitized = jewels.map(jewel => ({
-    id: jewel.id,
-    name: jewel.name,
-    type: jewel.type,
-    last_validated: jewel.last_validated,
-    validation_metadata: jewel.validation_metadata ? JSON.parse(jewel.validation_metadata) : null,
-    created_at: jewel.created_at,
-    updated_at: jewel.updated_at
-  }));
+  // Filter encrypted data for jewels owned by others
+  const sanitized = jewels.map(jewel => {
+    const isOwner = jewel.owner_id === user.id;
+    const isPrime = user.access_tier === 'prime';
 
-  return c.json({jewels: sanitized });
+    if (!isOwner && !isPrime) {
+      // Non-owners can see metadata but not data
+      return {
+        id: jewel.id,
+        name: jewel.name,
+        type: jewel.type,
+        owner_id: jewel.owner_id,
+        last_validated: jewel.last_validated,
+        validation_metadata: jewel.validation_metadata ? JSON.parse(jewel.validation_metadata) : null,
+        created_at: jewel.created_at,
+        updated_at: jewel.updated_at,
+        data: '[REDACTED - owned by another user]'
+      };
+    }
+
+    // Owners and Prime can see full metadata (but still not the encrypted data)
+    return {
+      id: jewel.id,
+      name: jewel.name,
+      type: jewel.type,
+      owner_id: jewel.owner_id,
+      last_validated: jewel.last_validated,
+      validation_metadata: jewel.validation_metadata ? JSON.parse(jewel.validation_metadata) : null,
+      created_at: jewel.created_at,
+      updated_at: jewel.updated_at
+    };
+  });
+
+  return c.json({ jewels: sanitized });
 });
 
-// Create jewel with validation
-app.post('/', async (c) => {
+// Create jewel with validation (auto-assign owner)
+app.post('/', authMiddleware(), requireTier('coherent'), async (c) => {
+  const user = c.get('user') as Zoku;
   const db = new DB(c.env.DB);
   const body = await c.req.json();
 
@@ -95,13 +120,23 @@ app.post('/', async (c) => {
   // Encrypt jewel
   const encrypted = await encryptJewel(JSON.stringify(body.data), c.env.ENCRYPTION_KEY);
 
-  // Store jewel
+  // Store jewel with owner auto-assigned
   const jewel = await db.createJewel({
     name: body.name,
     type: body.type,
     data: encrypted,
+    owner_id: user.id,  // Auto-assign owner
     last_validated: Math.floor(Date.now() / 1000),
     validation_metadata: validationMetadata
+  });
+
+  // Audit log
+  await db.createAuditLog({
+    zoku_id: user.id,
+    action: 'create',
+    resource_type: 'jewel',
+    resource_id: jewel.id,
+    request_id: c.get('requestId')
   });
 
   // Return without encrypted data
@@ -123,7 +158,8 @@ app.post('/', async (c) => {
 });
 
 // Get single jewel (without encrypted data)
-app.get('/:id', async (c) => {
+app.get('/:id', authMiddleware(), async (c) => {
+  const user = c.get('user') as Zoku;
   const db = new DB(c.env.DB);
   const id = c.req.param('id');
 
@@ -136,6 +172,7 @@ app.get('/:id', async (c) => {
     id: jewel.id,
     name: jewel.name,
     type: jewel.type,
+    owner_id: jewel.owner_id,
     last_validated: jewel.last_validated,
     validation_metadata: jewel.validation_metadata ? JSON.parse(jewel.validation_metadata) : null,
     created_at: jewel.created_at,
@@ -143,8 +180,9 @@ app.get('/:id', async (c) => {
   });
 });
 
-// Update jewel
-app.patch('/:id', async (c) => {
+// Update jewel (must own it, unless Prime)
+app.patch('/:id', authMiddleware(), requireTier('coherent'), async (c) => {
+  const user = c.get('user') as Zoku;
   const db = new DB(c.env.DB);
   const id = c.req.param('id');
   const body = await c.req.json();
@@ -152,6 +190,11 @@ app.patch('/:id', async (c) => {
   const jewel = await db.getJewel(id);
   if (!jewel) {
     return c.json({ error: { code: 'NOT_FOUND', message: 'Jewel not found' } }, 404);
+  }
+
+  // Check ownership
+  if (jewel.owner_id !== user.id && user.access_tier !== 'prime') {
+    return c.json({ error: 'Can only update your own jewels' }, 403);
   }
 
   const updates: any = {};
@@ -218,13 +261,19 @@ app.patch('/:id', async (c) => {
 });
 
 // Re-authorize Google jewel (uses existing client_id/secret)
-app.post('/:id/reauthorize', async (c) => {
+app.post('/:id/reauthorize', authMiddleware(), requireTier('coherent'), async (c) => {
+  const user = c.get('user') as Zoku;
   const db = new DB(c.env.DB);
   const id = c.req.param('id');
 
   const jewel = await db.getJewel(id);
   if (!jewel) {
     return c.json({ error: { code: 'NOT_FOUND', message: 'Jewel not found' } }, 404);
+  }
+
+  // Check ownership
+  if (jewel.owner_id !== user.id && user.access_tier !== 'prime') {
+    return c.json({ error: 'Can only reauthorize your own jewels' }, 403);
   }
 
   if (jewel.type !== 'gdrive') {
@@ -259,14 +308,20 @@ app.post('/:id/reauthorize', async (c) => {
   });
 });
 
-// Delete jewel
-app.delete('/:id', async (c) => {
+// Delete jewel (must own it, unless Prime)
+app.delete('/:id', authMiddleware(), requireTier('coherent'), async (c) => {
+  const user = c.get('user') as Zoku;
   const db = new DB(c.env.DB);
   const id = c.req.param('id');
 
   const jewel = await db.getJewel(id);
   if (!jewel) {
     return c.json({ error: { code: 'NOT_FOUND', message: 'Jewel not found' } }, 404);
+  }
+
+  // Check ownership or Prime permission
+  if (jewel.owner_id !== user.id && user.access_tier !== 'prime') {
+    return c.json({ error: 'Can only delete your own jewels' }, 403);
   }
 
   // Check if jewel is in use
@@ -282,6 +337,16 @@ app.delete('/:id', async (c) => {
   }
 
   await db.deleteJewel(id);
+
+  // Audit log
+  await db.createAuditLog({
+    zoku_id: user.id,
+    action: 'delete',
+    resource_type: 'jewel',
+    resource_id: id,
+    request_id: c.get('requestId')
+  });
+
   return c.json({ success: true });
 });
 
