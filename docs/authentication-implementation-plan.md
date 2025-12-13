@@ -1,9 +1,12 @@
 # Authentication Implementation Plan
 ## The Great Game - Multi-Tier Access Control System
 
-**Document Version**: 1.0
+**Document Version**: 1.1
 **Created**: 2025-12-12
-**Status**: Planning - Awaiting Review
+**Last Updated**: 2025-12-12
+**Status**: Ready for Implementation (see [Status Document](./authentication-implementation-status.md))
+
+> **📋 Implementation Status**: No authentication has been implemented yet. This plan is current and ready to execute. See `authentication-implementation-status.md` for detailed current state analysis and required updates to this plan before starting implementation.
 
 ---
 
@@ -34,20 +37,32 @@ This plan outlines the implementation of a comprehensive authentication and auth
 ### Key Changes
 
 - **User Identity**: Cloudflare Access JWT validation for web, OAuth 2.1 + PAT for MCP
-- **Access Tiers**: Four-level permission system with smart auto-promotion (Observed → Coherent on first login)
-- **Jewel Ownership**: User-owned credentials from day one (no existing jewels to migrate)
+- **Access Tiers**: Four-level permission system with auto-promotion (Observed → Coherent on first login)
+- **Jewel Ownership**: User-owned credentials from day one
 - **MCP Authentication**: OAuth 2.1 as primary method (automatic), PAT as fallback (manual, 30-365 day expiration)
 - **Zero Trust**: All endpoints authenticated, PASCI roles enforced
 - **Developer Experience**: JWT-based dev flow tests real auth code path
-- **Admin Features**: Configurable audit log retention (10 days default), user management UI
+- **Admin Features**: Audit logging, user tier management UI
 
 ### Impact Assessment
 
-- **Breaking Changes**: Yes - all API endpoints require authentication
-- **Data Migration**: None required (no existing jewels or production data)
+- **Breaking Changes**: Yes - all API endpoints require authentication, fresh start
+- **Data Migration**: **NONE** - Prototype with no production data, fresh database migration
+- **Existing Data**: Will be wiped during migration (no preservation needed)
 - **Client Updates**: MCP clients auto-discover OAuth, no manual config for modern clients
-- **Timeline**: 5 weeks (6 phases) to full production deployment
-- **Backward Compatibility**: None - clean break for security
+- **Timeline**: 3-4 weeks to full production deployment
+- **Backward Compatibility**: **None** - Clean slate, no legacy code or data
+
+### ⚠️ Plan Updates Required
+
+Before starting implementation, apply these corrections:
+
+1. **Migration Number**: Use `005_add_authentication.sql` (004 is used for source error tracking)
+2. **Remove D1 Token Table**: Do NOT create `mcp_tokens` table in migration - use KV only for both OAuth and PAT
+3. **OAuth Library**: Verify `@cloudflare/workers-oauth-provider` package name (recent work used Arctic library)
+4. **Dependencies**: Check current `package.json` - some OAuth libs may already be installed
+
+See `authentication-implementation-status.md` for detailed analysis of current state vs this plan.
 
 ---
 
@@ -298,7 +313,7 @@ preview_id = "your-preview-auth-kv-id"  # Create: wrangler kv:namespace create "
 **File**: `schema.sql`
 
 ```sql
--- Add ownership to credentials
+-- Add ownership to jewels
 ALTER TABLE jewels ADD COLUMN owner_id TEXT REFERENCES zoku(id) ON DELETE CASCADE;
 
 -- Index for fast "my jewels" queries
@@ -1344,7 +1359,9 @@ export function setupOAuthProvider(env: Bindings): OAuthProvider {
 
 **OAuth API Endpoints**:
 
-**File**: `src/api/oauth.ts` (new file)
+**File**: `src/api/mcp-oauth.ts` (new file - for MCP authentication)
+
+**Note**: `src/api/google-oauth.ts` already exists for Google Drive/Docs jewel OAuth - this is separate.
 
 ```typescript
 import { Hono } from 'hono';
@@ -1530,6 +1547,13 @@ app.use('*', async (c, next) => {
 });
 
 export default app;
+```
+
+**Route Structure**:
+```typescript
+// In src/index.ts
+app.route('/oauth', mcpOAuthRoutes);        // MCP user authentication (this file)
+app.route('/api/oauth', googleOAuthRoutes); // Google OAuth for jewels (google-oauth.ts)
 ```
 
 **Notes**:
@@ -2072,15 +2096,17 @@ if (env.DEV_AUTH_BYPASS === 'true') {
 
 ## Migration Strategy
 
-### Data Migration Required
+### Fresh Start - No Data Preservation
 
-**Problem**: Existing jewels have no `owner_id`, existing zoku have no `access_tier`.
+**Approach**: Clean slate migration - all existing data will be wiped and recreated with auth fields.
+
+**Why**: This is a prototype with no production data. Starting fresh is simpler and cleaner than migrating.
 
 ### Migration Steps
 
-#### Step 1: Database Schema Update
+#### Step 1: Fresh Database Schema
 
-**File**: `migrations/004_add_authentication.sql`
+**File**: `migrations/005_add_authentication.sql` (fresh migration, not ALTER)
 
 ```sql
 -- Add auth fields to zoku
@@ -2100,22 +2126,10 @@ CREATE INDEX IF NOT EXISTS idx_zoku_access_tier ON zoku(access_tier);
 ALTER TABLE jewels ADD COLUMN owner_id TEXT REFERENCES zoku(id) ON DELETE CASCADE;
 CREATE INDEX IF NOT EXISTS idx_jewels_owner ON jewels(owner_id);
 
--- Create MCP tokens table
-CREATE TABLE IF NOT EXISTS mcp_tokens (
-  id TEXT PRIMARY KEY,
-  zoku_id TEXT NOT NULL REFERENCES zoku(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  token_hash TEXT NOT NULL,
-  scopes TEXT,
-  expires_at INTEGER,
-  last_used INTEGER,
-  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
-  revoked INTEGER NOT NULL DEFAULT 0,
-  UNIQUE(token_hash)
-);
-
-CREATE INDEX IF NOT EXISTS idx_mcp_tokens_zoku ON mcp_tokens(zoku_id);
-CREATE INDEX IF NOT EXISTS idx_mcp_tokens_hash ON mcp_tokens(token_hash) WHERE revoked = 0;
+-- NOTE: Do NOT create mcp_tokens table - we use KV storage for all MCP auth (both OAuth and PAT)
+-- PAT tokens are self-contained JWTs (validated by signature)
+-- OAuth tokens are managed by library in KV
+-- Revocation uses KV blocklist with TTL
 
 -- Create audit log
 CREATE TABLE IF NOT EXISTS audit_log (
@@ -2139,63 +2153,32 @@ CREATE INDEX IF NOT EXISTS idx_audit_log_resource ON audit_log(resource_type, re
 Run migration:
 
 ```bash
-# Local
-npm run db:migrate
+# Local - Wipes existing data and recreates with auth
+npm run db:reset  # Runs migrations + seed from scratch
 
-# Production
+# Production - Fresh deployment (first time)
 npm run db:migrate:remote
 ```
 
-#### Step 2: Data Backfill
+**Note**: No data backfill needed - starting fresh!
 
-**Option A: Assign all jewels to admin user** (recommended)
-
-```sql
--- Create system admin user
-INSERT INTO zoku (id, name, email, type, access_tier)
-VALUES ('zoku-system-admin', 'System Admin', 'admin@reset.tech', 'human', 'prime');
-
--- Assign all existing jewels to admin
-UPDATE jewels SET owner_id = 'zoku-system-admin' WHERE owner_id IS NULL;
-```
-
-**Option B: Interactive assignment** (if you know who created each jewel)
-
-```bash
-# Script to prompt for owner assignment
-node scripts/assign-jewel-owners.js
-```
-
-#### Step 3: Promote Existing Users
+#### Step 2: Seed Initial Admin User
 
 ```sql
--- Promote existing team members based on their PASCI roles
-UPDATE zoku
-SET access_tier = CASE
-  -- Users with Accountable or Control roles → Prime
-  WHEN id IN (
-    SELECT DISTINCT zoku_id FROM matrix
-    WHERE role IN ('accountable', 'control')
-  ) THEN 'prime'
-
-  -- Users with Perform role → Entangled
-  WHEN id IN (
-    SELECT DISTINCT zoku_id FROM matrix
-    WHERE role = 'perform'
-  ) THEN 'entangled'
-
-  -- Everyone else → Coherent (can be adjusted later)
-  ELSE 'coherent'
-END
-WHERE access_tier = 'observed';
-
--- Extract emails from metadata JSON if available
-UPDATE zoku
-SET email = json_extract(metadata, '$.email')
-WHERE email IS NULL AND metadata IS NOT NULL AND json_extract(metadata, '$.email') IS NOT NULL;
+-- Create first admin user (will auto-promote on CF Access login)
+-- This happens automatically when admin@reset.tech logs in for first time
+-- They start as Coherent, admin promotes them to Prime via UI
 ```
 
-#### Step 4: Deploy Code Changes
+**Alternative**: Bootstrap admin directly in seed:
+
+```sql
+-- seed.sql addition
+INSERT INTO zoku (id, name, email, type, access_tier, created_at)
+VALUES ('zoku-admin-1', 'System Admin', 'admin@reset.tech', 'human', 'prime', unixepoch());
+```
+
+#### Step 3: Deploy Code Changes
 
 ```bash
 # Deploy backend with auth middleware
@@ -2205,7 +2188,7 @@ npm run deploy
 cd frontend && npm run build
 ```
 
-#### Step 5: Configure Cloudflare Access
+#### Step 4: Configure Cloudflare Access
 
 1. Create Access Application at https://one.dash.cloudflare.com
 2. Configure policies (allow @reset.tech emails)
@@ -2220,91 +2203,89 @@ wrangler secret put JWT_SECRET
 
 ### Rollback Plan
 
-If issues arise:
+**Simple**: If critical issues arise, we can redeploy previous version and wipe the database again.
 
-1. Remove auth middleware from `src/index.ts`
-2. Redeploy backend (endpoints become public again)
-3. Fix issues in staging
-4. Re-enable auth
+Since this is a prototype with no production data, rollback is straightforward:
+1. Revert code to previous commit
+2. Run `npm run db:reset` to restore pre-auth schema
+3. Redeploy
 
-**Note**: Database changes (new columns) don't break old code, so no rollback needed for schema.
+**No complex data migration rollback needed.**
 
 ---
 
 ## Implementation Phases
 
-### Phase 1: Foundation (Week 1)
+### Phase 1: Foundation (3-4 days)
 
-**Goal**: Database and middleware without enforcement
+**Goal**: Database schema and auth libraries (no enforcement yet)
 
 **Tasks**:
 - [ ] Add `jose` dependency for JWT validation
-- [ ] Create database migration `004_add_authentication.sql`
-- [ ] Run migration locally and in production
-- [ ] Backfill jewel owners (assign to admin)
-- [ ] Promote existing users to appropriate tiers
+- [ ] Create database migration `005_add_authentication.sql` with auth fields
+- [ ] Run `npm run db:reset` locally (wipes data, applies new schema)
+- [ ] Optionally seed admin user in `seed.sql` or let auto-create on first login
 - [ ] Create `src/lib/cf-access.ts` (JWT validation)
 - [ ] Create `src/lib/mcp-tokens.ts` (PAT generation/validation)
-- [ ] Create `src/middleware/auth.ts` (auth middleware)
-- [ ] Add DB methods: `getZokuByEmail`, `getMcpTokenByHash`, etc.
-- [ ] Update `src/types.ts` with new interfaces
+- [ ] Create `src/middleware/auth.ts` (auth middleware - not applied yet)
+- [ ] Add DB methods: `getZokuByEmail`, `updateZokuTier`, `createAuditLog`, etc.
+- [ ] Update `src/types.ts` with new interfaces (Zoku with auth fields, AuditLog)
 
 **Testing**:
 - Unit tests for JWT validation (mock CF responses)
-- Unit tests for token generation/validation
+- Unit tests for PAT generation/validation
 - Verify dev bypass works locally
 
-### Phase 2: API Authentication (Week 2)
+**Timeline**: 3-4 days
+
+### Phase 2: API Authentication (4-5 days)
 
 **Goal**: Protect all API endpoints, enforce permissions
 
 **Tasks**:
-- [ ] Apply `authMiddleware()` to all `/api/*` routes
-- [ ] Add `requireTier()` to write endpoints
-- [ ] Update `src/api/jewels.ts` for ownership checks
+- [ ] Apply `authMiddleware()` to all `/api/*` routes in `src/index.ts`
+- [ ] Add `requireTier()` to write endpoints (entanglements, sources, qupts)
+- [ ] Update `src/api/jewels.ts` for ownership checks and `owner_id` auto-assignment
 - [ ] Update `src/api/sources.ts` for jewel ownership validation
-- [ ] Add `owner_id` auto-assignment on jewel creation
-- [ ] Create `src/api/zoku.ts` `/me` endpoint (current user)
-- [ ] Create `src/api/zoku.ts` POST endpoint (Entangled creates as observed, Prime can set tier)
-- [ ] Create `src/api/zoku.ts` tier promotion endpoint (Prime only)
-- [ ] Create `src/api/mcp-tokens.ts` (PAT management)
-- [ ] Add audit logging to sensitive operations (especially tier changes)
-- [ ] Update all API routes to include `user_id` in logs
+- [ ] Create `src/api/zoku.ts` `/me` endpoint (get current user)
+- [ ] Create `src/api/zoku.ts` POST endpoint (Entangled creates as observed, Prime sets tier)
+- [ ] Create `src/api/zoku.ts` PATCH `/:id/tier` endpoint (Prime only)
+- [ ] Create `src/api/mcp-tokens.ts` (PAT CRUD endpoints)
+- [ ] Add audit logging to tier changes and jewel operations
+- [ ] Update all API routes to log `user_id`
 
 **Testing**:
-- Test with dev bypass as different tiers
-- Verify Coherent can't write or create Zoku
-- Verify Entangled can write and create Zoku (only as observed)
-- Verify Entangled cannot promote users
-- Verify Prime can create Zoku with any tier
-- Verify Prime can promote/demote users
-- Verify Prime can delete others' jewels
-- Test jewel ownership filtering
-- Test audit logging for tier changes
+- Test dev bypass with different `DEV_USER_EMAIL` values
+- Verify Coherent: read-only, can't create/edit/delete
+- Verify Entangled: full CRUD, creates Zoku as observed only
+- Verify Prime: all access including tier management
+- Test jewel ownership filtering (can't see others' encrypted data)
+- Test audit log entries for sensitive operations
 
-### Phase 3: Frontend Integration (Week 2-3)
+**Timeline**: 4-5 days
+
+### Phase 3: Frontend Integration (3-4 days)
 
 **Goal**: User context, account page, permission-based UI
 
 **Tasks**:
-- [ ] Create `frontend/src/lib/auth.tsx` (AuthProvider)
-- [ ] Wrap App in AuthProvider
-- [ ] Create `frontend/src/components/AccountPage.tsx`
-- [ ] Add MCP token generation UI
-- [ ] Add MCP configuration instructions
-- [ ] Create `frontend/src/components/AccessDenied.tsx`
-- [ ] Update all components to check `user.access_tier`
-- [ ] Hide create/edit/delete buttons for Coherent users
-- [ ] Add user menu with tier badge
-- [ ] Update navigation to include Account page
+- [ ] Create `frontend/src/lib/auth.tsx` (AuthProvider, useAuth hook)
+- [ ] Wrap App in AuthProvider, add `/api/zoku/me` call
+- [ ] Create `frontend/src/components/AccountPage.tsx` with user info and PAT management
+- [ ] Add MCP token generation UI (name, expiration dropdown, show-once token)
+- [ ] Create `frontend/src/components/AccessDenied.tsx` (for observed tier)
+- [ ] Update all components to check `user.access_tier` (hide buttons for Coherent)
+- [ ] Add user menu with name, email, tier badge, Account link
 
 **Testing**:
-- Test as Coherent: verify read-only
-- Test as Entangled: verify full CRUD
-- Test token generation and revocation
-- Verify MCP config instructions
+- Test as Coherent: verify read-only UI
+- Test as Entangled: verify full CRUD UI
+- Test PAT generation and revocation
+- Verify MCP config instructions display correctly
 
-### Phase 4: MCP Authentication - OAuth + PAT (Week 3-4)
+**Timeline**: 3-4 days
+
+### Phase 4: MCP Authentication - OAuth + PAT (5-6 days)
 
 **Goal**: Secure MCP endpoint with both OAuth 2.1 and PAT support
 
@@ -2312,7 +2293,7 @@ If issues arise:
 - [ ] Install `@cloudflare/workers-oauth-provider` dependency
 - [ ] Create KV namespace for OAuth tokens (`OAUTH_KV`)
 - [ ] Create `src/lib/oauth-setup.ts` (configure library)
-- [ ] Create `src/api/oauth.ts` (authorization UI + library integration)
+- [ ] Create `src/api/mcp-oauth.ts` (authorization UI + library integration) - **Note**: `google-oauth.ts` exists for jewels
 - [ ] Implement `/oauth/authorize` GET (authorization page with CF Access auth)
 - [ ] Implement `/oauth/authorize` POST (approval handler calling library)
 - [ ] Mount library middleware for `.well-known/*`, `/oauth/token`, `/oauth/revoke`
@@ -2340,7 +2321,7 @@ If issues arise:
 - [ ] Apply `mcpAuthMiddleware` to `/mcp` endpoint
 - [ ] Update MCP tools to check user tier
 - [ ] Return permission errors for insufficient tier
-- [ ] Mount OAuth routes in `src/index.ts`
+- [ ] Mount MCP OAuth routes in `src/index.ts` at `/mcp-oauth` prefix
 
 **Testing - OAuth Flow**:
 - Test OAuth discovery endpoints return correct metadata
@@ -2374,47 +2355,63 @@ If issues arise:
 - Verify tier checks work for both auth methods
 - Test performance: measure auth overhead on initialize vs tool calls
 
-### Phase 5: Production Deployment (Week 4)
+### Phase 5: Production Deployment (2-3 days)
 
-**Goal**: Enable Cloudflare Access, go live
+**Goal**: Deploy to production with Cloudflare Access
 
 **Tasks**:
 - [ ] Create CF Access application for zoku.205.dev
-- [ ] Configure access policies (allow @reset.tech)
-- [ ] Set production secrets (AUD, team domain, JWT secret)
-- [ ] Remove `DEV_AUTH_BYPASS` from production env
-- [ ] Deploy backend to production
-- [ ] Deploy frontend to production
-- [ ] Test end-to-end authentication flow
-- [ ] Create admin account(s)
-- [ ] Document user onboarding process
+- [ ] Configure access policies (allow @reset.tech or specific emails)
+- [ ] Set production secrets: `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD`, `JWT_SECRET`
+- [ ] Create KV namespaces in production
+- [ ] Remove `DEV_AUTH_BYPASS` from `wrangler.toml` (keep in `.dev.vars` only)
+- [ ] Run `npm run db:reset` on production (wipes existing data)
+- [ ] Deploy backend: `npm run deploy`
+- [ ] Deploy frontend: `cd frontend && npm run build` (already in worker assets)
+- [ ] Test end-to-end: CF Access login → API access → MCP OAuth/PAT
 
 **Testing**:
-- Test CF Access login flow
-- Test first-time user creation (Coherent tier)
-- Test tier promotion by admin
-- Test jewel ownership in production
+- Test CF Access login redirects correctly
+- Test first user auto-creates as Coherent
+- Test admin can promote self to Prime via Account page
+- Test MCP OAuth flow from Claude Desktop
 - Monitor logs for auth errors
 
-### Phase 6: Admin Features & Polish (Week 5+)
+**Timeline**: 2-3 days
 
-**Goal**: Admin settings, audit log UI, polish
+### Phase 6: Admin UI & Polish (Optional - 2-3 days)
+
+**Goal**: Admin features for user management
 
 **Tasks**:
-- [ ] Create Admin section in Account Page (visible to Prime tier only)
-- [ ] Add audit log retention setting (default: 10 days)
-- [ ] Add audit log viewer UI for admins
-- [ ] Add user management UI (list users, promote/demote tiers)
-- [ ] Add bulk jewel management (for migrating ownership)
-- [ ] Performance optimization and caching
-- [ ] Comprehensive error handling and user feedback
-- [ ] Documentation and user onboarding guide
+- [ ] Add user management UI to Account page (Prime tier only)
+  - List all users with tier, email, last login
+  - Promote/demote tier buttons
+- [ ] Add audit log viewer (simple table, filter by action/user)
+- [ ] Polish error messages and loading states
+- [ ] Add user onboarding guide (simple markdown doc)
 
 **Testing**:
-- Test admin settings persistence
-- Test audit log queries and filtering
-- Test user tier management by admins
-- Load testing for auth middleware overhead
+- Test tier promotion from UI
+- Test audit log displays correctly
+- Test error messages are helpful
+
+**Timeline**: 2-3 days (optional - can be done post-launch)
+
+---
+
+## Summary: Realistic Timeline
+
+**Total**: 3-4 weeks for MVP authentication
+
+- **Phase 1** (Foundation): 3-4 days
+- **Phase 2** (API Auth): 4-5 days
+- **Phase 3** (Frontend): 3-4 days
+- **Phase 4** (MCP Auth): 5-6 days
+- **Phase 5** (Deploy): 2-3 days
+- **Phase 6** (Polish): 2-3 days (optional)
+
+**Total**: ~20-25 days = 3-4 weeks
 
 ---
 

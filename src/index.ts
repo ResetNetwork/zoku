@@ -9,7 +9,7 @@ import quptsRoutes from './api/qupts';
 import sourcesRoutes from './api/sources';
 import dimensionsRoutes from './api/dimensions';
 import jewelsRoutes from './api/jewels';
-import oauthRoutes from './api/oauth';
+import googleOAuthRoutes from './api/google-oauth';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -26,7 +26,7 @@ app.route('/api/qupts', quptsRoutes);
 app.route('/api/sources', sourcesRoutes);
 app.route('/api/dimensions', dimensionsRoutes);
 app.route('/api/jewels', jewelsRoutes);
-app.route('/api/oauth', oauthRoutes);
+app.route('/api/oauth', googleOAuthRoutes);  // Google OAuth for jewels
 
 // MCP endpoint
 import { mcpHandler } from './mcp/server';
