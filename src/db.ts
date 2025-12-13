@@ -8,6 +8,8 @@ import type {
   Source,
   Dimension,
   DimensionValue,
+  AccessTier,
+  AuditLog,
   EntanglementAttribute,
   MatrixAssignment,
   QuptInput,
@@ -302,20 +304,48 @@ export class DB {
     name: string;
     description?: string;
     type: 'human' | 'agent';
+    email?: string | null;
+    access_tier?: AccessTier;
+    cf_access_sub?: string | null;
+    created_by?: string | null;
     metadata?: Record<string, any>;
   }): Promise<Zoku> {
-    const id = crypto.randomUUID();
+    const id = `zoku-${crypto.randomUUID()}`;
     const metadata = data.metadata ? JSON.stringify(data.metadata) : null;
+    const now = Math.floor(Date.now() / 1000);
+
     await this.d1
-      .prepare('INSERT INTO zoku (id, name, description, type, metadata) VALUES (?, ?, ?, ?, ?)')
-      .bind(id, data.name, data.description || null, data.type, metadata)
+      .prepare(`
+        INSERT INTO zoku (id, name, description, type, email, access_tier, cf_access_sub, created_by, metadata, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+      .bind(
+        id,
+        data.name,
+        data.description || null,
+        data.type,
+        data.email || null,
+        data.access_tier || 'observed',
+        data.cf_access_sub || null,
+        data.created_by || null,
+        metadata,
+        now
+      )
       .run();
     return (await this.getZoku(id))!;
   }
 
   async updateZoku(
     id: string,
-    data: { name?: string; description?: string; metadata?: Record<string, any> }
+    data: {
+      name?: string;
+      description?: string;
+      email?: string | null;
+      last_login?: number;
+      cf_access_sub?: string | null;
+      updated_by?: string | null;
+      metadata?: Record<string, any>;
+    }
   ): Promise<void> {
     const updates: string[] = [];
     const params: any[] = [];
@@ -327,6 +357,22 @@ export class DB {
     if (data.description !== undefined) {
       updates.push('description = ?');
       params.push(data.description);
+    }
+    if (data.email !== undefined) {
+      updates.push('email = ?');
+      params.push(data.email);
+    }
+    if (data.last_login !== undefined) {
+      updates.push('last_login = ?');
+      params.push(data.last_login);
+    }
+    if (data.cf_access_sub !== undefined) {
+      updates.push('cf_access_sub = ?');
+      params.push(data.cf_access_sub);
+    }
+    if (data.updated_by !== undefined) {
+      updates.push('updated_by = ?');
+      params.push(data.updated_by);
     }
     if (data.metadata !== undefined) {
       updates.push('metadata = ?');
@@ -344,6 +390,22 @@ export class DB {
 
   async deleteZoku(id: string): Promise<void> {
     await this.d1.prepare('DELETE FROM zoku WHERE id = ?').bind(id).run();
+  }
+
+  // Auth methods
+  async getZokuByEmail(email: string): Promise<Zoku | null> {
+    const result = await this.d1
+      .prepare('SELECT * FROM zoku WHERE email = ?')
+      .bind(email)
+      .first<Zoku>();
+    return result || null;
+  }
+
+  async updateZokuTier(id: string, tier: AccessTier): Promise<void> {
+    await this.d1
+      .prepare('UPDATE zoku SET access_tier = ? WHERE id = ?')
+      .bind(tier, id)
+      .run();
   }
 
   async getZokuEntanglements(zokuId: string): Promise<any[]> {
@@ -763,27 +825,29 @@ export class DB {
       .run();
   }
 
-  // Credentials management
+  // Jewel management
   async createJewel(params: {
     name: string;
     type: string;
     data: string;  // Already encrypted
+    owner_id?: string | null;
     last_validated?: number | null;
     validation_metadata?: Record<string, any> | null;
   }): Promise<Jewel> {
-    const id = crypto.randomUUID();
+    const id = `jewel-${crypto.randomUUID()}`;
     const now = Math.floor(Date.now() / 1000);
 
     await this.d1
       .prepare(`
-        INSERT INTO jewels (id, name, type, data, last_validated, validation_metadata, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO jewels (id, name, type, data, owner_id, last_validated, validation_metadata, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
       .bind(
         id,
         params.name,
         params.type,
         params.data,
+        params.owner_id || null,
         params.last_validated || null,
         params.validation_metadata ? JSON.stringify(params.validation_metadata) : null,
         now,
@@ -888,4 +952,92 @@ export class DB {
 
     return result.results || [];
   }
+
+  // Audit logging
+  async createAuditLog(params: {
+    zoku_id?: string | null;
+    action: string;
+    resource_type: string;
+    resource_id: string;
+    details?: string | null;
+    ip_address?: string | null;
+    user_agent?: string | null;
+    request_id?: string | null;
+  }): Promise<AuditLog> {
+    const id = `log-${crypto.randomUUID()}`;
+    const timestamp = Math.floor(Date.now() / 1000);
+
+    await this.d1
+      .prepare(`
+        INSERT INTO audit_log (id, timestamp, zoku_id, action, resource_type, resource_id, details, ip_address, user_agent, request_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+      .bind(
+        id,
+        timestamp,
+        params.zoku_id || null,
+        params.action,
+        params.resource_type,
+        params.resource_id,
+        params.details || null,
+        params.ip_address || null,
+        params.user_agent || null,
+        params.request_id || null
+      )
+      .run();
+
+    return {
+      id,
+      timestamp,
+      zoku_id: params.zoku_id || null,
+      action: params.action,
+      resource_type: params.resource_type,
+      resource_id: params.resource_id,
+      details: params.details || null,
+      ip_address: params.ip_address || null,
+      user_agent: params.user_agent || null,
+      request_id: params.request_id || null,
+    };
+  }
+
+  async getAuditLogs(params?: {
+    zoku_id?: string;
+    resource_type?: string;
+    resource_id?: string;
+    limit?: number;
+  }): Promise<AuditLog[]> {
+    let query = 'SELECT * FROM audit_log';
+    const conditions: string[] = [];
+    const bindings: any[] = [];
+
+    if (params?.zoku_id) {
+      conditions.push('zoku_id = ?');
+      bindings.push(params.zoku_id);
+    }
+
+    if (params?.resource_type) {
+      conditions.push('resource_type = ?');
+      bindings.push(params.resource_type);
+    }
+
+    if (params?.resource_id) {
+      conditions.push('resource_id = ?');
+      bindings.push(params.resource_id);
+    }
+
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
+    }
+
+    query += ' ORDER BY timestamp DESC';
+
+    if (params?.limit) {
+      query += ' LIMIT ?';
+      bindings.push(params.limit);
+    }
+
+    const result = await this.d1.prepare(query).bind(...bindings).all<AuditLog>();
+    return result.results || [];
+  }
 }
+

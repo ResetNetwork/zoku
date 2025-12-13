@@ -24,9 +24,20 @@ CREATE TABLE IF NOT EXISTS zoku (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   type TEXT NOT NULL CHECK (type IN ('human', 'agent')),
+  email TEXT UNIQUE,
+  access_tier TEXT NOT NULL DEFAULT 'observed' CHECK (access_tier IN ('observed', 'coherent', 'entangled', 'prime')),
+  cf_access_sub TEXT,
+  last_login INTEGER,
+  created_by TEXT,
+  updated_by TEXT,
+  description TEXT,
   metadata TEXT,              -- JSON blob
   created_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
+
+CREATE INDEX IF NOT EXISTS idx_zoku_email ON zoku(email);
+CREATE INDEX IF NOT EXISTS idx_zoku_cf_sub ON zoku(cf_access_sub);
+CREATE INDEX IF NOT EXISTS idx_zoku_access_tier ON zoku(access_tier);
 
 -- PASCI responsibility matrix
 CREATE TABLE IF NOT EXISTS entanglement_zoku (
@@ -104,12 +115,59 @@ CREATE TABLE IF NOT EXISTS sources (
   type TEXT NOT NULL,           -- 'github', 'gmail', 'zammad', 'gdrive', 'gdocs', 'webhook'
   config TEXT NOT NULL,         -- JSON configuration
   credentials TEXT,             -- JSON encrypted credentials (tokens, etc.)
+  jewel_id TEXT REFERENCES jewels(id) ON DELETE SET NULL,
   enabled INTEGER DEFAULT 1,
   last_sync INTEGER,            -- Last successful sync timestamp
   sync_cursor TEXT,             -- Pagination cursor for incremental sync
+  last_error TEXT,
+  error_count INTEGER DEFAULT 0,
+  last_error_at INTEGER,
   created_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
 
 CREATE INDEX IF NOT EXISTS idx_sources_entanglement ON sources(entanglement_id);
 CREATE INDEX IF NOT EXISTS idx_sources_type ON sources(type);
 CREATE INDEX IF NOT EXISTS idx_sources_enabled ON sources(enabled);
+CREATE INDEX IF NOT EXISTS idx_sources_jewel ON sources(jewel_id);
+
+-- Jewels (stored credentials for reuse across sources)
+CREATE TABLE IF NOT EXISTS jewels (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  type TEXT NOT NULL,
+  data TEXT NOT NULL,
+  owner_id TEXT REFERENCES zoku(id) ON DELETE CASCADE,
+  last_validated INTEGER,
+  validation_metadata TEXT,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+
+CREATE INDEX IF NOT EXISTS idx_jewels_type ON jewels(type);
+CREATE INDEX IF NOT EXISTS idx_jewels_name ON jewels(name);
+CREATE INDEX IF NOT EXISTS idx_jewels_owner ON jewels(owner_id);
+
+-- Trigger to update updated_at on jewel changes
+CREATE TRIGGER IF NOT EXISTS jewels_updated_at
+AFTER UPDATE ON jewels
+BEGIN
+  UPDATE jewels SET updated_at = unixepoch() WHERE id = NEW.id;
+END;
+
+-- Audit log table
+CREATE TABLE IF NOT EXISTS audit_log (
+  id TEXT PRIMARY KEY,
+  timestamp INTEGER NOT NULL DEFAULT (unixepoch()),
+  zoku_id TEXT,
+  action TEXT NOT NULL,
+  resource_type TEXT NOT NULL,
+  resource_id TEXT NOT NULL,
+  details TEXT,
+  ip_address TEXT,
+  user_agent TEXT,
+  request_id TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_log_zoku ON audit_log(zoku_id);
+CREATE INDEX IF NOT EXISTS idx_audit_log_resource ON audit_log(resource_type, resource_id);

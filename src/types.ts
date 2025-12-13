@@ -4,6 +4,17 @@ export interface Bindings {
   DB: D1Database;
   ENCRYPTION_KEY: string;
   LOG_LEVEL?: string;
+  // Cloudflare Access
+  CF_ACCESS_TEAM_DOMAIN?: string;
+  CF_ACCESS_AUD?: string;
+  // JWT for MCP tokens
+  JWT_SECRET?: string;
+  // OAuth KV storage
+  AUTH_KV?: KVNamespace;
+  // Development
+  DEV_AUTH_BYPASS?: string;
+  DEV_USER_EMAIL?: string;
+  APP_URL?: string;
 }
 
 export interface Entanglement {
@@ -15,11 +26,19 @@ export interface Entanglement {
   updated_at: number;
 }
 
+export type AccessTier = 'observed' | 'coherent' | 'entangled' | 'prime';
+
 export interface Zoku {
   id: string;
   name: string;
   description?: string | null;
   type: 'human' | 'agent';
+  email: string | null;
+  access_tier: AccessTier;
+  cf_access_sub: string | null;
+  last_login: number | null;
+  created_by: string | null;
+  updated_by: string | null;
   metadata: string | null;
   created_at: number;
 }
@@ -40,14 +59,12 @@ export interface Jewel {
   name: string;
   type: string;
   data: string;  // Encrypted JSON
+  owner_id: string | null;
   last_validated: number | null;
   validation_metadata: string | null;
   created_at: number;
   updated_at: number;
 }
-
-// Legacy alias for backward compatibility
-export type Credential = Jewel;
 
 export interface Source {
   id: string;
@@ -111,4 +128,35 @@ export interface QuptInput {
   external_id?: string;
   metadata?: Record<string, any>;
   created_at?: number;
+}
+
+export interface AuditLog {
+  id: string;
+  timestamp: number;
+  zoku_id: string | null;
+  action: string;
+  resource_type: string;
+  resource_id: string;
+  details: string | null;
+  ip_address: string | null;
+  user_agent: string | null;
+  request_id: string | null;
+}
+
+export interface CloudflareAccessPayload {
+  sub: string;
+  email: string;
+  iss: string;
+  aud: string[];
+  iat: number;
+  exp: number;
+  custom?: Record<string, any>;
+}
+
+export interface PatMetadata {
+  id: string;
+  name: string;
+  created_at: number;
+  expires_at: number;
+  last_used: number | null;
 }
