@@ -233,8 +233,25 @@ const schemas = {
 // The SDK handles conversion to JSON Schema internally when responding to tools/list.
 // We can pass our Zod schemas directly without any conversion.
 
+// Helper to check user tier for MCP tools
+function requireMcpTier(user: any, minTier: string): void {
+  const tierLevels = {
+    observed: 0,
+    coherent: 1,
+    entangled: 2,
+    prime: 3,
+  };
+
+  const userLevel = tierLevels[user?.access_tier as keyof typeof tierLevels] || 0;
+  const requiredLevel = tierLevels[minTier as keyof typeof tierLevels] || 0;
+
+  if (userLevel < requiredLevel) {
+    throw new Error(`Insufficient permissions: This tool requires ${minTier} tier or higher. You have ${user?.access_tier || 'no'} access.`);
+  }
+}
+
 // Create and configure MCP server
-function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServer {
+function createMcpServer(db: DB, encryptionKey: string, logger: Logger, user: any): McpServer {
   const server = new McpServer(
     {
       name: 'zoku',
@@ -399,6 +416,7 @@ function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServ
       inputSchema: schemas.create_entanglement
     },
     async (args, extra) => {
+      requireMcpTier(user, 'entangled');
       const toolLogger = logger.child({ tool: 'create_entanglement', session_id: extra.sessionId });
       const startTime = Date.now();
 
@@ -442,6 +460,7 @@ function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServ
       inputSchema: schemas.update_entanglement
     },
     async (args, extra) => {
+      requireMcpTier(user, 'entangled');
       const toolLogger = logger.child({ tool: 'update_entanglement', session_id: extra.sessionId });
       const startTime = Date.now();
 
@@ -474,6 +493,7 @@ function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServ
       inputSchema: schemas.move_entanglement
     },
     async (args, extra) => {
+      requireMcpTier(user, 'entangled');
       const toolLogger = logger.child({ tool: 'move_entanglement', session_id: extra.sessionId });
       const startTime = Date.now();
 
@@ -502,6 +522,7 @@ function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServ
       inputSchema: schemas.delete_entanglement
     },
     async (args, extra) => {
+      requireMcpTier(user, 'entangled');
       const toolLogger = logger.child({ tool: 'delete_entanglement', session_id: extra.sessionId });
       const startTime = Date.now();
 
@@ -533,6 +554,7 @@ function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServ
       inputSchema: schemas.create_qupt
     },
     async (args, extra) => {
+      requireMcpTier(user, 'entangled');
       const toolLogger = logger.child({ tool: 'create_qupt', session_id: extra.sessionId });
       const startTime = Date.now();
 
@@ -649,6 +671,7 @@ function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServ
       inputSchema: schemas.create_zoku
     },
     async (args, extra) => {
+      requireMcpTier(user, 'entangled');
       const toolLogger = logger.child({ tool: 'create_zoku', session_id: extra.sessionId });
       const startTime = Date.now();
 
@@ -706,6 +729,7 @@ function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServ
       inputSchema: schemas.entangle
     },
     async (args, extra) => {
+      requireMcpTier(user, 'entangled');
       const toolLogger = logger.child({ tool: 'entangle', session_id: extra.sessionId });
       const startTime = Date.now();
 
@@ -734,6 +758,7 @@ function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServ
       inputSchema: schemas.disentangle
     },
     async (args, extra) => {
+      requireMcpTier(user, 'entangled');
       const toolLogger = logger.child({ tool: 'disentangle', session_id: extra.sessionId });
       const startTime = Date.now();
 
@@ -823,6 +848,7 @@ function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServ
       inputSchema: schemas.set_attributes
     },
     async (args, extra) => {
+      requireMcpTier(user, 'entangled');
       const toolLogger = logger.child({ tool: 'set_attributes', session_id: extra.sessionId });
       const startTime = Date.now();
 
@@ -927,6 +953,7 @@ function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServ
       inputSchema: schemas.add_source
     },
     async (args, extra) => {
+      requireMcpTier(user, 'entangled');
       const toolLogger = logger.child({ tool: 'add_source', session_id: extra.sessionId });
       const startTime = Date.now();
 
@@ -1018,11 +1045,12 @@ function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServ
       inputSchema: schemas.sync_source
     },
     async (args, extra) => {
+      requireMcpTier(user, 'entangled');
       const toolLogger = logger.child({ tool: 'sync_source', session_id: extra.sessionId });
       const startTime = Date.now();
 
       try {
-        const { decryptCredentials } = await import('../lib/crypto');
+        const { decryptJewel } = await import('../lib/crypto');
         const { handlers } = await import('../handlers');
 
         // Get the source
@@ -1123,6 +1151,7 @@ function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServ
       inputSchema: schemas.remove_source
     },
     async (args, extra) => {
+      requireMcpTier(user, 'entangled');
       const toolLogger = logger.child({ tool: 'remove_source', session_id: extra.sessionId });
       const startTime = Date.now();
 
@@ -1151,6 +1180,7 @@ function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServ
       inputSchema: schemas.toggle_source
     },
     async (args, extra) => {
+      requireMcpTier(user, 'entangled');
       const toolLogger = logger.child({ tool: 'toggle_source', session_id: extra.sessionId });
       const startTime = Date.now();
 
@@ -1179,11 +1209,12 @@ function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServ
       inputSchema: schemas.add_jewel
     },
     async (args, extra) => {
+      requireMcpTier(user, 'coherent'); // Coherent can create jewels
       const toolLogger = logger.child({ tool: 'add_jewel', session_id: extra.sessionId });
       const startTime = Date.now();
 
       try {
-        const { encryptCredentials } = await import('../lib/crypto');
+        const { encryptJewel } = await import('../lib/crypto');
         const { validateGitHubCredential, validateZammadCredential, validateGoogleDocsSource } = await import('../handlers/validate');
 
         const warnings: string[] = [];
@@ -1336,6 +1367,7 @@ function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServ
       inputSchema: schemas.update_jewel
     },
     async (args, extra) => {
+      requireMcpTier(user, 'coherent'); // Coherent can update own jewels
       const toolLogger = logger.child({ tool: 'update_jewel', session_id: extra.sessionId });
       const startTime = Date.now();
 
@@ -1402,6 +1434,7 @@ function createMcpServer(db: DB, encryptionKey: string, logger: Logger): McpServ
       inputSchema: schemas.delete_jewel
     },
     async (args, extra) => {
+      requireMcpTier(user, 'coherent'); // Coherent can delete own jewels
       const toolLogger = logger.child({ tool: 'delete_jewel', session_id: extra.sessionId });
       const startTime = Date.now();
 
@@ -1485,9 +1518,59 @@ export async function mcpHandler(c: Context<{ Bindings: Bindings }>) {
     // Parse request body
     const body = await c.req.json().catch(() => undefined);
 
+    // Authenticate MCP request (unless dev bypass)
+    let user = null;
+    if (c.env.DEV_AUTH_BYPASS === 'true' && c.env.DEV_USER_EMAIL) {
+      // Dev bypass
+      user = await db.getZokuByEmail(c.env.DEV_USER_EMAIL);
+      if (!user) {
+        user = await db.createZoku({
+          name: 'Dev User',
+          type: 'human',
+          email: c.env.DEV_USER_EMAIL,
+          access_tier: 'prime',
+        });
+      }
+      logger.info('MCP dev auth bypass', { user_id: user.id });
+    } else {
+      // Validate Bearer token
+      const authHeader = c.req.header('Authorization');
+      if (!authHeader?.startsWith('Bearer ')) {
+        logger.warn('Missing MCP Bearer token');
+        return c.json({
+          jsonrpc: '2.0',
+          error: { code: -32001, message: 'Authentication required - provide Bearer token' },
+          id: null
+        }, 401);
+      }
+
+      const token = authHeader.substring(7);
+      const { validateMcpToken } = await import('../lib/mcp-tokens');
+      const isInitialize = body?.method === 'initialize';
+
+      try {
+        user = await validateMcpToken(token, c.env, db, isInitialize);
+        logger.info('MCP token validated', {
+          user_id: user.id,
+          tier: user.access_tier,
+          method: body?.method,
+          cached: !isInitialize
+        });
+      } catch (error) {
+        logger.error('MCP token validation failed', error as Error);
+        return c.json({
+          jsonrpc: '2.0',
+          error: { code: -32001, message: `Authentication failed: ${error instanceof Error ? error.message : 'Invalid token'}` },
+          id: null
+        }, 401);
+      }
+    }
+
+    c.set('user', user);
+
     // Create fresh transport and server for this request
     const transport = new StreamableHTTPTransport();
-    const server = createMcpServer(db, encryptionKey, logger);
+    const server = createMcpServer(db, encryptionKey, logger, user);
 
     // Connect server to transport
     await server.connect(transport);
