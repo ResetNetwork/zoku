@@ -27,11 +27,19 @@ export interface Qupt {
   created_at: number
 }
 
+export type AccessTier = 'observed' | 'coherent' | 'entangled' | 'prime';
+
 export interface Zoku {
   id: string
   name: string
   description?: string | null
   type: 'human' | 'agent'
+  email: string | null
+  access_tier: AccessTier
+  cf_access_sub: string | null
+  last_login: number | null
+  created_by: string | null
+  updated_by: string | null
   metadata?: {
     github_username?: string
     email?: string
@@ -72,4 +80,23 @@ export interface Source {
     name: string
     email: string | null
   } | null
+}
+
+export interface Jewel {
+  id: string
+  name: string
+  type: string
+  owner_id: string | null
+  last_validated: number | null
+  validation_metadata: Record<string, any> | null
+  created_at: number
+  updated_at: number
+}
+
+export interface PatMetadata {
+  id: string
+  name: string
+  created_at: number
+  expires_at: number
+  last_used: number | null
 }

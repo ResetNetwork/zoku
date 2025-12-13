@@ -8,17 +8,20 @@ import ZokuDetail from './components/ZokuDetail'
 import ActivityList from './components/ActivityList'
 import SourcesList from './components/SourcesList'
 import JewelsList from './components/JewelsList'
+import AccountPage from './components/AccountPage'
 import { useTheme } from './lib/theme'
 import { useNotifications } from './lib/notifications'
+import { useAuth } from './lib/auth'
 import { api } from './lib/api'
 
-type View = 'dashboard' | 'entanglements' | 'zoku' | 'activity' | 'sources' | 'jewels'
+type View = 'dashboard' | 'entanglements' | 'zoku' | 'activity' | 'sources' | 'jewels' | 'account'
 
 export default function App() {
+  const { user } = useAuth()
   const [currentView, setCurrentView] = useState<View>(() => {
     const params = new URLSearchParams(window.location.search)
     const view = params.get('view')
-    if (view === 'entanglements' || view === 'zoku' || view === 'activity' || view === 'sources' || view === 'jewels') {
+    if (view === 'entanglements' || view === 'zoku' || view === 'activity' || view === 'sources' || view === 'jewels' || view === 'account') {
       return view
     }
     return 'dashboard'
@@ -57,7 +60,7 @@ export default function App() {
       setSelectedEntanglementId(params.get('entanglement'))
       setSelectedEntangledId(params.get('zoku'))
       const view = params.get('view')
-      if (view === 'entanglements' || view === 'zoku' || view === 'activity' || view === 'sources' || view === 'jewels') {
+      if (view === 'entanglements' || view === 'zoku' || view === 'activity' || view === 'sources' || view === 'jewels' || view === 'account') {
         setCurrentView(view)
       } else {
         setCurrentView('dashboard')
@@ -120,6 +123,12 @@ export default function App() {
     setSelectedEntangledId(null)
   }
 
+  const handleShowAccount = () => {
+    setCurrentView('account')
+    setSelectedEntanglementId(null)
+    setSelectedEntangledId(null)
+  }
+
   const { data: volitions = [] } = useQuery({
     queryKey: ['entanglements'],
     queryFn: () => api.listEntanglements({ root_only: true, limit: 50 })
@@ -175,7 +184,23 @@ export default function App() {
             <button onClick={handleShowDashboard} className="text-left hover:opacity-80 transition-opacity">
               <h1 className="text-2xl font-bold text-quantum-500 dark:text-quantum-400">The Great Game</h1>
             </button>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
+              {/* User Menu */}
+              {user && (
+                <button
+                  onClick={handleShowAccount}
+                  className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-200 dark:hover:bg-quantum-700 transition-colors"
+                  title="Account settings"
+                >
+                  <span className="text-sm text-gray-700 dark:text-gray-300">{user.name}</span>
+                  <span className={`inline-block w-2 h-2 rounded-full ${
+                    user.access_tier === 'prime' ? 'bg-yellow-500' :
+                    user.access_tier === 'entangled' ? 'bg-purple-500' :
+                    user.access_tier === 'coherent' ? 'bg-blue-500' : 'bg-gray-500'
+                  }`} title={user.access_tier} />
+                </button>
+              )}
+
               <button
                 onClick={handleSyncAll}
                 disabled={syncing || volitions.length === 0}
@@ -236,6 +261,8 @@ export default function App() {
           <SourcesList />
         ) : currentView === 'jewels' ? (
           <JewelsList />
+        ) : currentView === 'account' ? (
+          <AccountPage />
         ) : (
           <Dashboard
             onSelectEntanglement={handleSelectEntanglement}
