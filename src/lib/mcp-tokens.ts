@@ -23,9 +23,7 @@ export async function generateMcpToken(
   if (!env.JWT_SECRET) {
     throw new Error('JWT_SECRET not configured');
   }
-  if (!env.AUTH_KV) {
-    throw new Error('AUTH_KV not configured');
-  }
+  // AUTH_KV is optional in dev - tokens still work without KV storage
 
   const user = await db.getZoku(zoku_id);
   if (!user) throw new Error('User not found');
@@ -47,7 +45,7 @@ export async function generateMcpToken(
     .setExpirationTime(expiresAt)
     .sign(secret);
 
-  // Store metadata in KV
+  // Store metadata in KV (if available)
   const metadata: PatMetadata = {
     id: tokenId,
     name,
@@ -56,10 +54,14 @@ export async function generateMcpToken(
     last_used: null,
   };
 
-  const kvKey = `pat:user:${zoku_id}`;
-  const existing = (await env.AUTH_KV.get(kvKey, 'json')) as PatMetadata[] || [];
-  existing.push(metadata);
-  await env.AUTH_KV.put(kvKey, JSON.stringify(existing));
+  if (env.AUTH_KV) {
+    const kvKey = `pat:user:${zoku_id}`;
+    const existing = (await env.AUTH_KV.get(kvKey, 'json')) as PatMetadata[] || [];
+    existing.push(metadata);
+    await env.AUTH_KV.put(kvKey, JSON.stringify(existing));
+  } else {
+    console.warn('AUTH_KV not configured - token metadata not persisted (dev mode)');
+  }
 
   return { token, metadata };
 }
@@ -78,9 +80,7 @@ export async function validateMcpToken(
   if (!env.JWT_SECRET) {
     throw new Error('JWT_SECRET not configured');
   }
-  if (!env.AUTH_KV) {
-    throw new Error('AUTH_KV not configured');
-  }
+  // AUTH_KV is optional in dev - just skip revocation check
 
   // PAT validation (JWT-based)
   try {
@@ -98,10 +98,12 @@ export async function validateMcpToken(
     }
 
     // Check revocation in KV (only on initialize or cache miss)
-    const isRevoked = await env.AUTH_KV.get(`pat:revoked:${jti}`);
-    if (isRevoked) {
-      tokenCache.delete(jti);  // Clear cache
-      throw new Error('Token has been revoked');
+    if (env.AUTH_KV) {
+      const isRevoked = await env.AUTH_KV.get(`pat:revoked:${jti}`);
+      if (isRevoked) {
+        tokenCache.delete(jti);  // Clear cache
+        throw new Error('Token has been revoked');
+      }
     }
 
     // Load user from D1
@@ -152,7 +154,8 @@ export async function revokeMcpToken(
   tokenId: string
 ): Promise<void> {
   if (!env.AUTH_KV) {
-    throw new Error('AUTH_KV not configured');
+    console.warn('AUTH_KV not configured - cannot revoke token (dev mode)');
+    return;
   }
 
   // Get token metadata to find expiration
@@ -182,7 +185,9 @@ export async function listMcpTokens(
   userId: string
 ): Promise<PatMetadata[]> {
   if (!env.AUTH_KV) {
-    throw new Error('AUTH_KV not configured');
+    // In dev mode without KV, return empty array
+    console.warn('AUTH_KV not configured - returning empty token list (dev mode)');
+    return [];
   }
 
   const kvKey = `pat:user:${userId}`;
