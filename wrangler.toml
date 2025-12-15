@@ -9,6 +9,11 @@ binding = "DB"
 database_name = "the-great-game"
 database_id = "e4024944-fcdc-420c-86ac-9e35f46e310a"
 
+[[kv_namespaces]]
+binding = "AUTH_KV"
+id = "placeholder-for-production"
+preview_id = "placeholder-for-preview"
+
 [vars]
 LOG_LEVEL = "info"
 
