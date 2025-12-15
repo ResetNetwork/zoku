@@ -14,6 +14,9 @@ export default function AccountPage() {
   const [showTokenForm, setShowTokenForm] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Use current domain for MCP URL examples
+  const mcpUrl = `${window.location.origin}/mcp`;
+
   useEffect(() => {
     fetchTokens();
   }, []);
@@ -150,7 +153,7 @@ export default function AccountPage() {
             {`{
   "mcpServers": {
     "the-great-game": {
-      "url": "https://zoku.205.dev/mcp"
+      "url": "${mcpUrl}"
     }
   }
 }`}
@@ -326,7 +329,7 @@ export default function AccountPage() {
                 {`{
   "mcpServers": {
     "the-great-game": {
-      "url": "https://zoku.205.dev/mcp",
+      "url": "${mcpUrl}",
       "headers": {
         "Authorization": "Bearer YOUR_TOKEN_HERE"
       }
