@@ -142,7 +142,7 @@ export default function Dashboard({
                 <QuptItem
                   key={qupt.id}
                   qupt={qupt}
-                  showVolitionName={true}
+                  showEntanglementName={true}
                 />
               ))}
             </div>

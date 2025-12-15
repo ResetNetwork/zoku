@@ -4,10 +4,10 @@ import { formatDate, formatRelativeTime, getSourceColor } from '../lib/formattin
 
 interface QuptItemProps {
   qupt: Qupt
-  showVolitionName?: boolean
+  showEntanglementName?: boolean
 }
 
-export default function QuptItem({ qupt, showVolitionName = false }: QuptItemProps) {
+export default function QuptItem({ qupt, showEntanglementName = false }: QuptItemProps) {
   const [expanded, setExpanded] = useState(false)
 
   const metadata = qupt.metadata
@@ -160,7 +160,7 @@ export default function QuptItem({ qupt, showVolitionName = false }: QuptItemPro
             </div>
             <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
               <div className="flex items-center gap-1">
-                {showVolitionName && qupt.entanglement_name && (
+                {showEntanglementName && qupt.entanglement_name && (
                   <span className="px-2 py-0.5 rounded-full bg-quantum-500/20 text-quantum-300 font-medium">
                     {qupt.entanglement_name}
                   </span>

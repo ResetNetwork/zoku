@@ -14,14 +14,14 @@ import { useNotifications } from './lib/notifications'
 import { useAuth } from './lib/auth'
 import { api } from './lib/api'
 
-type View = 'dashboard' | 'entanglements' | 'zoku' | 'activity' | 'sources' | 'jewels' | 'account'
+type View = 'dashboard' | 'entanglements' | 'zoku' | 'qupts' | 'sources' | 'jewels' | 'account'
 
 export default function App() {
   const { user } = useAuth()
   const [currentView, setCurrentView] = useState<View>(() => {
     const params = new URLSearchParams(window.location.search)
     const view = params.get('view')
-    if (view === 'entanglements' || view === 'zoku' || view === 'activity' || view === 'sources' || view === 'jewels' || view === 'account') {
+    if (view === 'entanglements' || view === 'zoku' || view === 'qupts' || view === 'sources' || view === 'jewels' || view === 'account') {
       return view
     }
     return 'dashboard'
@@ -60,7 +60,7 @@ export default function App() {
       setSelectedEntanglementId(params.get('entanglement'))
       setSelectedEntangledId(params.get('zoku'))
       const view = params.get('view')
-      if (view === 'entanglements' || view === 'zoku' || view === 'activity' || view === 'sources' || view === 'jewels' || view === 'account') {
+      if (view === 'entanglements' || view === 'zoku' || view === 'qupts' || view === 'sources' || view === 'jewels' || view === 'account') {
         setCurrentView(view)
       } else {
         setCurrentView('dashboard')
@@ -106,7 +106,7 @@ export default function App() {
   }
 
   const handleShowActivityList = () => {
-    setCurrentView('activity')
+    setCurrentView('qupts')
     setSelectedEntanglementId(null)
     setSelectedEntangledId(null)
   }
@@ -255,7 +255,7 @@ export default function App() {
             onSelectZoku={handleSelectZoku}
             onSelectEntanglement={handleSelectEntanglement}
           />
-        ) : currentView === 'activity' ? (
+        ) : currentView === 'qupts' ? (
           <ActivityList />
         ) : currentView === 'sources' ? (
           <SourcesList />

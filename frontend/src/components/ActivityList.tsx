@@ -96,7 +96,7 @@ export default function ActivityList() {
               <QuptItem
                 key={qupt.id}
                 qupt={qupt}
-                showVolitionName={true}
+                showEntanglementName={true}
               />
             ))}
           </div>

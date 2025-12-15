@@ -516,13 +516,14 @@ export class DB {
           SELECT v.id FROM entanglements v
           JOIN descendants d ON v.parent_id = d.id
         )
-        SELECT q.*, v.name as volition_name FROM qupts q
+        SELECT q.*, v.name as entanglement_name
+        FROM qupts q
         JOIN descendants d ON q.entanglement_id = d.id
         JOIN entanglements v ON q.entanglement_id = v.id
       `;
       params.push(filters.entanglement_id);
     } else {
-      query = 'SELECT q.*, v.name as volition_name FROM qupts q JOIN entanglements v ON q.entanglement_id = v.id';
+      query = 'SELECT q.*, v.name as entanglement_name FROM qupts q JOIN entanglements v ON q.entanglement_id = v.id';
       const conditions: string[] = [];
 
       if (filters.entanglement_id) {
