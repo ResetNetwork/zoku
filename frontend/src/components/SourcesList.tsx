@@ -46,7 +46,7 @@ export default function SourcesList() {
     <div className="space-y-6">
       {/* Header */}
       <div className="card">
-        <h1 className="text-3xl font-bold text-quantum-400 mb-2">Sources</h1>
+        <h1 className="text-3xl font-bold text-quantum-400 mb-2">Sources ({allSources.length})</h1>
         <p className="text-gray-400">Activity sources across all entanglements</p>
       </div>
 
@@ -84,7 +84,7 @@ export default function SourcesList() {
 
       {/* Sources List */}
       <div className="card">
-        <h2 className="text-xl font-bold mb-4">Sources</h2>
+        <h2 className="text-xl font-bold mb-4">Sources ({allSources.length})</h2>
         {isLoading ? (
           <div className="text-gray-400 text-center py-8">Loading sources...</div>
         ) : allSources.length === 0 ? (

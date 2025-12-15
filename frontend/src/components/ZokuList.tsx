@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../lib/api'
+import { useAuth } from '../lib/auth'
+import { useNotifications } from '../lib/notifications'
 
 interface ZokuListProps {
   onSelectZoku: (id: string) => void
@@ -8,7 +10,16 @@ interface ZokuListProps {
 }
 
 export default function ZokuList({ onSelectZoku, onSelectEntanglement }: ZokuListProps) {
+  const { user } = useAuth()
+  const { addNotification } = useNotifications()
   const [showAllMatrix, setShowAllMatrix] = useState(false)
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [newZokuName, setNewZokuName] = useState('')
+  const [newZokuType, setNewZokuType] = useState<'human' | 'agent'>('human')
+  const [newZokuEmail, setNewZokuEmail] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const canWrite = user?.access_tier === 'entangled' || user?.access_tier === 'prime'
 
   const { data: zoku = [], isLoading } = useQuery({
     queryKey: ['zoku'],
@@ -161,7 +172,99 @@ export default function ZokuList({ onSelectZoku, onSelectEntanglement }: ZokuLis
 
       {/* Zoku List */}
       <div className="card">
-        <h2 className="text-xl font-bold mb-4">All Partners</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold">Zoku ({zoku.length})</h2>
+          {canWrite && !showAddForm && (
+            <button
+              onClick={() => setShowAddForm(true)}
+              className="btn btn-primary text-sm"
+            >
+              + Add Zoku
+            </button>
+          )}
+        </div>
+
+        {/* Add Form */}
+        {showAddForm && (
+          <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700">
+            <h3 className="font-semibold mb-3">New Zoku</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium mb-1">Name *</label>
+                <input
+                  type="text"
+                  value={newZokuName}
+                  onChange={(e) => setNewZokuName(e.target.value)}
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded"
+                  placeholder="Person or agent name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Type</label>
+                <select
+                  value={newZokuType}
+                  onChange={(e) => setNewZokuType(e.target.value as 'human' | 'agent')}
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded"
+                >
+                  <option value="human">Human</option>
+                  <option value="agent">Agent</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Email (optional)</label>
+                <input
+                  type="email"
+                  value={newZokuEmail}
+                  onChange={(e) => setNewZokuEmail(e.target.value)}
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded"
+                  placeholder="email@example.com"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    if (!newZokuName.trim()) {
+                      addNotification('error', 'Name is required')
+                      return
+                    }
+                    setSaving(true)
+                    try {
+                      await api.createZoku({
+                        name: newZokuName,
+                        type: newZokuType,
+                        email: newZokuEmail || undefined
+                      })
+                      addNotification('success', 'Zoku created')
+                      setShowAddForm(false)
+                      setNewZokuName('')
+                      setNewZokuEmail('')
+                      window.location.reload()
+                    } catch (error) {
+                      addNotification('error', 'Failed to create zoku')
+                    } finally {
+                      setSaving(false)
+                    }
+                  }}
+                  disabled={saving}
+                  className="px-4 py-2 bg-quantum-600 hover:bg-quantum-700 text-white rounded disabled:opacity-50"
+                >
+                  {saving ? 'Creating...' : 'Create'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowAddForm(false)
+                    setNewZokuName('')
+                    setNewZokuEmail('')
+                  }}
+                  className="px-4 py-2 bg-gray-300 dark:bg-gray-700 hover:bg-gray-400 dark:hover:bg-gray-600 rounded"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {zoku.length === 0 ? (
           <div className="text-gray-400 text-center py-8">No zoku partners yet</div>
         ) : (

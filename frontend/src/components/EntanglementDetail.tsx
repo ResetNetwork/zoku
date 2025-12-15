@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/api'
+import { useAuth } from '../lib/auth'
 import { useNotifications } from '../lib/notifications'
 import { formatDate, getSourceColor } from '../lib/formatting'
 import QuptItem from './QuptItem'
@@ -13,8 +14,13 @@ interface EntanglementDetailProps {
 }
 
 export default function EntanglementDetail({ entanglementId }: EntanglementDetailProps) {
+  const { user } = useAuth()
+  const canWrite = user?.access_tier === 'entangled' || user?.access_tier === 'prime'
   const [showAddSource, setShowAddSource] = useState(false)
+  const [showAddQupt, setShowAddQupt] = useState(false)
+  const [newQuptContent, setNewQuptContent] = useState('')
   const [editingSource, setEditingSource] = useState<any>(null)
+  const [savingQupt, setSavingQupt] = useState(false)
   const queryClient = useQueryClient()
   const { addNotification } = useNotifications()
 
@@ -245,7 +251,76 @@ export default function EntanglementDetail({ entanglementId }: EntanglementDetai
 
       {/* Activity Feed */}
       <div className="card">
-        <h2 className="text-xl font-bold mb-4">Qupts</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold">Qupts</h2>
+          {canWrite && !showAddQupt && (
+            <button
+              onClick={() => setShowAddQupt(true)}
+              className="btn btn-primary text-sm"
+            >
+              + Add Qupt
+            </button>
+          )}
+        </div>
+
+        {/* Add Qupt Form */}
+        {showAddQupt && (
+          <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700">
+            <h3 className="font-semibold mb-3">New Qupt</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium mb-1">Content *</label>
+                <textarea
+                  value={newQuptContent}
+                  onChange={(e) => setNewQuptContent(e.target.value)}
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded"
+                  rows={3}
+                  placeholder="Describe the activity or update..."
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    if (!newQuptContent.trim()) {
+                      addNotification('error', 'Content is required')
+                      return
+                    }
+                    setSavingQupt(true)
+                    try {
+                      await api.createQupt({
+                        entanglement_id: entanglementId,
+                        content: newQuptContent,
+                        source: 'manual'
+                      })
+                      addNotification('success', 'Qupt created')
+                      setShowAddQupt(false)
+                      setNewQuptContent('')
+                      queryClient.invalidateQueries({ queryKey: ['qupts', entanglementId] })
+                      queryClient.invalidateQueries({ queryKey: ['all-qupts'] })
+                    } catch (error) {
+                      addNotification('error', 'Failed to create qupt')
+                    } finally {
+                      setSavingQupt(false)
+                    }
+                  }}
+                  disabled={savingQupt}
+                  className="px-4 py-2 bg-quantum-600 hover:bg-quantum-700 text-white rounded disabled:opacity-50"
+                >
+                  {savingQupt ? 'Creating...' : 'Create'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowAddQupt(false)
+                    setNewQuptContent('')
+                  }}
+                  className="px-4 py-2 bg-gray-300 dark:bg-gray-700 hover:bg-gray-400 dark:hover:bg-gray-600 rounded"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         {quptsLoading ? (
           <div className="text-gray-400 text-center py-8">Loading activity...</div>
         ) : qupts.length === 0 ? (

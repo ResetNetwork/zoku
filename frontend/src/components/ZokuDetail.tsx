@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/api'
+import { useAuth } from '../lib/auth'
+import { useNotifications } from '../lib/notifications'
+import type { AccessTier } from '../lib/types'
 
 interface ZokuDetailProps {
   zokuId: string
@@ -8,7 +11,12 @@ interface ZokuDetailProps {
 }
 
 export default function ZokuDetail({ zokuId, onSelectEntanglement }: ZokuDetailProps) {
+  const { user } = useAuth()
+  const { addNotification } = useNotifications()
+  const isPrime = user?.access_tier === 'prime'
   const [isEditing, setIsEditing] = useState(false)
+  const [changingTier, setChangingTier] = useState(false)
+  const [newTier, setNewTier] = useState<AccessTier>('observed')
   const [formData, setFormData] = useState({
     description: '',
     github_username: '',
@@ -132,7 +140,79 @@ export default function ZokuDetail({ zokuId, onSelectEntanglement }: ZokuDetailP
 
       {/* Details / Edit Form */}
       <div className="card">
-        <h2 className="text-xl font-bold mb-4">Details</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold">Details</h2>
+          {isPrime && zoku && (
+            <button
+              onClick={() => {
+                setNewTier(zoku.access_tier)
+                setChangingTier(true)
+              }}
+              className="px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-sm"
+            >
+              Change Access Tier
+            </button>
+          )}
+        </div>
+
+        {/* Tier Change Form */}
+        {changingTier && zoku && (
+          <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-400 dark:border-yellow-600 rounded">
+            <h3 className="font-semibold mb-3 text-yellow-900 dark:text-yellow-100">Change Access Tier</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium mb-1 text-yellow-900 dark:text-yellow-100">Current Tier</label>
+                <div className="px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded font-mono">
+                  {zoku.access_tier}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1 text-yellow-900 dark:text-yellow-100">New Tier</label>
+                <select
+                  value={newTier}
+                  onChange={(e) => setNewTier(e.target.value as AccessTier)}
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded"
+                >
+                  <option value="observed">Observed (No Access)</option>
+                  <option value="coherent">Coherent (Read Only)</option>
+                  <option value="entangled">Entangled (Read-Write)</option>
+                  <option value="prime">Prime (Admin)</option>
+                </select>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    if (!confirm(`Change ${zoku.name}'s access tier from ${zoku.access_tier} to ${newTier}?`)) {
+                      return
+                    }
+                    try {
+                      const response = await fetch(`/api/zoku/${zokuId}/tier`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ access_tier: newTier })
+                      })
+                      if (!response.ok) throw new Error('Failed to update tier')
+                      addNotification('success', `Access tier changed to ${newTier}`)
+                      setChangingTier(false)
+                      queryClient.invalidateQueries({ queryKey: ['zoku', zokuId] })
+                    } catch (error) {
+                      addNotification('error', 'Failed to change access tier')
+                    }
+                  }}
+                  className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded"
+                >
+                  Confirm Change
+                </button>
+                <button
+                  onClick={() => setChangingTier(false)}
+                  className="px-4 py-2 bg-gray-300 dark:bg-gray-700 hover:bg-gray-400 dark:hover:bg-gray-600 rounded"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         {isEditing ? (
           <div className="space-y-4">
             <div>

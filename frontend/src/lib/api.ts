@@ -45,6 +45,15 @@ export const api = {
     return await res.json() as Entanglement
   },
 
+  async createEntanglement(data: { name: string; description?: string; parent_id?: string }) {
+    const res = await fetch(`${API_BASE}/entanglements`, {
+      method: 'POST',
+      headers: getHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(data)
+    })
+    return await res.json() as Entanglement
+  },
+
   // Qupts
   async listQupts(entanglementId: string, params?: { source?: string; limit?: number; detailed?: boolean }) {
     const query = new URLSearchParams({ entanglement_id: entanglementId })
@@ -57,6 +66,15 @@ export const api = {
     })
     const data = await res.json()
     return data.qupts as Qupt[]
+  },
+
+  async createQupt(data: { entanglement_id: string; content: string; source?: string; metadata?: any }) {
+    const res = await fetch(`${API_BASE}/qupts`, {
+      method: 'POST',
+      headers: getHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(data)
+    })
+    return await res.json() as Qupt
   },
 
   // Zoku
@@ -75,7 +93,7 @@ export const api = {
     return await res.json() as Zoku
   },
 
-  async createZoku(data: { name: string; type: 'human' | 'agent' }) {
+  async createZoku(data: { name: string; type: 'human' | 'agent'; email?: string }) {
     const res = await fetch(`${API_BASE}/zoku`, {
       method: 'POST',
       headers: getHeaders({ 'Content-Type': 'application/json' }),
