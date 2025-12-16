@@ -65,7 +65,7 @@ export const batchCreateQuptsSchema = z.object({
 
 // Source schemas
 export const createSourceSchema = z.object({
-  type: z.enum(['github', 'zammad', 'gdocs', 'gdrive']),
+  type: z.enum(['github', 'zammad', 'gdocs', 'gdrive', 'gmail']),
   config: z.record(z.unknown()),
   jewels: z.record(z.unknown()).optional(),
   jewel_id: z.string().optional()

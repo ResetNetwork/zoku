@@ -23,6 +23,8 @@ export async function validateJewel(type: string, data: any, env: Env): Promise<
     case 'gdrive':
     case 'gdocs':
       return await validateGoogleDocsCredential(data, data.client_id, data.client_secret);
+    case 'gmail':
+      return await validateGmailCredential(data, data.client_id, data.client_secret);
     default:
       return {
         valid: false,
@@ -462,6 +464,93 @@ export async function validateGoogleDocsSource(config: any, credentials: any): P
       warnings,
       errors,
       metadata
+    };
+
+  } catch (error) {
+    errors.push(`Validation error: ${error instanceof Error ? error.message : String(error)}`);
+    return { valid: false, warnings, errors };
+  }
+}
+
+/**
+ * Validate Gmail credentials (Google OAuth)
+ */
+export async function validateGmailCredential(credentials: any, clientId: string, clientSecret: string): Promise<ValidationResult> {
+  const { refresh_token } = credentials;
+  const warnings: string[] = [];
+  const errors: string[] = [];
+  const metadata: Record<string, any> = {};
+
+  if (!refresh_token) {
+    errors.push('Missing refresh_token');
+    return { valid: false, warnings, errors };
+  }
+
+  if (!clientId || !clientSecret) {
+    errors.push('Missing client_id or client_secret');
+    return { valid: false, warnings, errors };
+  }
+
+  try {
+    // Refresh the token to get an access token
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: refresh_token,
+        grant_type: 'refresh_token'
+      })
+    });
+
+    if (!tokenResponse.ok) {
+      const errorData = await tokenResponse.json() as any;
+      errors.push(`Token refresh failed: ${errorData.error_description || errorData.error}`);
+      return { valid: false, warnings, errors };
+    }
+
+    const tokenData = await tokenResponse.json() as { access_token: string };
+    const accessToken = tokenData.access_token;
+
+    // Test Gmail API access by fetching user profile
+    const profileResponse = await fetch(
+      'https://gmail.googleapis.com/gmail/v1/users/me/profile',
+      {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        }
+      }
+    );
+
+    if (!profileResponse.ok) {
+      const errorText = await profileResponse.text();
+      errors.push(`Gmail API access failed: ${errorText}`);
+      return { valid: false, warnings, errors };
+    }
+
+    const profile = await profileResponse.json() as {
+      emailAddress: string;
+      messagesTotal: number;
+      threadsTotal: number;
+    };
+
+    metadata.email = profile.emailAddress;
+    metadata.messages_total = profile.messagesTotal;
+    metadata.threads_total = profile.threadsTotal;
+
+    // Check if we have the required Gmail scope
+    warnings.push('Ensure Gmail API is enabled and https://www.googleapis.com/auth/gmail.readonly scope is granted');
+
+    return {
+      valid: true,
+      warnings,
+      errors,
+      metadata,
+      info: {
+        authenticated_as: profile.emailAddress,
+        messages_total: profile.messagesTotal
+      }
     };
 
   } catch (error) {
