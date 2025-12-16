@@ -43,6 +43,66 @@ The Great Game is a project/initiative tracking system inspired by the Quantum T
 - **Cron**: 5-minute scheduled source collection
 - **Domain**: zoku.205.dev
 
+### Service Layer Architecture ✅ NEW
+**Complete refactor to shared business logic** (December 2025)
+
+```
+┌─────────────────────────────────────────────────────┐
+│                    Clients                           │
+├──────────────────────┬──────────────────────────────┤
+│   Web UI (React)     │   Claude Desktop (MCP)       │
+└──────────┬───────────┴────────────┬─────────────────┘
+           │                        │
+           │ HTTP/JSON              │ MCP Protocol
+           │                        │
+           ▼                        ▼
+    ┌──────────────┐        ┌──────────────┐
+    │  REST Routes │        │  MCP Tools   │
+    │  (thin)      │        │  (thin)      │
+    │  ~600 lines  │        │  ~660 lines  │
+    └──────┬───────┘        └──────┬───────┘
+           │                        │
+           └────────┬───────────────┘
+                    ▼
+         ┌─────────────────────┐
+         │   SERVICE LAYER     │ ← SINGLE SOURCE OF TRUTH
+         │   ~1200 lines       │
+         │                     │
+         │  - Validation       │ (using Zod schemas)
+         │  - Authorization    │ (tier checks)
+         │  - Business logic   │ (all rules here)
+         │  - Audit logging    │ (automatic)
+         │  - DB operations    │ (transactions)
+         └──────────┬──────────┘
+                    ▼
+            ┌──────────────┐
+            │   Database   │
+            └──────────────┘
+```
+
+**Key Benefits:**
+- ✅ **Single validation path** - All input validation in services using Zod
+- ✅ **Zero duplication** - Business logic written once, used by both REST and MCP
+- ✅ **Testable** - Can test services without HTTP/MCP concerns
+- ✅ **Consistent** - Same tier checks, error handling, audit logging everywhere
+- ✅ **Maintainable** - Update logic once, both endpoints benefit
+
+**Code Reduction:**
+- REST API: 2400 lines → 600 lines (75% reduction)
+- MCP Tools: 1604 lines → 658 lines (59% reduction)
+- Total: 4000 lines → 2458 lines (39% reduction)
+- Added: Services layer ~1200 lines (single source of truth)
+
+**Services:**
+- `BaseService` - Common validation, authorization, audit logging
+- `EntanglementService` - 13 methods (list, get, create, update, delete, matrix ops, attributes)
+- `ZokuService` - 6 methods (list, get, create, update, delete, updateTier)
+- `QuptService` - 5 methods (list, get, create, batchCreate, delete)
+- `JewelService` - 6 methods (list, get, create, update, delete, getUsage)
+- `SourceService` - 5 methods (get, create, update, delete, sync)
+
+See `docs/SHARED_SERVICE_LAYER_PLAN.md` for complete details.
+
 ## MCP Tools Available (29)
 
 ### Entanglements
@@ -90,18 +150,29 @@ The Great Game is a project/initiative tracking system inspired by the Quantum T
 
 ## Key Files
 
-### Backend
+### Backend - Services Layer ✅ NEW
+- `src/services/base.ts` - Base service class (validation, authorization, audit)
+- `src/services/entanglements.ts` - Entanglement business logic (13 methods)
+- `src/services/zoku.ts` - Zoku business logic (6 methods)
+- `src/services/qupts.ts` - Qupt business logic (5 methods)
+- `src/services/jewels.ts` - Jewel business logic (6 methods)
+- `src/services/sources.ts` - Source business logic (5 methods)
+- `src/lib/validation.ts` - Zod validation schemas
+- `src/lib/errors.ts` - Error classes and global error handler
+
+### Backend - Core
 - `src/index.ts` - Worker entry point, route mounting
 - `src/db.ts` - Database query helpers (DB class)
 - `src/types.ts` - TypeScript type definitions
 - `src/scheduled.ts` - Cron handler for source collection
-- `src/mcp/server.ts` - MCP server implementation (29 tools)
+- `src/mcp/server.ts` - MCP server (29 tools using services) ✅ REFACTORED
+- `src/mcp/mcp-helpers.ts` - Service factory and tool wrapper ✅ NEW
 - `src/lib/logger.ts` - Structured logging class
 - `src/middleware/logging.ts` - Hono logging middleware
-- `src/middleware/auth.ts` - Authentication middleware (CF Access + dev JWT) ✅ NEW
-- `src/lib/cf-access.ts` - Cloudflare Access JWT validation ✅ NEW
-- `src/lib/mcp-oauth.ts` - OAuth 2.1 server implementation ✅ NEW
-- `src/lib/mcp-tokens.ts` - PAT generation and validation ✅ NEW
+- `src/middleware/auth.ts` - Authentication middleware (CF Access + dev JWT)
+- `src/lib/cf-access.ts` - Cloudflare Access JWT validation
+- `src/lib/mcp-oauth.ts` - OAuth 2.1 server implementation
+- `src/lib/mcp-tokens.ts` - PAT generation and validation
 
 ### Frontend
 - `frontend/src/App.tsx` - Main app with URL routing and view management
@@ -120,15 +191,15 @@ The Great Game is a project/initiative tracking system inspired by the Quantum T
 - `frontend/src/lib/theme.ts` - Theme management (light/dark mode)
 - `frontend/src/lib/notifications.tsx` - Toast notification system
 
-### API Routes
-- `src/api/entanglements.ts` - Entanglement CRUD + matrix + attributes + sources
-- `src/api/zoku.ts` - Zoku CRUD + tier management
-- `src/api/qupts.ts` - Qupt CRUD + batch import
-- `src/api/sources.ts` - Source operations by ID
-- `src/api/dimensions.ts` - Taxonomy read-only
-- `src/api/jewels.ts` - Jewel store CRUD
-- `src/api/mcp-oauth.ts` - OAuth 2.1 endpoints + authorization UI ✅ NEW
-- `src/api/mcp-tokens.ts` - PAT management API ✅ NEW
+### API Routes (Thin wrappers around services) ✅ REFACTORED
+- `src/api/entanglements.ts` - Entanglement endpoints (uses EntanglementService)
+- `src/api/zoku.ts` - Zoku endpoints (uses ZokuService)
+- `src/api/qupts.ts` - Qupt endpoints (uses QuptService)
+- `src/api/sources.ts` - Source endpoints (uses SourceService)
+- `src/api/jewels.ts` - Jewel endpoints (uses JewelService)
+- `src/api/dimensions.ts` - Taxonomy read-only (no service needed)
+- `src/api/mcp-oauth.ts` - OAuth 2.1 endpoints + authorization UI
+- `src/api/mcp-tokens.ts` - PAT management API
 - `src/api/google-oauth.ts` - Google OAuth for jewels (separate from MCP auth)
 
 ### Source Handlers
@@ -545,8 +616,12 @@ add_source({
 - **Log Levels**: Configurable via LOG_LEVEL env var (default: info, supports: info/warn/error/fatal)
 - **Performance**: < 2ms overhead per request, no database writes
 - **Viewing Logs**: `wrangler tail` for production, console for local dev
+- **Service Layer Refactor**: Complete migration to shared business logic (December 2025) ✅ NEW
+- **Code Reduction**: 39% overall (4000→2458 lines), REST 75%, MCP 59%
+- **Single Validation**: All validation in services using Zod, zero duplication
+- **Testable Architecture**: Business logic separated from HTTP/MCP concerns
 
-## Authentication System ✅ NEW
+## Authentication System
 
 ### Overview
 Complete four-tier authentication with OAuth 2.1 and PAT support.

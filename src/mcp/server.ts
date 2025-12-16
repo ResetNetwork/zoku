@@ -1,4 +1,4 @@
-// MCP Server implementation using official SDK
+// MCP Server implementation using official SDK - MIGRATED TO SERVICES
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPTransport } from '@hono/mcp';
 import { z } from 'zod';
@@ -6,8 +6,9 @@ import type { Context } from 'hono';
 import type { Bindings } from '../types';
 import { DB } from '../db';
 import { Logger } from '../lib/logger';
+import { createServices, mcpToolWrapper } from './mcp-helpers';
 
-// Tool schemas using Zod
+// Tool schemas using Zod (UNCHANGED)
 const schemas = {
   list_entanglements: z.object({
     status: z.enum(['draft', 'active', 'paused', 'complete', 'archived']).optional().describe('Filter by status'),
@@ -198,7 +199,6 @@ const schemas = {
     enabled: z.boolean()
   }),
 
-  // Jewel/Credentials management
   add_jewel: z.object({
     name: z.string().describe('User-friendly name (e.g., "GitHub - Personal")'),
     type: z.enum(['github', 'gmail', 'zammad', 'gdrive', 'gdocs']),
@@ -229,29 +229,8 @@ const schemas = {
   })
 };
 
-// Note: The MCP SDK expects Zod schemas directly (not JSON Schema).
-// The SDK handles conversion to JSON Schema internally when responding to tools/list.
-// We can pass our Zod schemas directly without any conversion.
-
-// Helper to check user tier for MCP tools
-function requireMcpTier(user: any, minTier: string): void {
-  const tierLevels = {
-    observed: 0,
-    coherent: 1,
-    entangled: 2,
-    prime: 3,
-  };
-
-  const userLevel = tierLevels[user?.access_tier as keyof typeof tierLevels] || 0;
-  const requiredLevel = tierLevels[minTier as keyof typeof tierLevels] || 0;
-
-  if (userLevel < requiredLevel) {
-    throw new Error(`Insufficient permissions: This tool requires ${minTier} tier or higher. You have ${user?.access_tier || 'no'} access.`);
-  }
-}
-
-// Create and configure MCP server
-function createMcpServer(db: DB, encryptionKey: string, logger: Logger, user: any): McpServer {
+// Create and configure MCP server using SERVICES
+function createMcpServer(db: DB, env: any, logger: Logger, user: any): McpServer {
   const server = new McpServer(
     {
       name: 'zoku',
@@ -264,1246 +243,328 @@ function createMcpServer(db: DB, encryptionKey: string, logger: Logger, user: an
     }
   );
 
-  // Tools are registered with inline implementations. Each tool receives validated args and returns CallToolResult format.
+  // Create services once for all tools
+  const services = createServices(db, user, logger, env);
 
+  // ENTANGLEMENT TOOLS (using EntanglementService)
+  
   server.registerTool(
     'list_entanglements',
-    {
-      description: 'List entanglements in the Zoku system',
-      inputSchema: schemas.list_entanglements
-    },
-    async (args, extra) => {
-      const toolLogger = logger.child({ tool: 'list_entanglements', session_id: extra.sessionId });
-      const startTime = Date.now();
-
-      try {
-        const entanglementsWithCounts = await db.listEntanglementsWithCounts({
-          parent_id: args.parent_id,
-          root_only: args.root_only,
-          status: args.status,
-          function: args.function,
-          limit: args.limit
-        });
-
-        // Return minimal or detailed view
-        let result: any;
-        if (!args.detailed) {
-          result = {
-            entanglements: entanglementsWithCounts.map(v => ({
-              id: v.id,
-              name: v.name,
-              parent_id: v.parent_id,
-              created_at: v.created_at,
-              updated_at: v.updated_at,
-              qupts_count: v.qupts_count,
-              sources_count: v.sources_count
-            }))
-          };
-        } else {
-          result = { entanglements: entanglementsWithCounts };
-        }
-
-        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
-
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify(result, null, 2)
-          }]
-        };
-      } catch (error) {
-        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
-        throw error;
-      }
-    }
+    { description: 'List entanglements in the Zoku system', inputSchema: schemas.list_entanglements },
+    async (args, extra) => mcpToolWrapper('list_entanglements', logger, extra.sessionId, async () => {
+      return await services.entanglements.list(args);
+    })
   );
 
   server.registerTool(
     'get_entanglement',
-    {
-      description: 'Get entanglement details. By default returns minimal info (counts only). Use detailed=true for full nested data.',
-      inputSchema: schemas.get_entanglement
-    },
-    async (args, extra) => {
-      const toolLogger = logger.child({ tool: 'get_entanglement', session_id: extra.sessionId });
-      const startTime = Date.now();
-
-      try {
-        const entanglement = await db.getEntanglement(args.id);
-        if (!entanglement) throw new Error('Entanglement not found');
-
-        let result: any;
-        // Default: return minimal info with proper counts
-        if (!args.detailed) {
-          const [childrenCount, quptsCount, sourcesCount] = await Promise.all([
-            db.getEntanglementChildrenCount(args.id),
-            db.getEntanglementQuptsCount(args.id, args.include_children_qupts ?? true),
-            db.getEntanglementSourcesCount(args.id)
-          ]);
-
-          result = {
-            ...entanglement,
-            children_count: childrenCount,
-            qupts_count: quptsCount,
-            sources_count: sourcesCount
-          };
-        } else {
-          // Detailed: return full nested data
-          const children = await db.getEntanglementChildren(args.id);
-          const matrix = await db.getMatrix(args.id);
-          const attributes = await db.getEntanglementAttributes(args.id);
-          const qupts = await db.listQupts({
-            entanglement_id: args.id,
-            recursive: args.include_children_qupts ?? true,
-            limit: 20
-          });
-
-          result = { ...entanglement, children, matrix, attributes, qupts };
-        }
-
-        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
-
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify(result, null, 2)
-          }]
-        };
-      } catch (error) {
-        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
-        throw error;
-      }
-    }
+    { description: 'Get entanglement details', inputSchema: schemas.get_entanglement },
+    async (args, extra) => mcpToolWrapper('get_entanglement', logger, extra.sessionId, async () => {
+      return await services.entanglements.get(
+        args.id,
+        args.include_children_qupts ?? true,
+        args.detailed ? 50 : 20
+      );
+    })
   );
 
   server.registerTool(
     'get_child_entanglements',
-    {
-      description: 'Get child entanglements of a parent entanglement',
-      inputSchema: schemas.get_child_entanglements
-    },
-    async (args, extra) => {
-      const toolLogger = logger.child({ tool: 'get_child_entanglements', session_id: extra.sessionId });
-      const startTime = Date.now();
-
-      try {
-        let result: any;
-        if (args.recursive) {
-          result = { children: await db.getEntanglementDescendants(args.parent_id) };
-        } else {
-          result = { children: await db.getEntanglementChildren(args.parent_id) };
-        }
-
-        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
-
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify(result, null, 2)
-          }]
-        };
-      } catch (error) {
-        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
-        throw error;
-      }
-    }
+    { description: 'Get child entanglements of a parent', inputSchema: schemas.get_child_entanglements },
+    async (args, extra) => mcpToolWrapper('get_child_entanglements', logger, extra.sessionId, async () => {
+      const children = await services.entanglements.getChildren(args.parent_id, args.recursive ?? false);
+      return { children };
+    })
   );
 
   server.registerTool(
     'create_entanglement',
-    {
-      description: 'Create a new entanglement/initiative, optionally as a child of another entanglement with initial team assignments',
-      inputSchema: schemas.create_entanglement
-    },
-    async (args, extra) => {
-      requireMcpTier(user, 'entangled');
-      const toolLogger = logger.child({ tool: 'create_entanglement', session_id: extra.sessionId });
-      const startTime = Date.now();
-
-      try {
-        const entanglement = await db.createEntanglement({
-          name: args.name,
-          description: args.description,
-          parent_id: args.parent_id
-        });
-
-        // Add initial zoku assignments if provided
-        if (args.initial_zoku && Array.isArray(args.initial_zoku)) {
-          for (const assignment of args.initial_zoku) {
-            try {
-              await db.assignToMatrix(entanglement.id, assignment.zoku_id, assignment.role);
-            } catch (error) {
-              toolLogger.warn(`Failed to assign ${assignment.zoku_id} to ${assignment.role}`, { error });
-            }
-          }
-        }
-
-        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
-
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify(entanglement, null, 2)
-          }]
-        };
-      } catch (error) {
-        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
-        throw error;
-      }
-    }
+    { description: 'Create a new entanglement', inputSchema: schemas.create_entanglement },
+    async (args, extra) => mcpToolWrapper('create_entanglement', logger, extra.sessionId, async () => {
+      return await services.entanglements.create(args);
+    })
   );
 
   server.registerTool(
     'update_entanglement',
-    {
-      description: "Update an entanglement's name, description, or parent",
-      inputSchema: schemas.update_entanglement
-    },
-    async (args, extra) => {
-      requireMcpTier(user, 'entangled');
-      const toolLogger = logger.child({ tool: 'update_entanglement', session_id: extra.sessionId });
-      const startTime = Date.now();
-
-      try {
-        await db.updateEntanglement(args.id, {
-          name: args.name,
-          description: args.description,
-          parent_id: args.parent_id
-        });
-
-        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
-
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify({ success: true }, null, 2)
-          }]
-        };
-      } catch (error) {
-        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
-        throw error;
-      }
-    }
+    { description: 'Update an entanglement', inputSchema: schemas.update_entanglement },
+    async (args, extra) => mcpToolWrapper('update_entanglement', logger, extra.sessionId, async () => {
+      return await services.entanglements.update(args.id, args);
+    })
   );
 
   server.registerTool(
     'move_entanglement',
-    {
-      description: 'Move an entanglement to become a child of another entanglement, or make it a root entanglement',
-      inputSchema: schemas.move_entanglement
-    },
-    async (args, extra) => {
-      requireMcpTier(user, 'entangled');
-      const toolLogger = logger.child({ tool: 'move_entanglement', session_id: extra.sessionId });
-      const startTime = Date.now();
-
-      try {
-        await db.updateEntanglement(args.id, { parent_id: args.new_parent_id || null });
-
-        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
-
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify({ success: true }, null, 2)
-          }]
-        };
-      } catch (error) {
-        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
-        throw error;
-      }
-    }
+    { description: 'Move an entanglement to a new parent', inputSchema: schemas.move_entanglement },
+    async (args, extra) => mcpToolWrapper('move_entanglement', logger, extra.sessionId, async () => {
+      await services.entanglements.move(args.id, args.new_parent_id ?? null);
+      return { success: true };
+    })
   );
 
   server.registerTool(
     'delete_entanglement',
-    {
-      description: 'Delete an entanglement. WARNING: Also deletes all child entanglements, qupts, sources, and assignments.',
-      inputSchema: schemas.delete_entanglement
-    },
-    async (args, extra) => {
-      requireMcpTier(user, 'entangled');
-      const toolLogger = logger.child({ tool: 'delete_entanglement', session_id: extra.sessionId });
-      const startTime = Date.now();
-
-      try {
-        if (!args.confirm) {
-          throw new Error('Must set confirm=true to delete entanglement');
-        }
-        await db.deleteEntanglement(args.id);
-
-        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
-
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify({ success: true }, null, 2)
-          }]
-        };
-      } catch (error) {
-        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
-        throw error;
-      }
-    }
-  );
-
-  server.registerTool(
-    'create_qupt',
-    {
-      description: 'Record activity or update on an entanglement',
-      inputSchema: schemas.create_qupt
-    },
-    async (args, extra) => {
-      requireMcpTier(user, 'entangled');
-      const toolLogger = logger.child({ tool: 'create_qupt', session_id: extra.sessionId });
-      const startTime = Date.now();
-
-      try {
-        const qupt = await db.createQupt({
-          entanglement_id: args.entanglement_id,
-          content: args.content,
-          zoku_id: args.zoku_id,
-          source: 'mcp',
-          metadata: args.metadata
-        });
-
-        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
-
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify(qupt, null, 2)
-          }]
-        };
-      } catch (error) {
-        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
-        throw error;
-      }
-    }
-  );
-
-  server.registerTool(
-    'list_qupts',
-    {
-      description: 'List activity for an entanglement. By default omits metadata for brevity. Use detailed=true for full metadata.',
-      inputSchema: schemas.list_qupts
-    },
-    async (args, extra) => {
-      const toolLogger = logger.child({ tool: 'list_qupts', session_id: extra.sessionId });
-      const startTime = Date.now();
-
-      try {
-        const qupts = await db.listQupts({
-          entanglement_id: args.entanglement_id,
-          recursive: args.recursive ?? true,
-          source: args.source,
-          limit: args.limit
-        });
-
-        let result: any;
-        // Default: return minimal qupts (no metadata)
-        if (!args.detailed) {
-          result = {
-            qupts: qupts.map(q => ({
-              id: q.id,
-              entanglement_id: q.entanglement_id,
-              content: q.content,
-              source: q.source,
-              external_id: q.external_id,
-              created_at: q.created_at
-            }))
-          };
-        } else {
-          // Detailed: return full qupts with metadata
-          result = { qupts };
-        }
-
-        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
-
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify(result, null, 2)
-          }]
-        };
-      } catch (error) {
-        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
-        throw error;
-      }
-    }
-  );
-
-  server.registerTool(
-    'list_zoku',
-    {
-      description: 'List all zoku partners (humans and AI agents)',
-      inputSchema: schemas.list_zoku
-    },
-    async (args, extra) => {
-      const toolLogger = logger.child({ tool: 'list_zoku', session_id: extra.sessionId });
-      const startTime = Date.now();
-
-      try {
-        const zoku = await db.listZoku({
-          type: args.type,
-          limit: args.limit
-        });
-
-        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
-
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify({ zoku }, null, 2)
-          }]
-        };
-      } catch (error) {
-        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
-        throw error;
-      }
-    }
-  );
-
-  server.registerTool(
-    'create_zoku',
-    {
-      description: 'Register a new zoku partner (human or AI agent)',
-      inputSchema: schemas.create_zoku
-    },
-    async (args, extra) => {
-      requireMcpTier(user, 'entangled');
-      const toolLogger = logger.child({ tool: 'create_zoku', session_id: extra.sessionId });
-      const startTime = Date.now();
-
-      try {
-        const zoku = await db.createZoku(args);
-
-        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
-
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify(zoku, null, 2)
-          }]
-        };
-      } catch (error) {
-        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
-        throw error;
-      }
-    }
-  );
-
-  server.registerTool(
-    'get_entangled',
-    {
-      description: 'Get details of a zoku partner including their entanglements and roles',
-      inputSchema: schemas.get_entangled
-    },
-    async (args, extra) => {
-      const toolLogger = logger.child({ tool: 'get_entangled', session_id: extra.sessionId });
-      const startTime = Date.now();
-
-      try {
-        const zoku = await db.getZoku(args.id);
-        if (!zoku) throw new Error('Zoku not found');
-
-        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
-
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify(zoku, null, 2)
-          }]
-        };
-      } catch (error) {
-        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
-        throw error;
-      }
-    }
-  );
-
-  server.registerTool(
-    'entangle',
-    {
-      description: 'Assign a zoku partner to a PASCI role on an entanglement',
-      inputSchema: schemas.entangle
-    },
-    async (args, extra) => {
-      requireMcpTier(user, 'entangled');
-      const toolLogger = logger.child({ tool: 'entangle', session_id: extra.sessionId });
-      const startTime = Date.now();
-
-      try {
-        await db.assignToMatrix(args.entanglement_id, args.zoku_id, args.role);
-
-        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
-
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify({ success: true }, null, 2)
-          }]
-        };
-      } catch (error) {
-        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
-        throw error;
-      }
-    }
-  );
-
-  server.registerTool(
-    'disentangle',
-    {
-      description: 'Remove a zoku partner from a PASCI role on an entanglement',
-      inputSchema: schemas.disentangle
-    },
-    async (args, extra) => {
-      requireMcpTier(user, 'entangled');
-      const toolLogger = logger.child({ tool: 'disentangle', session_id: extra.sessionId });
-      const startTime = Date.now();
-
-      try {
-        await db.removeFromMatrix(args.entanglement_id, args.zoku_id, args.role);
-
-        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
-
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify({ success: true }, null, 2)
-          }]
-        };
-      } catch (error) {
-        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
-        throw error;
-      }
-    }
+    { description: 'Delete an entanglement', inputSchema: schemas.delete_entanglement },
+    async (args, extra) => mcpToolWrapper('delete_entanglement', logger, extra.sessionId, async () => {
+      await services.entanglements.delete(args.id, args.confirm);
+      return { success: true };
+    })
   );
 
   server.registerTool(
     'get_matrix',
-    {
-      description: 'Get the PASCI responsibility matrix showing who is assigned to each role',
-      inputSchema: schemas.get_matrix
-    },
-    async (args, extra) => {
-      const toolLogger = logger.child({ tool: 'get_matrix', session_id: extra.sessionId });
-      const startTime = Date.now();
-
-      try {
-        const matrix = await db.getMatrix(args.entanglement_id);
-
-        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
-
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify({ matrix }, null, 2)
-          }]
-        };
-      } catch (error) {
-        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
-        throw error;
-      }
-    }
+    { description: 'Get PASCI responsibility matrix', inputSchema: schemas.get_matrix },
+    async (args, extra) => mcpToolWrapper('get_matrix', logger, extra.sessionId, async () => {
+      const matrix = await services.entanglements.getMatrix(args.entanglement_id);
+      return { entanglement_id: args.entanglement_id, matrix };
+    })
   );
 
   server.registerTool(
-    'list_dimensions',
-    {
-      description: 'List all taxonomy dimensions and their available values',
-      inputSchema: schemas.list_dimensions
-    },
-    async (args, extra) => {
-      const toolLogger = logger.child({ tool: 'list_dimensions', session_id: extra.sessionId });
-      const startTime = Date.now();
-
-      try {
-        const dimensions = await db.listDimensions();
-        const values = await db.getAllDimensionValues();
-        const dimensionsWithValues = dimensions.map(dim => ({
-          ...dim,
-          values: values.filter(v => v.dimension_id === dim.id)
-        }));
-
-        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
-
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify({ dimensions: dimensionsWithValues }, null, 2)
-          }]
-        };
-      } catch (error) {
-        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
-        throw error;
-      }
-    }
+    'entangle',
+    { description: 'Assign a zoku to a PASCI role', inputSchema: schemas.entangle },
+    async (args, extra) => mcpToolWrapper('entangle', logger, extra.sessionId, async () => {
+      await services.entanglements.assignToMatrix(args.entanglement_id, args);
+      return { success: true };
+    })
   );
 
   server.registerTool(
-    'set_attributes',
-    {
-      description: 'Set taxonomy attributes on an entanglement (function, pillar, service area, etc.)',
-      inputSchema: schemas.set_attributes
-    },
-    async (args, extra) => {
-      requireMcpTier(user, 'entangled');
-      const toolLogger = logger.child({ tool: 'set_attributes', session_id: extra.sessionId });
-      const startTime = Date.now();
-
-      try {
-        const dimensions = await db.listDimensions();
-        const values = await db.getAllDimensionValues();
-
-        const attributesToSet = args.attributes.map(attr => {
-          const dim = dimensions.find(d => d.name === attr.dimension);
-          if (!dim) throw new Error(`Unknown dimension: ${attr.dimension}`);
-          const val = values.find(v => v.dimension_id === dim.id && v.value === attr.value);
-          if (!val) throw new Error(`Unknown value: ${attr.value} for dimension ${attr.dimension}`);
-          return { dimension_id: dim.id, value_id: val.id };
-        });
-
-        await db.setEntanglementAttributes(args.entanglement_id, attributesToSet);
-
-        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
-
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify({ success: true }, null, 2)
-          }]
-        };
-      } catch (error) {
-        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
-        throw error;
-      }
-    }
+    'disentangle',
+    { description: 'Remove a zoku from a PASCI role', inputSchema: schemas.disentangle },
+    async (args, extra) => mcpToolWrapper('disentangle', logger, extra.sessionId, async () => {
+      await services.entanglements.removeFromMatrix(args.entanglement_id, args.zoku_id, args.role);
+      return { success: true };
+    })
   );
 
   server.registerTool(
     'get_attributes',
-    {
-      description: 'Get taxonomy attributes assigned to an entanglement',
-      inputSchema: schemas.get_attributes
-    },
-    async (args, extra) => {
-      const toolLogger = logger.child({ tool: 'get_attributes', session_id: extra.sessionId });
-      const startTime = Date.now();
-
-      try {
-        const attributes = await db.getEntanglementAttributes(args.entanglement_id);
-
-        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
-
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify({ attributes }, null, 2)
-          }]
-        };
-      } catch (error) {
-        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
-        throw error;
-      }
-    }
+    { description: 'Get taxonomy attributes', inputSchema: schemas.get_attributes },
+    async (args, extra) => mcpToolWrapper('get_attributes', logger, extra.sessionId, async () => {
+      return await services.entanglements.getAttributes(args.entanglement_id);
+    })
   );
 
   server.registerTool(
     'list_sources',
-    {
-      description: 'List activity sources configured for an entanglement',
-      inputSchema: schemas.list_sources
-    },
-    async (args, extra) => {
-      const toolLogger = logger.child({ tool: 'list_sources', session_id: extra.sessionId });
-      const startTime = Date.now();
+    { description: 'List sources for an entanglement', inputSchema: schemas.list_sources },
+    async (args, extra) => mcpToolWrapper('list_sources', logger, extra.sessionId, async () => {
+      const sources = await services.entanglements.listSources(args.entanglement_id);
+      return { sources };
+    })
+  );
 
-      try {
-        const sources = await db.listSources(args.entanglement_id);
-        const result = {
-          sources: sources.map(s => ({
-            id: s.id,
-            type: s.type,
-            config: s.config,
-            enabled: s.enabled,
-            last_sync: s.last_sync
+  // ZOKU TOOLS (using ZokuService)
+
+  server.registerTool(
+    'list_zoku',
+    { description: 'List all zoku partners', inputSchema: schemas.list_zoku },
+    async (args, extra) => mcpToolWrapper('list_zoku', logger, extra.sessionId, async () => {
+      const zoku = await services.zoku.list(args);
+      return { zoku };
+    })
+  );
+
+  server.registerTool(
+    'create_zoku',
+    { description: 'Register a new zoku partner', inputSchema: schemas.create_zoku },
+    async (args, extra) => mcpToolWrapper('create_zoku', logger, extra.sessionId, async () => {
+      return await services.zoku.create(args);
+    })
+  );
+
+  server.registerTool(
+    'get_entangled',
+    { description: 'Get details of a zoku partner', inputSchema: schemas.get_entangled },
+    async (args, extra) => mcpToolWrapper('get_entangled', logger, extra.sessionId, async () => {
+      return await services.zoku.get(args.id);
+    })
+  );
+
+  // QUPT TOOLS (using QuptService)
+
+  server.registerTool(
+    'list_qupts',
+    { description: 'List activity for an entanglement', inputSchema: schemas.list_qupts },
+    async (args, extra) => mcpToolWrapper('list_qupts', logger, extra.sessionId, async () => {
+      const qupts = await services.qupts.list(args);
+      
+      // Format response based on detailed flag
+      if (!args.detailed) {
+        return {
+          qupts: qupts.map((q: any) => ({
+            id: q.id,
+            entanglement_id: q.entanglement_id,
+            content: q.content,
+            source: q.source,
+            external_id: q.external_id,
+            created_at: q.created_at
           }))
         };
-
-        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
-
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify(result, null, 2)
-          }]
-        };
-      } catch (error) {
-        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
-        throw error;
       }
-    }
+      return { qupts };
+    })
   );
 
   server.registerTool(
-    'add_source',
-    {
-      description: 'Add an activity source to an entanglement. Can use stored jewels (via jewel_id) or provide inline jewels.',
-      inputSchema: schemas.add_source
-    },
-    async (args, extra) => {
-      requireMcpTier(user, 'entangled');
-      const toolLogger = logger.child({ tool: 'add_source', session_id: extra.sessionId });
-      const startTime = Date.now();
-
-      try {
-        // Validate source configuration if jewels are provided
-        const warnings: string[] = [];
-        let validationMetadata: Record<string, any> = {};
-
-        // If jewel_id is provided, verify it exists and matches type
-        if (args.jewel_id) {
-          const jewel = await db.getJewel(args.jewel_id);
-          if (!jewel) {
-            throw new Error('Jewel not found');
-          }
-          if (jewel.type !== args.type) {
-            throw new Error(`Jewel type mismatch: jewel is ${jewel.type}, source is ${args.type}`);
-          }
-        } else if (args.jewels) {
-          // Validate inline jewels
-          const { validateGitHubSource, validateZammadSource, validateGoogleDocsSource } = await import('../handlers/validate');
-
-          let validationResult;
-          switch (args.type) {
-            case 'github':
-              validationResult = await validateGitHubSource(args.config, args.jewels);
-              break;
-            case 'zammad':
-              validationResult = await validateZammadSource(args.config, args.jewels);
-              break;
-            case 'gdocs':
-            case 'gdrive':
-              validationResult = await validateGoogleDocsSource(args.config, args.jewels);
-              break;
-            default:
-              // Other source types don't have validation yet
-              break;
-          }
-
-          if (validationResult) {
-            if (!validationResult.valid) {
-              throw new Error(`Source validation failed: ${validationResult.errors.join(', ')}${validationResult.warnings.length > 0 ? '. Warnings: ' + validationResult.warnings.join(', ') : ''}`);
-            }
-
-            warnings.push(...validationResult.warnings);
-            validationMetadata = validationResult.metadata || {};
-          }
-        }
-
-        const source = await db.createSource({
-          entanglement_id: args.entanglement_id,
-          type: args.type,
-          config: args.config,
-          credentials: args.jewels,  // Store as credentials in DB for backward compat
-          jewel_id: args.jewel_id
-        });
-
-        // Set initial sync window to last 30 days (mandatory)
-        const thirtyDaysAgo = Math.floor(Date.now() / 1000) - (30 * 24 * 60 * 60);
-        await db.updateSource(source.id, { last_sync: thirtyDaysAgo });
-        toolLogger.info(`Set initial sync window to last 30 days for source ${source.id}`);
-
-        const result: any = { source };
-        if (warnings.length > 0) {
-          result.warnings = warnings;
-        }
-        if (Object.keys(validationMetadata).length > 0) {
-          result.validation = validationMetadata;
-        }
-
-        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
-
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify(result, null, 2)
-          }]
-        };
-      } catch (error) {
-        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
-        throw error;
-      }
-    }
+    'create_qupt',
+    { description: 'Record activity or update on an entanglement', inputSchema: schemas.create_qupt },
+    async (args, extra) => mcpToolWrapper('create_qupt', logger, extra.sessionId, async () => {
+      return await services.qupts.create(args);
+    })
   );
 
-  server.registerTool(
-    'sync_source',
-    {
-      description: 'Manually trigger a sync for a source',
-      inputSchema: schemas.sync_source
-    },
-    async (args, extra) => {
-      requireMcpTier(user, 'entangled');
-      const toolLogger = logger.child({ tool: 'sync_source', session_id: extra.sessionId });
-      const startTime = Date.now();
-
-      try {
-        const { decryptJewel } = await import('../lib/crypto');
-        const { handlers } = await import('../handlers');
-
-        // Get the source
-        const source = await db.getSource(args.source_id);
-        if (!source) {
-          throw new Error('Source not found');
-        }
-
-        const handler = handlers[source.type];
-        if (!handler) {
-          throw new Error(`No handler for source type: ${source.type}`);
-        }
-
-        const config = JSON.parse(source.config);
-
-        // Get credentials - either from jewel_id or inline
-        let credentials = {};
-        if (source.jewel_id) {
-          const jewel = await db.getJewel(source.jewel_id);
-          if (!jewel) {
-            throw new Error('Jewel not found');
-          }
-          credentials = JSON.parse(await decryptCredentials(jewel.data, encryptionKey));
-        } else if (source.credentials) {
-          credentials = JSON.parse(await decryptCredentials(source.credentials, encryptionKey));
-        }
-
-        // Fetch new activity with error tracking and timeout
-        try {
-          // Timeout after 25 seconds (leave 5s buffer for Cloudflare Workers 30s limit)
-          const SYNC_TIMEOUT = 25000;
-          const collectPromise = handler.collect({
-            source,
-            config,
-            credentials,
-            since: source.last_sync,
-            cursor: source.sync_cursor
-          });
-
-          const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('Source sync timeout after 25 seconds')), SYNC_TIMEOUT);
-          });
-
-          const { qupts, cursor } = await Promise.race([collectPromise, timeoutPromise]) as any;
-
-          // Insert qupts
-          if (qupts.length > 0) {
-            await db.batchCreateQupts(qupts);
-          }
-
-          // Update sync state and clear any previous errors
-          await db.updateSource(source.id, {
-            last_sync: Math.floor(Date.now() / 1000),
-            sync_cursor: cursor,
-            last_error: null,
-            error_count: 0,
-            last_error_at: null
-          });
-
-          const result = {
-            success: true,
-            qupts_collected: qupts.length,
-            source_id: source.id,
-            cursor: cursor
-          };
-
-          toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
-
-          return {
-            content: [{
-              type: 'text',
-              text: JSON.stringify(result, null, 2)
-            }]
-          };
-        } catch (syncError) {
-          // Track sync failure
-          const errorMessage = syncError instanceof Error ? syncError.message : String(syncError);
-          await db.updateSource(source.id, {
-            last_error: errorMessage,
-            error_count: (source.error_count || 0) + 1,
-            last_error_at: Math.floor(Date.now() / 1000)
-          });
-
-          toolLogger.error('Source sync failed', syncError as Error, { source_id: source.id });
-          throw new Error(`Source sync failed: ${errorMessage}`);
-        }
-      } catch (error) {
-        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
-        throw error;
-      }
-    }
-  );
-
-  server.registerTool(
-    'remove_source',
-    {
-      description: 'Remove an activity source from an entanglement',
-      inputSchema: schemas.remove_source
-    },
-    async (args, extra) => {
-      requireMcpTier(user, 'entangled');
-      const toolLogger = logger.child({ tool: 'remove_source', session_id: extra.sessionId });
-      const startTime = Date.now();
-
-      try {
-        await db.deleteSource(args.source_id);
-
-        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
-
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify({ success: true }, null, 2)
-          }]
-        };
-      } catch (error) {
-        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
-        throw error;
-      }
-    }
-  );
-
-  server.registerTool(
-    'toggle_source',
-    {
-      description: 'Enable or disable a source',
-      inputSchema: schemas.toggle_source
-    },
-    async (args, extra) => {
-      requireMcpTier(user, 'entangled');
-      const toolLogger = logger.child({ tool: 'toggle_source', session_id: extra.sessionId });
-      const startTime = Date.now();
-
-      try {
-        await db.updateSource(args.source_id, { enabled: args.enabled });
-
-        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
-
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify({ success: true }, null, 2)
-          }]
-        };
-      } catch (error) {
-        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
-        throw error;
-      }
-    }
-  );
+  // JEWEL TOOLS (using JewelService)
 
   server.registerTool(
     'add_jewel',
-    {
-      description: 'Store and validate jewels that can be reused across multiple sources',
-      inputSchema: schemas.add_jewel
-    },
-    async (args, extra) => {
-      requireMcpTier(user, 'coherent'); // Coherent can create jewels
-      const toolLogger = logger.child({ tool: 'add_jewel', session_id: extra.sessionId });
-      const startTime = Date.now();
-
-      try {
-        const { encryptJewel } = await import('../lib/crypto');
-        const { validateGitHubCredential, validateZammadCredential, validateGoogleDocsSource } = await import('../handlers/validate');
-
-        const warnings: string[] = [];
-        let validationMetadata: Record<string, any> = {};
-
-        // Validate credentials
-        let validationResult;
-        switch (args.type) {
-          case 'github':
-            validationResult = await validateGitHubCredential(args.data);
-            break;
-          case 'zammad':
-            validationResult = await validateZammadCredential(args.data);
-            break;
-          case 'gdocs':
-          case 'gdrive':
-            // For Google, just validate OAuth credentials work (no document needed)
-            validationResult = await validateGoogleDocsSource({}, args.data);
-            break;
-        }
-
-        if (validationResult) {
-          if (!validationResult.valid) {
-            throw new Error(`Credential validation failed: ${validationResult.errors.join(', ')}`);
-          }
-          warnings.push(...validationResult.warnings);
-          validationMetadata = validationResult.metadata || {};
-        }
-
-        // Encrypt and store
-        const encrypted = await encryptCredentials(JSON.stringify(args.data), encryptionKey);
-        const jewel = await db.createJewel({
-          name: args.name,
-          type: args.type,
-          data: encrypted,
-          last_validated: Math.floor(Date.now() / 1000),
-          validation_metadata: validationMetadata
-        });
-
-        const result = {
-          id: jewel.id,
-          name: jewel.name,
-          type: jewel.type,
-          validation: validationMetadata,
-          warnings: warnings.length > 0 ? warnings : undefined
-        };
-
-        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
-
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify(result, null, 2)
-          }]
-        };
-      } catch (error) {
-        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
-        throw error;
-      }
-    }
+    { description: 'Store and validate jewels for reuse', inputSchema: schemas.add_jewel },
+    async (args, extra) => mcpToolWrapper('add_jewel', logger, extra.sessionId, async () => {
+      return await services.jewels.create(args);
+    })
   );
 
   server.registerTool(
     'list_jewels',
-    {
-      description: 'List stored jewels (without exposing sensitive data)',
-      inputSchema: schemas.list_jewels
-    },
-    async (args, extra) => {
-      const toolLogger = logger.child({ tool: 'list_jewels', session_id: extra.sessionId });
-      const startTime = Date.now();
-
-      try {
-        const jewels = await db.listJewels({
-          type: args.type,
-          limit: args.limit
-        });
-
-        // Remove encrypted data
-        const result = {
-          jewels: jewels.map(c => ({
-            id: c.id,
-            name: c.name,
-            type: c.type,
-            last_validated: c.last_validated,
-            validation_metadata: c.validation_metadata ? JSON.parse(c.validation_metadata) : null,
-            created_at: c.created_at,
-            updated_at: c.updated_at
-          }))
-        };
-
-        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
-
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify(result, null, 2)
-          }]
-        };
-      } catch (error) {
-        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
-        throw error;
-      }
-    }
+    { description: 'List stored jewels (without exposing sensitive data)', inputSchema: schemas.list_jewels },
+    async (args, extra) => mcpToolWrapper('list_jewels', logger, extra.sessionId, async () => {
+      const jewels = await services.jewels.list(args);
+      return { jewels };
+    })
   );
 
   server.registerTool(
     'get_jewel',
-    {
-      description: 'Get jewel details (without exposing sensitive data)',
-      inputSchema: schemas.get_jewel
-    },
-    async (args, extra) => {
-      const toolLogger = logger.child({ tool: 'get_jewel', session_id: extra.sessionId });
-      const startTime = Date.now();
-
-      try {
-        const jewel = await db.getJewel(args.id);
-        if (!jewel) throw new Error('Jewel not found');
-
-        const result = {
-          id: jewel.id,
-          name: jewel.name,
-          type: jewel.type,
-          last_validated: jewel.last_validated,
-          validation_metadata: jewel.validation_metadata ? JSON.parse(jewel.validation_metadata) : null,
-          created_at: jewel.created_at,
-          updated_at: jewel.updated_at
-        };
-
-        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
-
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify(result, null, 2)
-          }]
-        };
-      } catch (error) {
-        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
-        throw error;
-      }
-    }
+    { description: 'Get jewel details', inputSchema: schemas.get_jewel },
+    async (args, extra) => mcpToolWrapper('get_jewel', logger, extra.sessionId, async () => {
+      return await services.jewels.get(args.id);
+    })
   );
 
   server.registerTool(
     'update_jewel',
-    {
-      description: 'Update jewel name or data (will re-validate if data is updated)',
-      inputSchema: schemas.update_jewel
-    },
-    async (args, extra) => {
-      requireMcpTier(user, 'coherent'); // Coherent can update own jewels
-      const toolLogger = logger.child({ tool: 'update_jewel', session_id: extra.sessionId });
-      const startTime = Date.now();
-
-      try {
-        const updates: any = {};
-
-        if (args.name) {
-          updates.name = args.name;
-        }
-
-        if (args.data) {
-          const { encryptCredentials } = await import('../lib/crypto');
-          const { validateGitHubCredential, validateZammadCredential, validateGoogleDocsSource } = await import('../handlers/validate');
-
-          const jewel = await db.getJewel(args.id);
-          if (!jewel) throw new Error('Jewel not found');
-
-          // Validate new credentials
-          let validationResult;
-          switch (jewel.type) {
-            case 'github':
-              validationResult = await validateGitHubCredential(args.data);
-              break;
-            case 'zammad':
-              validationResult = await validateZammadCredential(args.data);
-              break;
-            case 'gdocs':
-            case 'gdrive':
-              validationResult = await validateGoogleDocsSource({}, args.data);
-              break;
-          }
-
-          if (validationResult && !validationResult.valid) {
-            throw new Error(`Credential validation failed: ${validationResult.errors.join(', ')}`);
-          }
-
-          const encrypted = await encryptCredentials(JSON.stringify(args.data), encryptionKey);
-          updates.data = encrypted;
-          updates.last_validated = Math.floor(Date.now() / 1000);
-          updates.validation_metadata = validationResult?.metadata || {};
-        }
-
-        await db.updateJewel(args.id, updates);
-
-        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
-
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify({ success: true }, null, 2)
-          }]
-        };
-      } catch (error) {
-        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
-        throw error;
-      }
-    }
+    { description: 'Update jewel name or data', inputSchema: schemas.update_jewel },
+    async (args, extra) => mcpToolWrapper('update_jewel', logger, extra.sessionId, async () => {
+      await services.jewels.update(args.id, args);
+      return { success: true };
+    })
   );
 
   server.registerTool(
     'delete_jewel',
-    {
-      description: 'Delete a stored jewel (fails if used by any sources)',
-      inputSchema: schemas.delete_jewel
-    },
-    async (args, extra) => {
-      requireMcpTier(user, 'coherent'); // Coherent can delete own jewels
-      const toolLogger = logger.child({ tool: 'delete_jewel', session_id: extra.sessionId });
-      const startTime = Date.now();
-
-      try {
-        // Check if in use
-        const usage = await db.getJewelUsage(args.id);
-        if (usage.length > 0) {
-          throw new Error(`Cannot delete jewel: used by ${usage.length} source(s). Usage: ${usage.map(u => `${u.entanglement_name} (${u.source_type})`).join(', ')}`);
-        }
-
-        await db.deleteJewel(args.id);
-
-        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
-
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify({ success: true }, null, 2)
-          }]
-        };
-      } catch (error) {
-        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
-        throw error;
-      }
-    }
+    { description: 'Delete a stored jewel', inputSchema: schemas.delete_jewel },
+    async (args, extra) => mcpToolWrapper('delete_jewel', logger, extra.sessionId, async () => {
+      await services.jewels.delete(args.id);
+      return { success: true };
+    })
   );
 
   server.registerTool(
     'get_jewel_usage',
-    {
-      description: 'See which sources are using a jewel',
-      inputSchema: schemas.get_jewel_usage
-    },
-    async (args, extra) => {
-      const toolLogger = logger.child({ tool: 'get_jewel_usage', session_id: extra.sessionId });
-      const startTime = Date.now();
+    { description: 'See which sources are using a jewel', inputSchema: schemas.get_jewel_usage },
+    async (args, extra) => mcpToolWrapper('get_jewel_usage', logger, extra.sessionId, async () => {
+      const sources = await services.jewels.getUsage(args.id);
+      return { sources };
+    })
+  );
 
-      try {
-        const usage = await db.getJewelUsage(args.id);
+  // SOURCE TOOLS (using SourceService)
 
-        toolLogger.info('Tool completed', { duration_ms: Date.now() - startTime });
+  server.registerTool(
+    'add_source',
+    { description: 'Add an activity source to an entanglement', inputSchema: schemas.add_source },
+    async (args, extra) => mcpToolWrapper('add_source', logger, extra.sessionId, async () => {
+      return await services.sources.create(args.entanglement_id, args);
+    })
+  );
 
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify({ usage }, null, 2)
-          }]
-        };
-      } catch (error) {
-        toolLogger.error('Tool failed', error as Error, { duration_ms: Date.now() - startTime });
-        throw error;
+  server.registerTool(
+    'sync_source',
+    { description: 'Manually trigger a sync for a source', inputSchema: schemas.sync_source },
+    async (args, extra) => mcpToolWrapper('sync_source', logger, extra.sessionId, async () => {
+      return await services.sources.sync(args.source_id);
+    })
+  );
+
+  server.registerTool(
+    'remove_source',
+    { description: 'Remove an activity source from an entanglement', inputSchema: schemas.remove_source },
+    async (args, extra) => mcpToolWrapper('remove_source', logger, extra.sessionId, async () => {
+      await services.sources.delete(args.source_id);
+      return { success: true };
+    })
+  );
+
+  server.registerTool(
+    'toggle_source',
+    { description: 'Enable or disable a source', inputSchema: schemas.toggle_source },
+    async (args, extra) => mcpToolWrapper('toggle_source', logger, extra.sessionId, async () => {
+      await services.sources.update(args.source_id, { enabled: args.enabled });
+      return { success: true };
+    })
+  );
+
+  // SPECIAL CASE TOOLS (No service, direct DB access)
+
+  server.registerTool(
+    'list_dimensions',
+    { description: 'List all taxonomy dimensions and their available values', inputSchema: schemas.list_dimensions },
+    async (args, extra) => mcpToolWrapper('list_dimensions', logger, extra.sessionId, async () => {
+      const dimensions = await db.listDimensions();
+      const values = await db.getAllDimensionValues();
+      
+      const enriched = dimensions.map(dim => ({
+        ...dim,
+        values: values.filter(v => v.dimension_id === dim.id)
+      }));
+      
+      return { dimensions: enriched };
+    })
+  );
+
+  server.registerTool(
+    'set_attributes',
+    { description: 'Set taxonomy attributes on an entanglement', inputSchema: schemas.set_attributes },
+    async (args, extra) => mcpToolWrapper('set_attributes', logger, extra.sessionId, async () => {
+      // Convert dimension names to IDs
+      const dimensions = await db.listDimensions();
+      const dimensionValues = await db.getAllDimensionValues();
+      
+      const attributesToSet = [];
+      for (const attr of args.attributes) {
+        const dimension = dimensions.find((d: any) => d.name === attr.dimension);
+        if (!dimension) {
+          throw new Error(`Unknown dimension: ${attr.dimension}`);
+        }
+        
+        const value = dimensionValues.find((v: any) =>
+          v.dimension_id === dimension.id && v.value === attr.value
+        );
+        if (!value) {
+          throw new Error(`Unknown value: ${attr.value} for dimension ${attr.dimension}`);
+        }
+        
+        attributesToSet.push({ dimension_id: dimension.id, value_id: value.id });
       }
-    }
+      
+      await db.setEntanglementAttributes(args.entanglement_id, attributesToSet);
+      return { success: true };
+    })
   );
 
   return server;
 }
 
-// HTTP handler for Hono (stateless per request)
-export async function mcpHandler(c: Context<{ Bindings: Bindings }>) {
+// HTTP handler for MCP requests (UNCHANGED)
+export async function handleMcpRequest(c: Context<{ Bindings: Bindings }>) {
   const db = new DB(c.env.DB);
   const encryptionKey = c.env.ENCRYPTION_KEY;
   const minLogLevel = (c.env.LOG_LEVEL || 'info') as 'info' | 'warn' | 'error' | 'fatal';
 
-  // Get request/session IDs from headers
   const requestId = c.req.header('X-Request-ID') || crypto.randomUUID().substring(0, 8);
   const sessionId = c.req.header('X-Zoku-Session-ID');
 
-  // Create logger
   const logger = new Logger({
     request_id: requestId,
     session_id: sessionId,
@@ -1515,10 +576,8 @@ export async function mcpHandler(c: Context<{ Bindings: Bindings }>) {
   logger.info('MCP request received');
 
   try {
-    // Parse request body
     const body = await c.req.json().catch(() => undefined);
 
-    // Authenticate MCP request - always required (no dev bypass)
     const authHeader = c.req.header('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
       logger.warn('Missing MCP Bearer token');
@@ -1553,14 +612,11 @@ export async function mcpHandler(c: Context<{ Bindings: Bindings }>) {
 
     c.set('user', user);
 
-    // Create fresh transport and server for this request
     const transport = new StreamableHTTPTransport();
-    const server = createMcpServer(db, encryptionKey, logger, user);
+    const server = createMcpServer(db, c.env, logger, user);
 
-    // Connect server to transport
     await server.connect(transport);
 
-    // Handle the request
     const response = await transport.handleRequest(c, body);
 
     logger.info('MCP request completed', logger.withDuration());
@@ -1569,26 +625,24 @@ export async function mcpHandler(c: Context<{ Bindings: Bindings }>) {
   } catch (error) {
     logger.error('MCP request failed', error as Error, logger.withDuration());
 
-    // Map error types to JSON-RPC error codes
     const errorMessage = error instanceof Error ? error.message : String(error);
-    let code = -32603; // Default: Internal error
+    let code = -32603;
     let httpStatus = 500;
 
-    // Map specific error patterns to appropriate codes
     if (errorMessage.includes('not found')) {
-      code = -32001; // Resource not found (custom)
+      code = -32001;
       httpStatus = 404;
     } else if (errorMessage.includes('validation failed') || errorMessage.includes('Invalid')) {
-      code = -32602; // Invalid params
+      code = -32602;
       httpStatus = 400;
     } else if (errorMessage.includes('timeout')) {
-      code = -32002; // Timeout (custom)
+      code = -32002;
       httpStatus = 504;
     } else if (errorMessage.includes('Access denied') || errorMessage.includes('permission')) {
-      code = -32003; // Permission denied (custom)
+      code = -32003;
       httpStatus = 403;
     } else if (error instanceof Error && error.name === 'ZodError') {
-      code = -32602; // Invalid params
+      code = -32602;
       httpStatus = 400;
     }
 
