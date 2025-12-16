@@ -144,7 +144,7 @@ export class OAuthApplicationService extends BaseService {
     const now = Math.floor(Date.now() / 1000);
 
     // Encrypt client_secret
-    const encryptedSecret = encryptJewel(input.client_secret, this.env.ENCRYPTION_KEY);
+    const encryptedSecret = await encryptJewel(input.client_secret, this.env.ENCRYPTION_KEY);
 
     await this.db.d1
       .prepare(`INSERT INTO oauth_applications (id, name, provider, client_id, client_secret, scopes, metadata, created_at, updated_at)
@@ -221,7 +221,7 @@ export class OAuthApplicationService extends BaseService {
 
     if (updates.client_secret !== undefined) {
       sets.push('client_secret = ?');
-      const encrypted = encryptJewel(updates.client_secret, this.env.ENCRYPTION_KEY);
+      const encrypted = await encryptJewel(updates.client_secret, this.env.ENCRYPTION_KEY);
       values.push(encrypted);
     }
 
