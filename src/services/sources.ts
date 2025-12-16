@@ -120,8 +120,22 @@ export class SourceService extends BaseService {
       throw new ValidationError('Cannot sync disabled source');
     }
 
-    await syncSource(this.db, source, this.env, this.logger);
-
-    return { success: true, synced_at: new Date().toISOString() };
+    try {
+      await syncSource(this.db, source, this.env, this.logger);
+      return { success: true, synced_at: new Date().toISOString() };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown sync error';
+      this.logger.error('Source sync failed', { source_id: id, error: errorMessage });
+      
+      // Update source with error info
+      await this.db.updateSourceError(id, errorMessage);
+      
+      // Return error instead of throwing
+      return { 
+        success: false, 
+        error: errorMessage,
+        synced_at: new Date().toISOString() 
+      };
+    }
   }
 }
