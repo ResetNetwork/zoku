@@ -11,12 +11,13 @@ import JewelsList from './components/JewelsList'
 import AccountPage from './components/AccountPage'
 import AdminUsers from './components/AdminUsers'
 import AuditLog from './components/AuditLog'
+import SettingsPage from './components/SettingsPage'
 import { useTheme } from './lib/theme'
 import { useNotifications } from './lib/notifications'
 import { useAuth } from './lib/auth'
 import { api } from './lib/api'
 
-type View = 'dashboard' | 'entanglements' | 'zoku' | 'qupts' | 'sources' | 'jewels' | 'account' | 'admin-users' | 'audit-log'
+type View = 'dashboard' | 'entanglements' | 'zoku' | 'qupts' | 'sources' | 'jewels' | 'account' | 'admin-users' | 'audit-log' | 'settings'
 
 export default function App() {
   const { user, loading, error } = useAuth()
@@ -71,7 +72,7 @@ function AuthenticatedApp({ user }: { user: any }) {
   const [currentView, setCurrentView] = useState<View>(() => {
     const params = new URLSearchParams(window.location.search)
     const view = params.get('view') as View | null
-    const validViews: View[] = ['entanglements', 'zoku', 'qupts', 'sources', 'jewels', 'account', 'admin-users', 'audit-log']
+    const validViews: View[] = ['entanglements', 'zoku', 'qupts', 'sources', 'jewels', 'account', 'admin-users', 'audit-log', 'settings']
     if (view && validViews.includes(view)) {
       return view
     }
@@ -319,6 +320,8 @@ function AuthenticatedApp({ user }: { user: any }) {
           <AdminUsers />
         ) : currentView === 'audit-log' ? (
           <AuditLog />
+        ) : currentView === 'settings' ? (
+          <SettingsPage />
         ) : (
           <Dashboard
             onSelectEntanglement={handleSelectEntanglement}
