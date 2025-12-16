@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import { useNotifications } from '../lib/notifications'
+import GoogleOAuthButton from './GoogleOAuthButton'
 
 interface AddSourceFormProps {
   entanglementId: string
@@ -19,7 +20,9 @@ export default function AddSourceForm({ entanglementId, onSuccess, onCancel }: A
     events: ['push', 'pull_request', 'issues']
   })
   const [adding, setAdding] = useState(false)
+  const [showJewelCreator, setShowJewelCreator] = useState(false)
   const { addNotification } = useNotifications()
+  const queryClient = useQueryClient()
 
   const { data: jewels = [] } = useQuery({
     queryKey: ['jewels'],
@@ -129,8 +132,52 @@ export default function AddSourceForm({ entanglementId, onSuccess, onCancel }: A
       <div>
         <label className="block text-sm text-gray-400 mb-2">Jewel</label>
         {availableJewels.length === 0 ? (
-          <div className="text-sm text-gray-400 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-md">
-            No {sourceType} jewels found. Create one in the Jewels page first.
+          <div className="space-y-3">
+            <div className="text-sm text-gray-400 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-md">
+              No {sourceType} jewels found. {!showJewelCreator && 'Create one below or visit the Jewels page.'}
+            </div>
+            
+            {!showJewelCreator && (
+              <button
+                onClick={() => setShowJewelCreator(true)}
+                className="w-full btn btn-secondary"
+              >
+                + Create {sourceType === 'github' ? 'GitHub Token' : sourceType === 'zammad' ? 'Zammad' : sourceType === 'gmail' ? 'Gmail' : 'Google Drive'} Jewel
+              </button>
+            )}
+
+            {showJewelCreator && (sourceType === 'gmail' || sourceType === 'gdrive') && (
+              <div className="border border-quantum-600 rounded-md p-4 bg-quantum-700/30">
+                <GoogleOAuthButton
+                  jewelType={sourceType}
+                  onSuccess={(jewel) => {
+                    addNotification('success', 'Jewel created')
+                    setSelectedJewel(jewel.id)
+                    setShowJewelCreator(false)
+                    queryClient.invalidateQueries({ queryKey: ['jewels'] })
+                  }}
+                  onCancel={() => setShowJewelCreator(false)}
+                />
+              </div>
+            )}
+
+            {showJewelCreator && (sourceType === 'github' || sourceType === 'zammad') && (
+              <div className="text-sm text-gray-400 p-3 bg-blue-500/10 border border-blue-500/30 rounded-md">
+                {sourceType === 'github' ? (
+                  <>
+                    <strong>GitHub Token:</strong> Generate a personal access token at{' '}
+                    <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer" className="text-quantum-400 hover:underline">
+                      github.com/settings/tokens
+                    </a>{' '}
+                    with <code>repo</code> scope, then add it on the Jewels page.
+                  </>
+                ) : (
+                  <>
+                    <strong>Zammad:</strong> Get your API token from Zammad settings, then add it on the Jewels page.
+                  </>
+                )}
+              </div>
+            )}
           </div>
         ) : (
           <select
