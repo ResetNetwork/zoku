@@ -2,10 +2,12 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import { useNotifications } from '../lib/notifications'
+import { useIsPrime, useAuth } from '../lib/auth'
 import GoogleOAuthButton from './GoogleOAuthButton'
 
 export default function JewelsList() {
-  // Note: useIsPrime hook available for future use (delete others' jewels)
+  const isPrime = useIsPrime()
+  const { user } = useAuth()
   const [showAddForm, setShowAddForm] = useState<'github' | 'zammad' | 'gdrive' | 'gmail' | null>(null)
   const [editingJewel, setEditingJewel] = useState<any>(null)
   const [formData, setFormData] = useState<any>({ name: '', token: '', url: '' })
@@ -499,6 +501,12 @@ export default function JewelsList() {
                       <span className={`px-2 py-0.5 rounded-full text-xs ${getTypeColor(cred.type)}`}>
                         {getTypeLabel(cred.type)}
                       </span>
+                      {/* Show owner for prime users viewing others' jewels */}
+                      {isPrime && cred.owner_id !== user?.id && cred.owner_name && (
+                        <span className="px-2 py-0.5 rounded-full text-xs bg-yellow-500/20 text-yellow-300 border border-yellow-500/30">
+                          Owner: {cred.owner_name}
+                        </span>
+                      )}
                     </div>
 
                     {/* Show account email prominently for Google Drive */}

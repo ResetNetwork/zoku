@@ -15,12 +15,15 @@ export class JewelService extends BaseService {
 
   /**
    * List jewels (ownership filtered, no encrypted data)
+   * Prime users can see all jewels
    */
   async list(filters: { type?: string; limit?: number } = {}) {
     this.requireTier('coherent');
 
+    const isPrime = this.user.access_tier === 'prime';
+
     const jewels = await this.db.listJewels({
-      owner_id: this.user.id,
+      owner_id: isPrime ? undefined : this.user.id, // Prime sees all
       type: filters.type,
       limit: filters.limit || 20
     });
@@ -30,6 +33,8 @@ export class JewelService extends BaseService {
       id: j.id,
       name: j.name,
       type: j.type,
+      owner_id: j.owner_id,
+      owner_name: j.owner_name, // From JOIN with zoku table
       created_at: j.created_at,
       last_validated_at: j.last_validated_at,
       validation_result: j.validation_result
@@ -38,6 +43,7 @@ export class JewelService extends BaseService {
 
   /**
    * Get jewel (no encrypted data)
+   * Prime users can view any jewel
    */
   async get(id: string) {
     this.requireTier('coherent');
@@ -47,8 +53,10 @@ export class JewelService extends BaseService {
       throw new NotFoundError('Jewel', id);
     }
 
-    // Check ownership
-    if (jewel.owner_id !== this.user.id) {
+    const isPrime = this.user.access_tier === 'prime';
+
+    // Check ownership (prime can view all)
+    if (!isPrime && jewel.owner_id !== this.user.id) {
       throw new ForbiddenError('You can only view your own jewels');
     }
 
@@ -56,6 +64,7 @@ export class JewelService extends BaseService {
       id: jewel.id,
       name: jewel.name,
       type: jewel.type,
+      owner_id: jewel.owner_id,
       created_at: jewel.created_at,
       last_validated_at: jewel.last_validated_at,
       validation_result: jewel.validation_result
@@ -140,6 +149,7 @@ export class JewelService extends BaseService {
 
   /**
    * Delete jewel
+   * Only owner or prime users can delete
    */
   async delete(id: string): Promise<void> {
     this.requireTier('coherent');
@@ -149,8 +159,10 @@ export class JewelService extends BaseService {
       throw new NotFoundError('Jewel', id);
     }
 
-    // Check ownership
-    if (jewel.owner_id !== this.user.id) {
+    const isPrime = this.user.access_tier === 'prime';
+
+    // Check ownership (prime can delete any)
+    if (!isPrime && jewel.owner_id !== this.user.id) {
       throw new ForbiddenError('You can only delete your own jewels');
     }
 
@@ -163,11 +175,15 @@ export class JewelService extends BaseService {
     }
 
     await this.db.deleteJewel(id);
-    await this.audit('delete', 'jewel', id);
+    await this.audit('delete', 'jewel', id, { 
+      owner_id: jewel.owner_id,
+      deleted_by_prime: isPrime && jewel.owner_id !== this.user.id
+    });
   }
 
   /**
    * Get jewel usage
+   * Prime users can view usage for any jewel
    */
   async getUsage(id: string) {
     this.requireTier('coherent');
@@ -177,8 +193,10 @@ export class JewelService extends BaseService {
       throw new NotFoundError('Jewel', id);
     }
 
-    // Check ownership
-    if (jewel.owner_id !== this.user.id) {
+    const isPrime = this.user.access_tier === 'prime';
+
+    // Check ownership (prime can view all)
+    if (!isPrime && jewel.owner_id !== this.user.id) {
       throw new ForbiddenError('You can only view usage for your own jewels');
     }
 

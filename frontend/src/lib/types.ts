@@ -87,6 +87,7 @@ export interface Jewel {
   name: string
   type: string
   owner_id: string | null
+  owner_name?: string // From JOIN, only for prime users
   last_validated: number | null
   validation_metadata: Record<string, any> | null
   created_at: number

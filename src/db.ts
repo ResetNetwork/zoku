@@ -877,18 +877,35 @@ export class DB {
   }
 
   async listJewels(params?: {
+    owner_id?: string;
     type?: string;
     limit?: number;
   }): Promise<Jewel[]> {
-    let query = 'SELECT * FROM jewels';
+    let query = `
+      SELECT 
+        j.*,
+        z.name as owner_name
+      FROM jewels j
+      LEFT JOIN zoku z ON j.owner_id = z.id
+    `;
     const bindings: any[] = [];
+    const conditions: string[] = [];
+
+    if (params?.owner_id) {
+      conditions.push('j.owner_id = ?');
+      bindings.push(params.owner_id);
+    }
 
     if (params?.type) {
-      query += ' WHERE type = ?';
+      conditions.push('j.type = ?');
       bindings.push(params.type);
     }
 
-    query += ' ORDER BY created_at DESC';
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
+    }
+
+    query += ' ORDER BY j.created_at DESC';
 
     if (params?.limit) {
       query += ' LIMIT ?';
