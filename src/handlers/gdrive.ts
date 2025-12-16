@@ -28,12 +28,18 @@ export const gdriveHandler: SourceHandler = {
 
       // Route based on mode
       if (mode === 'folder' && folder_id) {
-        // Folder mode: List new files
+        // Folder mode: List new files and detect renames
         if (track_new_files) {
           await collectFolderFiles(source, folder_id, headers, since, qupts);
         }
+        // Check for renames by comparing current file list with cursor
+        if (cursor) {
+          await detectFolderRenames(source, folder_id, headers, cursor, qupts);
+        }
         console.log(`Google Drive handler collected ${qupts.length} qupts for folder ${folder_id}`);
-        return { qupts };
+        // Store current file names in cursor for next sync
+        const fileMap = await buildFileMap(folder_id, headers);
+        return { qupts, cursor: JSON.stringify(fileMap) };
       } else if (mode === 'document' && document_id) {
         // Document mode: Track revisions and comments
         const result = await collectDocumentActivity(source, document_id, headers, since, cursor, track_revisions, track_comments);
@@ -261,4 +267,71 @@ async function collectDocumentActivity(
   const newCursor = `${maxRevisionId}:${docTitle}`;
   
   return { qupts, cursor: newCursor };
+}
+
+// Build a map of file IDs to names in a folder
+async function buildFileMap(folder_id: string, headers: any): Promise<Record<string, string>> {
+  const apiUrl = new URL('https://www.googleapis.com/drive/v3/files');
+  apiUrl.searchParams.set('q', `'${folder_id}' in parents and trashed = false`);
+  apiUrl.searchParams.set('fields', 'files(id,name)');
+  apiUrl.searchParams.set('pageSize', '1000');
+  apiUrl.searchParams.set('supportsAllDrives', 'true');
+  apiUrl.searchParams.set('includeItemsFromAllDrives', 'true');
+  apiUrl.searchParams.set('corpora', 'allDrives');
+  
+  const response = await fetch(apiUrl.toString(), { headers });
+  
+  if (!response.ok) {
+    console.error('Failed to build file map:', response.status);
+    return {};
+  }
+  
+  const data = await response.json() as { files?: Array<{ id: string, name: string }> };
+  const map: Record<string, string> = {};
+  
+  for (const file of data.files || []) {
+    map[file.id] = file.name;
+  }
+  
+  return map;
+}
+
+// Detect renamed files in a folder
+async function detectFolderRenames(
+  source: any,
+  folder_id: string,
+  headers: any,
+  cursor: string,
+  qupts: QuptInput[]
+) {
+  try {
+    const oldMap: Record<string, string> = JSON.parse(cursor);
+    const newMap = await buildFileMap(folder_id, headers);
+    
+    // Check for renames (same file ID, different name)
+    for (const [fileId, oldName] of Object.entries(oldMap)) {
+      const newName = newMap[fileId];
+      if (newName && newName !== oldName) {
+        // File was renamed!
+        qupts.push({
+          entanglement_id: source.entanglement_id,
+          content: `Renamed: "${oldName}" → "${newName}"`,
+          source: 'gdrive',
+          external_id: `gdrive:folder:${folder_id}:rename:${fileId}:${Date.now()}`,
+          metadata: {
+            type: 'rename',
+            folder_id,
+            file_id: fileId,
+            old_name: oldName,
+            new_name: newName,
+            url: `https://drive.google.com/file/d/${fileId}/view`
+          },
+          created_at: Math.floor(Date.now() / 1000)
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Failed to detect folder renames:', error);
+    // Don't throw - continue with other qupts
+  }
 }
