@@ -1,4 +1,4 @@
-# The Great Game - Claude Context
+# The Great Game - AI Agent Context
 
 ## Project Overview
 The Great Game is a project/initiative tracking system inspired by the Quantum Thief trilogy. Built as a Cloudflare Worker with D1 database, MCP interface, and web frontend.
@@ -564,7 +564,7 @@ add_source({
    - Configure Cloudflare Access
    - Test full stack in production
 
-## Notes for Future Claude Sessions
+## Notes for Future AI Agent Sessions
 
 - Wrangler upgraded to v4.53.0 (was v3.114.15)
 - node_modules excluded from git via .gitignore
