@@ -45,7 +45,6 @@ export default function AddSourceForm({ entanglementId, onSuccess, onCancel }: A
         mode: 'document',
         document_id: '',
         folder_id: '',
-        label: '',
         track_new_files: true,
         track_revisions: true,
         track_comments: true
@@ -78,10 +77,6 @@ export default function AddSourceForm({ entanglementId, onSuccess, onCancel }: A
       }
       if (mode === 'folder' && !config.folder_id) {
         addNotification('error', 'Please provide folder URL or ID')
-        return
-      }
-      if (mode === 'label' && !config.label) {
-        addNotification('error', 'Please provide label name')
         return
       }
     }
@@ -276,20 +271,18 @@ export default function AddSourceForm({ entanglementId, onSuccess, onCancel }: A
                 mode: e.target.value,
                 document_id: '',
                 folder_id: '',
-                label: '',
                 track_comments: true,
-                track_revisions: true
+                track_revisions: true,
+                track_new_files: true
               })}
               className="w-full px-3 py-2 rounded-md bg-gray-100 dark:bg-quantum-700 border border-gray-300 dark:border-quantum-600 text-gray-900 dark:text-gray-100"
             >
               <option value="document">Individual Document</option>
               <option value="folder">Folder</option>
-              <option value="label">Label</option>
             </select>
             <p className="text-xs text-gray-500 mt-1">
               {config.mode === 'document' && 'Track revisions and comments on a single document'}
               {config.mode === 'folder' && 'Track new files, revisions, and comments in a folder'}
-              {config.mode === 'label' && 'Track new files, revisions, and comments with a specific label'}
             </p>
           </div>
 
@@ -349,19 +342,7 @@ export default function AddSourceForm({ entanglementId, onSuccess, onCancel }: A
             </div>
           )}
 
-          {config.mode === 'label' && (
-            <div>
-              <label className="block text-sm text-gray-400 mb-2">Label Name</label>
-              <input
-                type="text"
-                value={config.label || ''}
-                onChange={(e) => setConfig({ ...config, label: e.target.value })}
-                placeholder="zoku"
-                className="w-full px-3 py-2 rounded-md bg-gray-100 dark:bg-quantum-700 border border-gray-300 dark:border-quantum-600 text-gray-900 dark:text-gray-100"
-              />
-              <p className="text-xs text-gray-500 mt-1">Files with this label will be tracked</p>
-            </div>
-          )}
+
 
           <div className="space-y-2">
             <label className="block text-sm text-gray-400">Qupt Types</label>
