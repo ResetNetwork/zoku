@@ -152,11 +152,14 @@ export default function QuptItem({ qupt, showEntanglementName = false, onDelete 
 
     // Google Drive formatting
     if (qupt.source === 'gdrive') {
+      if (metadata.type === 'new_file') {
+        return `📄 New file: ${metadata.file_name}`;
+      }
       if (metadata.type === 'revision') {
-        return `${metadata.document_title}: Edited by ${metadata.modified_by || 'Someone'}`;
+        return `✏️ ${metadata.document_title}: Edited by ${metadata.modified_by || 'Someone'}`;
       }
       if (metadata.type === 'comment') {
-        return `${metadata.document_title}: Comment by ${metadata.author || 'Someone'}`;
+        return `💬 ${metadata.document_title}: Comment by ${metadata.author || 'Someone'}`;
       }
     }
 
@@ -247,11 +250,13 @@ export default function QuptItem({ qupt, showEntanglementName = false, onDelete 
                 {metadata?.type && qupt.source === 'gdrive' && (
                   <span
                     className={`text-sm font-semibold ${
-                      metadata.type === 'revision' ? 'text-purple-400' : 'text-yellow-400'
+                      metadata.type === 'new_file' ? 'text-green-400' :
+                      metadata.type === 'revision' ? 'text-purple-400' : 
+                      'text-yellow-400'
                     }`}
-                    title={metadata.type}
+                    title={metadata.type === 'new_file' ? 'New file' : metadata.type === 'revision' ? 'Revision' : 'Comment'}
                   >
-                    {metadata.type === 'revision' ? '←' : '💬'}
+                    {metadata.type === 'new_file' ? '📄' : metadata.type === 'revision' ? '✏️' : '💬'}
                   </span>
                 )}
                 {qupt.source === 'gmail' && (
@@ -361,8 +366,74 @@ export default function QuptItem({ qupt, showEntanglementName = false, onDelete 
             {/* Google Drive-specific metadata */}
             {qupt.source === 'gdrive' && (
               <div className="space-y-2">
+                {/* New File */}
+                {metadata.type === 'new_file' && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 text-xs font-semibold">
+                        📄 New File
+                      </span>
+                      {metadata.mime_type && (
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {metadata.mime_type.replace('application/vnd.google-apps.', '')}
+                        </span>
+                      )}
+                    </div>
+                    
+                    <div className="p-3 bg-gray-100 dark:bg-quantum-900/30 rounded border-l-2 border-green-500">
+                      <div className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">
+                        {metadata.file_name}
+                      </div>
+                      {metadata.created_by && (
+                        <div className="text-xs text-gray-600 dark:text-gray-400">
+                          Created by {metadata.created_by}
+                          {metadata.created_by_email && ` (${metadata.created_by_email})`}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Revision */}
+                {metadata.type === 'revision' && (
+                  <div className="space-y-2">
+                    <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400 text-xs font-semibold">
+                      ✏️ Revision
+                    </span>
+                    
+                    <div className="p-3 bg-gray-100 dark:bg-quantum-900/30 rounded border-l-2 border-purple-500">
+                      <div className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">
+                        {metadata.document_title}
+                      </div>
+                      {metadata.modified_by && (
+                        <div className="text-xs text-gray-600 dark:text-gray-400">
+                          Edited by {metadata.modified_by}
+                          {metadata.modified_by_email && ` (${metadata.modified_by_email})`}
+                        </div>
+                      )}
+                      {metadata.revision_id && (
+                        <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                          Revision #{metadata.revision_id}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Comment */}
                 {metadata.type === 'comment' && (
-                  <>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 text-xs font-semibold">
+                        💬 Comment
+                      </span>
+                      {metadata.resolved && (
+                        <span className="px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 text-xs">
+                          Resolved
+                        </span>
+                      )}
+                    </div>
+
                     {/* Quoted/highlighted text */}
                     {metadata.quoted_content && (
                       <div className="p-3 bg-yellow-500/10 dark:bg-yellow-500/5 rounded border-l-2 border-yellow-500">
@@ -377,27 +448,19 @@ export default function QuptItem({ qupt, showEntanglementName = false, onDelete 
 
                     {/* Full comment */}
                     <div className="p-3 bg-gray-100 dark:bg-quantum-900/30 rounded border-l-2 border-quantum-500">
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="text-xs font-semibold text-gray-500 dark:text-gray-400">
-                          Comment by {metadata.author || 'Unknown'}
+                      <div className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">
+                        {metadata.document_title}
+                      </div>
+                      <div className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                        Comment by {metadata.author || 'Unknown'}
+                        {metadata.author_email && ` (${metadata.author_email})`}
+                      </div>
+                      {metadata.comment_text && (
+                        <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                          {metadata.comment_text}
                         </div>
-                        {metadata.resolved && (
-                          <span className="px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 text-xs">
-                            Resolved
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                        {qupt.content.split(': ').slice(1).join(': ')}
-                      </div>
+                      )}
                     </div>
-                  </>
-                )}
-
-                {metadata.type === 'revision' && metadata.modified_by && (
-                  <div className="text-gray-600 dark:text-gray-400 text-sm">
-                    <span className="font-semibold">Edited by:</span> {metadata.modified_by}
-                    {metadata.modified_by_email && ` (${metadata.modified_by_email})`}
                   </div>
                 )}
               </div>
