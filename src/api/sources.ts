@@ -29,10 +29,11 @@ app.patch('/:id', async (c) => {
   return c.json({ success: true });
 });
 
-// Delete source
+// Delete source (with optional cascade delete of qupts)
 app.delete('/:id', async (c) => {
   const service = getService(c);
-  await service.delete(c.req.param('id'));
+  const cascadeQupts = c.req.query('cascade') === 'true';
+  await service.delete(c.req.param('id'), cascadeQupts);
   return c.json({ success: true });
 });
 

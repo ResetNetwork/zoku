@@ -150,11 +150,19 @@ export default function SourcesList() {
                     </button>
                     <button
                       onClick={async () => {
-                        if (!confirm(`Delete ${source.type} source from ${source.volition_name}?`)) return
+                        const message = `Delete ${source.type} source from ${source.volition_name}?\n\nAlso delete all activity (qupts) collected from this source?`
+                        const confirmResult = confirm(message)
+                        if (!confirmResult) return
+                        
+                        // Ask if they want to cascade delete qupts
+                        const cascade = confirm('Delete associated activity (qupts) from this source too?\n\nClick OK to delete qupts, Cancel to keep them.')
+                        
                         try {
-                          await fetch(`/api/sources/${source.id}`, { method: 'DELETE' })
-                          addNotification('success', 'Source deleted')
+                          const url = cascade ? `/api/sources/${source.id}?cascade=true` : `/api/sources/${source.id}`
+                          await fetch(url, { method: 'DELETE' })
+                          addNotification('success', cascade ? 'Source and qupts deleted' : 'Source deleted')
                           queryClient.invalidateQueries({ queryKey: ['entanglements'] })
+                          queryClient.invalidateQueries({ queryKey: ['all-qupts'] })
                         } catch (error) {
                           addNotification('error', 'Failed to delete source')
                         }

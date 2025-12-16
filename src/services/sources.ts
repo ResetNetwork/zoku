@@ -92,14 +92,35 @@ export class SourceService extends BaseService {
   }
 
   /**
-   * Delete source
+   * Delete source (optionally with cascade delete of associated qupts)
    */
-  async delete(id: string): Promise<void> {
+  async delete(id: string, cascadeQupts: boolean = false): Promise<void> {
     this.requireTier('entangled');
 
     const source = await this.db.getSource(id);
     if (!source) {
       throw new NotFoundError('Source', id);
+    }
+
+    // If cascade is requested, delete all qupts from this source
+    if (cascadeQupts) {
+      const result = await this.db.d1
+        .prepare('DELETE FROM qupts WHERE source = ? AND entanglement_id = ?')
+        .bind(source.type, source.entanglement_id)
+        .run();
+      
+      this.logger.info('Cascade deleted qupts', { 
+        source_id: id, 
+        source_type: source.type,
+        changes: result.changes 
+      });
+      
+      await this.audit('source.delete_with_qupts', { 
+        source_id: id,
+        qupts_deleted: result.changes 
+      });
+    } else {
+      await this.audit('source.delete', { source_id: id });
     }
 
     await this.db.deleteSource(id);

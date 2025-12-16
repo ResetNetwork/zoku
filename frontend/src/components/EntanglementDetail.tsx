@@ -245,10 +245,16 @@ export default function EntanglementDetail({ entanglementId }: EntanglementDetai
                       <button
                         onClick={async () => {
                           if (!confirm(`Delete this ${source.type} source?`)) return
+                          
+                          // Ask if they want to cascade delete qupts
+                          const cascade = confirm('Delete associated activity (qupts) from this source too?\n\nClick OK to delete qupts, Cancel to keep them.')
+                          
                           try {
-                            await fetch(`/api/sources/${source.id}`, { method: 'DELETE' })
-                            addNotification('success', 'Source deleted')
+                            const url = cascade ? `/api/sources/${source.id}?cascade=true` : `/api/sources/${source.id}`
+                            await fetch(url, { method: 'DELETE' })
+                            addNotification('success', cascade ? 'Source and qupts deleted' : 'Source deleted')
                             queryClient.invalidateQueries({ queryKey: ['sources', entanglementId] })
+                            queryClient.invalidateQueries({ queryKey: ['qupts', entanglementId] })
                           } catch (error) {
                             addNotification('error', 'Failed to delete source')
                           }
