@@ -153,13 +153,16 @@ export default function QuptItem({ qupt, showEntanglementName = false, onDelete 
     // Google Drive formatting
     if (qupt.source === 'gdrive') {
       if (metadata.type === 'new_file') {
-        return `📄 New file: ${metadata.file_name}`;
+        return `${metadata.file_name}`;
       }
       if (metadata.type === 'revision') {
-        return `✏️ ${metadata.document_title}: Edited by ${metadata.modified_by || 'Someone'}`;
+        return `${metadata.document_title}: Edited by ${metadata.modified_by || 'Someone'}`;
       }
       if (metadata.type === 'comment') {
-        return `💬 ${metadata.document_title}: Comment by ${metadata.author || 'Someone'}`;
+        return `${metadata.document_title}: Comment by ${metadata.author || 'Someone'}`;
+      }
+      if (metadata.type === 'rename') {
+        return `Renamed: "${metadata.old_title}" → "${metadata.new_title}"`;
       }
     }
 
@@ -200,9 +203,9 @@ export default function QuptItem({ qupt, showEntanglementName = false, onDelete 
         )}
         <button
           onClick={() => setExpanded(!expanded)}
-          className="w-full p-3 text-left hover:bg-gray-200 dark:hover:bg-quantum-700/50 transition-colors"
+          className="w-full p-3 pr-10 text-left hover:bg-gray-200 dark:hover:bg-quantum-700/50 transition-colors"
         >
-          <div className="flex items-start justify-between gap-3 pr-8">
+          <div className="flex items-start gap-3">
             <div className="flex-1">
               <div className="flex items-center gap-2">
                 <p className="text-gray-900 dark:text-gray-200 flex-1">{formatContent()}</p>
@@ -251,12 +254,13 @@ export default function QuptItem({ qupt, showEntanglementName = false, onDelete 
                   <span
                     className={`text-sm font-semibold ${
                       metadata.type === 'new_file' ? 'text-green-400' :
-                      metadata.type === 'revision' ? 'text-purple-400' : 
+                      metadata.type === 'revision' ? 'text-purple-400' :
+                      metadata.type === 'rename' ? 'text-blue-400' :
                       'text-yellow-400'
                     }`}
-                    title={metadata.type === 'new_file' ? 'New file' : metadata.type === 'revision' ? 'Revision' : 'Comment'}
+                    title={metadata.type === 'new_file' ? 'New file' : metadata.type === 'revision' ? 'Revision' : metadata.type === 'rename' ? 'Renamed' : 'Comment'}
                   >
-                    {metadata.type === 'new_file' ? '📄' : metadata.type === 'revision' ? '✏️' : '💬'}
+                    {metadata.type === 'new_file' ? '📄' : metadata.type === 'revision' ? '✏️' : metadata.type === 'rename' ? '✏️' : '💬'}
                   </span>
                 )}
                 {qupt.source === 'gmail' && (
@@ -416,6 +420,26 @@ export default function QuptItem({ qupt, showEntanglementName = false, onDelete 
                           Revision #{metadata.revision_id}
                         </div>
                       )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Rename */}
+                {metadata.type === 'rename' && (
+                  <div className="space-y-2">
+                    <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 text-xs font-semibold">
+                      ✏️ Renamed
+                    </span>
+                    
+                    <div className="p-3 bg-gray-100 dark:bg-quantum-900/30 rounded border-l-2 border-blue-500">
+                      <div className="text-sm space-y-1">
+                        <div className="text-gray-600 dark:text-gray-400">
+                          <span className="font-semibold">Old name:</span> {metadata.old_title}
+                        </div>
+                        <div className="text-gray-900 dark:text-gray-100">
+                          <span className="font-semibold">New name:</span> {metadata.new_title}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}

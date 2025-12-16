@@ -36,13 +36,9 @@ export const gdriveHandler: SourceHandler = {
         return { qupts };
       } else if (mode === 'document' && document_id) {
         // Document mode: Track revisions and comments
-        await collectDocumentActivity(source, document_id, headers, since, cursor, track_revisions, track_comments, qupts);
-        const maxRevisionId = qupts
-          .filter(q => q.metadata?.type === 'revision')
-          .reduce((max, q) => Math.max(max, parseInt(q.metadata?.revision_id || '0')), cursor ? parseInt(cursor) : 0);
-        
-        console.log(`Google Drive handler collected ${qupts.length} qupts for document ${document_id}`);
-        return { qupts, cursor: String(maxRevisionId) };
+        const result = await collectDocumentActivity(source, document_id, headers, since, cursor, track_revisions, track_comments);
+        console.log(`Google Drive handler collected ${result.qupts.length} qupts for document ${document_id}`);
+        return { qupts: result.qupts, cursor: result.cursor };
       } else {
         throw new Error(`Invalid configuration: mode=${mode}, document_id=${document_id}, folder_id=${folder_id}`);
       }
@@ -141,9 +137,9 @@ async function collectDocumentActivity(
   since: number | undefined,
   cursor: string | undefined,
   track_revisions: boolean,
-  track_comments: boolean,
-  qupts: QuptInput[]
-) {
+  track_comments: boolean
+): Promise<{ qupts: QuptInput[], cursor: string }> {
+  const qupts: QuptInput[] = [];
   // Get document title
   const docResponse = await fetch(
     `https://docs.googleapis.com/v1/documents/${document_id}?fields=title`,
@@ -158,11 +154,34 @@ async function collectDocumentActivity(
   const doc = await docResponse.json() as { title: string };
   const docTitle = doc.title;
   const lastProcessedId = cursor ? parseInt(cursor) : 0;
+  
+  // Check for file rename by comparing current title with stored title in cursor
+  // Cursor format: "revisionId:lastTitle"
+  if (cursor && cursor.includes(':')) {
+    const [, lastTitle] = cursor.split(':', 2);
+    if (lastTitle && lastTitle !== docTitle) {
+      // Title changed!
+      qupts.push({
+        entanglement_id: source.entanglement_id,
+        content: `Renamed: "${lastTitle}" → "${docTitle}"`,
+        source: 'gdrive',
+        external_id: `gdrive:${document_id}:rename:${Date.now()}`,
+        metadata: {
+          type: 'rename',
+          document_id,
+          old_title: lastTitle,
+          new_title: docTitle,
+          url: `https://docs.google.com/document/d/${document_id}/edit`
+        },
+        created_at: Math.floor(Date.now() / 1000)
+      });
+    }
+  }
 
   // Fetch revisions
   if (track_revisions) {
     const revisionsResponse = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${document_id}/revisions?fields=revisions(id,modifiedTime,lastModifyingUser)&pageSize=100`,
+      `https://www.googleapis.com/drive/v3/files/${document_id}/revisions?fields=revisions(id,modifiedTime,lastModifyingUser,originalFilename)&pageSize=100`,
       { headers }
     );
 
@@ -232,4 +251,14 @@ async function collectDocumentActivity(
       }
     }
   }
+  
+  // Calculate new cursor with title
+  const maxRevisionId = qupts
+    .filter(q => q.metadata?.type === 'revision')
+    .reduce((max, q) => Math.max(max, parseInt(q.metadata?.revision_id || '0')), cursor && cursor.includes(':') ? parseInt(cursor.split(':')[0]) : 0);
+  
+  // Store cursor as "revisionId:title" to detect renames next time
+  const newCursor = `${maxRevisionId}:${docTitle}`;
+  
+  return { qupts, cursor: newCursor };
 }
