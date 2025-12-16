@@ -4,17 +4,17 @@ import { Logger } from '../lib/logger';
 import { validateCloudflareAccessToken, extractCloudflareAccessToken } from '../lib/cf-access';
 import { validateMcpToken } from '../lib/mcp-tokens';
 import { DB } from '../db';
-import type { Bindings, Zoku, AccessTier } from '../types';
+import type { HonoEnv, Zoku, AccessTier } from '../types';
 
 /**
  * Authentication middleware for web requests
  * Validates Cloudflare Access JWT and loads user
  */
 export function authMiddleware() {
-  return async (c: Context, next: Next) => {
-    const env = c.env as Bindings;
+  return async (c: Context<HonoEnv>, next: Next) => {
+    const env = c.env;
     const logger = new Logger({
-      request_id: c.get('requestId'),
+      request_id: c.get('request_id') || crypto.randomUUID().substring(0, 8),
       operation: 'auth_middleware'
     });
 
@@ -111,15 +111,15 @@ export function requireTier(minTier: AccessTier) {
     prime: 3,
   };
 
-  return async (c: Context, next: Next) => {
+  return async (c: Context<HonoEnv>, next: Next) => {
     const user = c.get('user') as Zoku;
     if (!user) {
       return c.json({ error: 'Authentication required' }, 401);
     }
 
-    const env = c.env as Bindings;
+    const env = c.env;
     const logger = new Logger({
-      request_id: c.get('requestId'),
+      request_id: c.get('request_id') || crypto.randomUUID().substring(0, 8),
       user_id: user.id,
       operation: 'require_tier'
     });

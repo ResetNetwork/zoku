@@ -1,8 +1,9 @@
 import { Context, Next } from 'hono';
 import { Logger, LogLevel } from '../lib/logger';
+import type { HonoEnv } from '../types';
 
 export function loggingMiddleware() {
-  return async (c: Context, next: Next) => {
+  return async (c: Context<HonoEnv>, next: Next) => {
     const requestId = crypto.randomUUID().slice(0, 8);
     const sessionId = c.req.header('X-Zoku-Session-ID');
     const startTime = Date.now();
@@ -20,8 +21,7 @@ export function loggingMiddleware() {
     }, logLevel);
 
     c.set('logger', logger);
-    c.set('requestId', requestId);
-    c.set('startTime', startTime);
+    c.set('request_id', requestId);
 
     // Log request start
     logger.info('Request started', {
