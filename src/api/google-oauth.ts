@@ -98,21 +98,43 @@ app.get('/google/callback-page', async (c) => {
 
       console.log('✅ postMessage sent successfully');
 
-      // Update UI to show success
-      document.querySelector('.message').innerHTML =
-        '<div style="text-align: center;">' +
-        '<svg style="width: 64px; height: 64px; margin: 0 auto 20px; color: #22c55e;" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-        '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>' +
-        '</svg>' +
-        '<h2 style="color: #22c55e; margin-bottom: 12px;">Authorization Successful!</h2>' +
-        '<p style="color: #9ca3af;">You can close this window, or it will close automatically in 5 seconds.</p>' +
-        '</div>';
+      // Update UI based on success or error
+      if (tokens.error) {
+        // Show error state
+        const errorMessages = {
+          'access_denied': 'You denied access to your account.',
+          'invalid_scope': 'Invalid permission scope requested.',
+          'invalid_request': 'Invalid authorization request.',
+          'invalid_state': 'Authorization state mismatch. Please try again.'
+        };
+        const errorMsg = errorMessages[tokens.error] || 'Authorization failed: ' + tokens.error;
+        
+        document.querySelector('.message').innerHTML =
+          '<div style="text-align: center;">' +
+          '<svg style="width: 64px; height: 64px; margin: 0 auto 20px; color: #ef4444;" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+          '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>' +
+          '</svg>' +
+          '<h2 style="color: #ef4444; margin-bottom: 12px;">Authorization Failed</h2>' +
+          '<p style="color: #9ca3af;">' + errorMsg + '</p>' +
+          '<p style="color: #6b7280; margin-top: 12px;">You can close this window.</p>' +
+          '</div>';
+      } else {
+        // Show success state
+        document.querySelector('.message').innerHTML =
+          '<div style="text-align: center;">' +
+          '<svg style="width: 64px; height: 64px; margin: 0 auto 20px; color: #22c55e;" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+          '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>' +
+          '</svg>' +
+          '<h2 style="color: #22c55e; margin-bottom: 12px;">Authorization Successful!</h2>' +
+          '<p style="color: #9ca3af;">You can close this window, or it will close automatically in 5 seconds.</p>' +
+          '</div>';
 
-      // Close popup after 5 seconds
-      setTimeout(() => {
-        console.log('🚪 Closing popup window...');
-        window.close();
-      }, 5000);
+        // Close popup after 5 seconds only on success
+        setTimeout(() => {
+          console.log('🚪 Closing popup window...');
+          window.close();
+        }, 5000);
+      }
     } else {
       console.error('❌ No parent window (window.opener is null)');
       document.querySelector('.message').innerHTML =
@@ -129,7 +151,7 @@ app.get('/google/callback-page', async (c) => {
 // Arctic automatically handles PKCE (OAuth 2.1 requirement)
 app.post('/google/authorize', async (c) => {
   const body = await c.req.json();
-  const { client_id, client_secret } = body;
+  const { client_id, client_secret, jewel_type } = body;
 
   if (!client_id || !client_secret) {
     return c.json({
@@ -166,13 +188,25 @@ app.post('/google/authorize', async (c) => {
       // Use credentials and scopes from OAuth application
       actualClientId = oauthAppResult.client_id as string;
       actualClientSecret = oauthAppResult.client_secret as string; // Still encrypted - need to decrypt!
-      scopes = JSON.parse(oauthAppResult.scopes as string);
+      const allScopes = JSON.parse(oauthAppResult.scopes as string) as string[];
+      
+      // Filter scopes based on jewel type
+      if (jewel_type === 'gmail') {
+        // Gmail jewel: only Gmail scopes
+        scopes = allScopes.filter(scope => scope.includes('gmail'));
+      } else if (jewel_type === 'gdrive') {
+        // Google Drive jewel: only Drive and Docs scopes (exclude Gmail)
+        scopes = allScopes.filter(scope => !scope.includes('gmail'));
+      } else {
+        // Unknown type: use all scopes
+        scopes = allScopes;
+      }
       
       // Decrypt the client_secret
       const { decryptJewel } = await import('../lib/crypto');
       actualClientSecret = await decryptJewel(actualClientSecret, c.env.ENCRYPTION_KEY);
       
-      console.log('Using OAuth application:', { client_id: actualClientId, scopes });
+      console.log('Using OAuth application:', { client_id: actualClientId, jewel_type, filtered_scopes: scopes });
     } catch (error) {
       console.error('Failed to fetch OAuth application:', error);
       return c.json({

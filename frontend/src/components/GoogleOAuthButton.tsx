@@ -67,7 +67,8 @@ export default function GoogleOAuthButton({ onSuccess, onCancel, jewelType = 'gd
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           client_id: oauthApp.client_id,
-          client_secret: '[USE_SERVER_CONFIG]' // Signal to use server-side OAuth app
+          client_secret: '[USE_SERVER_CONFIG]', // Signal to use server-side OAuth app
+          jewel_type: jewelType // Send jewel type to filter scopes
         })
       }).then(r => r.json())
 
@@ -156,16 +157,14 @@ export default function GoogleOAuthButton({ onSuccess, onCancel, jewelType = 'gd
 
       console.log('👂 Listening for postMessage events...')
       window.addEventListener('message', handleMessage)
+      setMessageHandler(() => handleMessage)
 
       // Also check if popup closes without completing
       const checkClosed = setInterval(() => {
-        if (popup.closed) {
+        if (newPopup && newPopup.closed) {
           clearInterval(checkClosed)
-          window.removeEventListener('message', handleMessage)
-          if (authorizing) {
-            setAuthorizing(false)
-            console.log('❌ OAuth popup closed without completing')
-          }
+          cleanup()
+          console.log('❌ OAuth popup closed without completing')
         }
       }, 500)
 
