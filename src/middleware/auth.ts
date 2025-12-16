@@ -18,15 +18,77 @@ export function authMiddleware() {
       operation: 'auth_middleware'
     });
 
-    // Extract JWT
-    const token = extractCloudflareAccessToken(c.req.raw);
+    // Extract JWT from CF Access header
+    let token = extractCloudflareAccessToken(c.req.raw);
+
+    // In dev mode (no CF Access configured), accept JWT from Authorization header or Cookie
+    if (!token && !env.CF_ACCESS_TEAM_DOMAIN) {
+      // Try Authorization header
+      const authHeader = c.req.header('Authorization');
+      if (authHeader?.startsWith('Bearer ')) {
+        token = authHeader.substring(7);
+      }
+      // Try Cookie (for browser auto-login)
+      if (!token) {
+        const cookie = c.req.header('Cookie');
+        const match = cookie?.match(/dev_auth_token=([^;]+)/);
+        if (match) {
+          token = match[1];
+        }
+      }
+    }
+
     if (!token) {
-      logger.warn('Missing CF Access JWT');
+      logger.warn('Missing authentication token');
+
+      // In dev mode, redirect to dev login page
+      if (!env.CF_ACCESS_TEAM_DOMAIN) {
+        return c.redirect('/dev/login');
+      }
+
       return c.json({ error: 'Authentication required' }, 401);
     }
 
+    // Try dev JWT first (if CF Access not configured)
+    if (!env.CF_ACCESS_TEAM_DOMAIN && !env.CF_ACCESS_AUD) {
+      const { validateDevJWT } = await import('../lib/dev-auth');
+      const devPayload = await validateDevJWT(env, token);
+
+      if (devPayload) {
+        logger.info('Dev JWT validated', { email: devPayload.email });
+
+        // Load or create user (same logic as CF Access)
+        const db = new DB(env.DB);
+        let user = await db.getZokuByEmail(devPayload.email);
+
+        if (!user) {
+          user = await db.createZoku({
+            name: devPayload.email.split('@')[0],
+            type: 'human',
+            email: devPayload.email,
+            access_tier: 'prime', // Dev users get prime access
+            cf_access_sub: devPayload.sub,
+          });
+          logger.info('New user auto-created (dev)', { user_id: user.id });
+        } else if (user.access_tier === 'observed') {
+          await db.updateZokuTier(user.id, 'prime'); // Promote to prime in dev
+          user.access_tier = 'prime';
+          logger.info('User auto-promoted (dev)', { user_id: user.id });
+        }
+
+        await db.updateZoku(user.id, {
+          last_login: Math.floor(Date.now() / 1000),
+          cf_access_sub: devPayload.sub
+        });
+
+        c.set('user', user);
+        logger.info('User authenticated (dev)', { user_id: user.id, tier: user.access_tier });
+        return next();
+      }
+    }
+
     try {
-      // Validate JWT
+      // Validate real Cloudflare Access JWT
       const payload = await validateCloudflareAccessToken(token, env);
       logger.info('CF Access token validated', { email: payload.email });
 

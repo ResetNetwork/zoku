@@ -12,6 +12,7 @@ import jewelsRoutes from './api/jewels';
 import googleOAuthRoutes from './api/google-oauth';
 import mcpTokensRoutes from './api/mcp-tokens';
 import mcpOAuthRoutes from './api/mcp-oauth';
+import devAuthRoutes from './api/dev-auth';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -20,6 +21,9 @@ app.use('/*', cors());
 
 // Enable logging for all requests
 app.use('/*', loggingMiddleware());
+
+// Dev auth (only active when CF_ACCESS_TEAM_DOMAIN not configured)
+app.route('/dev', devAuthRoutes);
 
 // OAuth routes (must be before API routes for /.well-known to work)
 app.route('/', mcpOAuthRoutes);  // OAuth discovery (/.well-known/oauth-authorization-server)
