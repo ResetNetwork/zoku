@@ -1,7 +1,7 @@
 import { BaseService } from './base';
-import { addSourceSchema, updateSourceSchema } from '../lib/validation';
+import { createSourceSchema, updateSourceSchema } from '../lib/validation';
 import { NotFoundError, ValidationError } from '../lib/errors';
-import { syncSource } from '../handlers';
+import { syncSource } from '../lib/sync-source';
 import type { Source, Env } from '../types';
 
 export class SourceService extends BaseService {
@@ -34,7 +34,7 @@ export class SourceService extends BaseService {
   async create(entanglementId: string, input: unknown): Promise<Source> {
     this.requireTier('entangled');
 
-    const data = this.validate(addSourceSchema, input);
+    const data = this.validate(createSourceSchema, input);
 
     // Verify entanglement exists
     const entanglement = await this.db.getEntanglement(entanglementId);

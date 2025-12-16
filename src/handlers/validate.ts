@@ -1,10 +1,36 @@
 // Source validation helpers
+import type { Env } from '../types';
 
 export interface ValidationResult {
   valid: boolean;
   warnings: string[];
   errors: string[];
   metadata?: Record<string, any>;
+  info?: Record<string, any>;
+  error?: string;
+}
+
+/**
+ * Validate jewel credentials based on type
+ * Used by JewelService for credential validation
+ */
+export async function validateJewel(type: string, data: any, env: Env): Promise<ValidationResult> {
+  switch (type) {
+    case 'github':
+      return await validateGitHubCredential(data);
+    case 'zammad':
+      return await validateZammadCredential(data);
+    case 'gdrive':
+    case 'gdocs':
+      return await validateGoogleDocsCredential(data, data.client_id, data.client_secret);
+    default:
+      return {
+        valid: false,
+        warnings: [],
+        errors: [`Unknown jewel type: ${type}`],
+        error: `Unknown jewel type: ${type}`
+      };
+  }
 }
 
 /**
