@@ -162,7 +162,9 @@ export default function QuptItem({ qupt, showEntanglementName = false, onDelete 
         return `${metadata.document_title}: Comment by ${metadata.author || 'Someone'}`;
       }
       if (metadata.type === 'rename') {
-        return `Renamed: "${metadata.old_title}" → "${metadata.new_title}"`;
+        const oldName = metadata.old_title || metadata.old_name;
+        const newName = metadata.new_title || metadata.new_name;
+        return `Renamed: "${oldName}" → "${newName}"`;
       }
     }
 
@@ -434,10 +436,10 @@ export default function QuptItem({ qupt, showEntanglementName = false, onDelete 
                     <div className="p-3 bg-gray-100 dark:bg-quantum-900/30 rounded border-l-2 border-blue-500">
                       <div className="text-sm space-y-1">
                         <div className="text-gray-600 dark:text-gray-400">
-                          <span className="font-semibold">Old name:</span> {metadata.old_title}
+                          <span className="font-semibold">Old name:</span> {metadata.old_title || metadata.old_name}
                         </div>
                         <div className="text-gray-900 dark:text-gray-100">
-                          <span className="font-semibold">New name:</span> {metadata.new_title}
+                          <span className="font-semibold">New name:</span> {metadata.new_title || metadata.new_name}
                         </div>
                       </div>
                     </div>
