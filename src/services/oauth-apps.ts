@@ -35,7 +35,12 @@ export class OAuthApplicationService extends BaseService {
 
     query += ' ORDER BY created_at DESC';
 
-    const results = await this.db.query<OAuthApplication>(query, params);
+    const stmt = this.db.d1.prepare(query);
+    if (params.length > 0) {
+      stmt.bind(...params);
+    }
+    const result = await stmt.all();
+    const results = result.results as OAuthApplication[];
 
     // Decrypt client_secret if requested (prime tier only)
     if (options.decrypt) {
@@ -74,15 +79,17 @@ export class OAuthApplicationService extends BaseService {
 
     this.logger.info('Getting OAuth application', { oauth_app_id: id });
 
-    const app = await this.db.get<OAuthApplication>(
-      'SELECT * FROM oauth_applications WHERE id = ?',
-      [id]
-    );
+    const result = await this.db.d1
+      .prepare('SELECT * FROM oauth_applications WHERE id = ?')
+      .bind(id)
+      .first();
 
-    if (!app) {
+    if (!result) {
       this.logger.info('OAuth application not found', { oauth_app_id: id });
       return null;
     }
+
+    const app = result as OAuthApplication;
 
     // Decrypt client_secret if requested
     if (options.decrypt) {
@@ -139,10 +146,10 @@ export class OAuthApplicationService extends BaseService {
     // Encrypt client_secret
     const encryptedSecret = encryptJewel(input.client_secret, this.env.ENCRYPTION_KEY);
 
-    await this.db.run(
-      `INSERT INTO oauth_applications (id, name, provider, client_id, client_secret, scopes, metadata, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
+    await this.db.d1
+      .prepare(`INSERT INTO oauth_applications (id, name, provider, client_id, client_secret, scopes, metadata, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(
         id,
         input.name,
         input.provider,
@@ -152,8 +159,8 @@ export class OAuthApplicationService extends BaseService {
         input.metadata ? JSON.stringify(input.metadata) : null,
         now,
         now
-      ]
-    );
+      )
+      .run();
 
     // Audit log
     await this.audit('oauth_app_created', 'oauth_application', id, {
@@ -233,10 +240,10 @@ export class OAuthApplicationService extends BaseService {
 
     values.push(id);
 
-    await this.db.run(
-      `UPDATE oauth_applications SET ${sets.join(', ')} WHERE id = ?`,
-      values
-    );
+    await this.db.d1
+      .prepare(`UPDATE oauth_applications SET ${sets.join(', ')} WHERE id = ?`)
+      .bind(...values)
+      .run();
 
     // Audit log
     await this.audit('oauth_app_updated', 'oauth_application', id, {
@@ -262,10 +269,11 @@ export class OAuthApplicationService extends BaseService {
     }
 
     // Check if any jewels are using this OAuth app
-    const jewelsUsingApp = await this.db.query<any>(
-      'SELECT id, name, type FROM jewels WHERE oauth_app_id = ?',
-      [id]
-    );
+    const result = await this.db.d1
+      .prepare('SELECT id, name, type FROM jewels WHERE oauth_app_id = ?')
+      .bind(id)
+      .all();
+    const jewelsUsingApp = result.results;
 
     if (jewelsUsingApp.length > 0) {
       throw new Error(
@@ -274,7 +282,10 @@ export class OAuthApplicationService extends BaseService {
       );
     }
 
-    await this.db.run('DELETE FROM oauth_applications WHERE id = ?', [id]);
+    await this.db.d1
+      .prepare('DELETE FROM oauth_applications WHERE id = ?')
+      .bind(id)
+      .run();
 
     // Audit log
     await this.audit('oauth_app_deleted', 'oauth_application', id, {
@@ -294,15 +305,17 @@ export class OAuthApplicationService extends BaseService {
 
     this.logger.info('Getting OAuth application by provider', { provider });
 
-    const app = await this.db.get<OAuthApplication>(
-      'SELECT * FROM oauth_applications WHERE provider = ? ORDER BY created_at DESC LIMIT 1',
-      [provider]
-    );
+    const result = await this.db.d1
+      .prepare('SELECT * FROM oauth_applications WHERE provider = ? ORDER BY created_at DESC LIMIT 1')
+      .bind(provider)
+      .first();
 
-    if (!app) {
+    if (!result) {
       this.logger.info('No OAuth application found for provider', { provider });
       return null;
     }
+
+    const app = result as OAuthApplication;
 
     // Parse JSON but keep secret encrypted
     app.scopes = JSON.parse(app.scopes as any);
@@ -321,13 +334,15 @@ export class OAuthApplicationService extends BaseService {
 
     this.logger.info('Listing jewels using OAuth application', { oauth_app_id: id });
 
-    const jewels = await this.db.query<any>(
-      `SELECT id, name, type, owner_id, created_at, updated_at
+    const result = await this.db.d1
+      .prepare(`SELECT id, name, type, owner_id, created_at, updated_at
        FROM jewels
        WHERE oauth_app_id = ?
-       ORDER BY created_at DESC`,
-      [id]
-    );
+       ORDER BY created_at DESC`)
+      .bind(id)
+      .all();
+
+    const jewels = result.results;
 
     this.logger.info('Jewels using OAuth app listed', {
       oauth_app_id: id,
