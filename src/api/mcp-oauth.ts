@@ -4,7 +4,14 @@
 
 import { Hono } from 'hono';
 import { authMiddleware } from '../middleware/auth';
-import { createMcpOAuthProvider } from '../lib/mcp-oauth';
+import {
+  createAuthorizationCode,
+  exchangeCodeForToken,
+  refreshAccessToken,
+  registerClient,
+  validateOAuthToken,
+  revokeOAuthToken
+} from '../lib/mcp-oauth';
 import type { Bindings, Zoku } from '../types';
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -23,11 +30,8 @@ app.get('/.well-known/oauth-authorization-server', async (c) => {
     response_types_supported: ['code'],
     grant_types_supported: ['authorization_code', 'refresh_token'],
     code_challenge_methods_supported: ['S256'],
-    token_endpoint_auth_methods_supported: ['none', 'client_secret_basic'],
-    scopes_supported: ['mcp'],
-    token_endpoint: `${baseUrl}/oauth/token`,
-    revocation_endpoint: `${baseUrl}/oauth/revoke`,
-    revocation_endpoint_auth_methods_supported: ['none', 'client_secret_basic']
+    token_endpoint_auth_methods_supported: ['none'],
+    scopes_supported: ['mcp']
   });
 });
 
@@ -46,12 +50,18 @@ app.get('/oauth/authorize', authMiddleware(), async (c) => {
 
   // Validate required parameters
   if (!client_id || !redirect_uri || !code_challenge) {
-    return c.html(renderError('Missing required OAuth parameters'), 400);
+    return c.html(renderError('Missing required OAuth parameters: client_id, redirect_uri, or code_challenge'), 400);
   }
 
   // Validate PKCE (MCP requires S256)
   if (code_challenge_method !== 'S256') {
-    return c.html(renderError('PKCE with S256 required'), 400);
+    return c.html(renderError('PKCE code_challenge_method must be S256'), 400);
+  }
+
+  // Validate redirect_uri (must be HTTPS or localhost)
+  const redirectUrl = new URL(redirect_uri);
+  if (redirectUrl.protocol !== 'https:' && redirectUrl.hostname !== 'localhost' && redirectUrl.hostname !== '127.0.0.1') {
+    return c.html(renderError('Redirect URI must use HTTPS or localhost'), 400);
   }
 
   // Render authorization page
@@ -70,76 +80,103 @@ app.post('/oauth/authorize', authMiddleware(), async (c) => {
   const user = c.get('user') as Zoku;
   const body = await c.req.parseBody();
 
+  const redirect_uri = body.redirect_uri as string;
+  const state = (body.state as string) || '';
+
   // Check tier
   if (user.access_tier === 'observed') {
-    const redirect = new URL(body.redirect_uri as string);
+    const redirect = new URL(redirect_uri);
     redirect.searchParams.set('error', 'access_denied');
-    redirect.searchParams.set('error_description', 'User has no access');
-    if (body.state) redirect.searchParams.set('state', body.state as string);
+    redirect.searchParams.set('error_description', 'User has no access tier');
+    if (state) redirect.searchParams.set('state', state);
     return c.redirect(redirect.toString());
   }
 
   // User denied
   if (body.action !== 'approve') {
-    const redirect = new URL(body.redirect_uri as string);
+    const redirect = new URL(redirect_uri);
     redirect.searchParams.set('error', 'access_denied');
     redirect.searchParams.set('error_description', 'User denied authorization');
-    if (body.state) redirect.searchParams.set('state', body.state as string);
+    if (state) redirect.searchParams.set('state', state);
     return c.redirect(redirect.toString());
   }
 
-  // Complete authorization using OAuth provider
+  // Generate authorization code
   try {
-    const provider = createMcpOAuthProvider(c.env);
-
-    // Build authorization request from form data
-    const authRequest = {
-      response_type: 'code',
+    const code = await createAuthorizationCode(c.env, {
       client_id: body.client_id as string,
-      redirect_uri: body.redirect_uri as string,
-      state: (body.state as string) || undefined,
+      redirect_uri,
+      user_id: user.id,
+      tier: user.access_tier,
       code_challenge: body.code_challenge as string,
-      code_challenge_method: body.code_challenge_method as string,
       scope: (body.scope as string) || 'mcp'
-    };
-
-    // Complete authorization - generates code and stores PKCE challenge
-    const result = await provider.completeAuthorization({
-      request: authRequest,
-      userId: user.id,
-      scope: [authRequest.scope],
-      props: {
-        user_id: user.id,
-        tier: user.access_tier,
-        email: user.email
-      }
     });
 
     // Redirect to client with authorization code
-    return c.redirect(result.redirectTo);
+    const redirect = new URL(redirect_uri);
+    redirect.searchParams.set('code', code);
+    if (state) redirect.searchParams.set('state', state);
+
+    return c.redirect(redirect.toString());
   } catch (error) {
-    console.error('OAuth authorization failed:', error);
-    const redirect = new URL(body.redirect_uri as string);
+    console.error('Failed to generate authorization code:', error);
+    const redirect = new URL(redirect_uri);
     redirect.searchParams.set('error', 'server_error');
-    redirect.searchParams.set('error_description', error instanceof Error ? error.message : 'Authorization failed');
-    if (body.state) redirect.searchParams.set('state', body.state as string);
+    redirect.searchParams.set('error_description', error instanceof Error ? error.message : 'Failed to generate code');
+    if (state) redirect.searchParams.set('state', state);
     return c.redirect(redirect.toString());
   }
 });
 
-// Token endpoint - exchange authorization code for access token
-// Handled entirely by OAuth provider library
+// Token endpoint - exchange authorization code for access token, or refresh token
 app.post('/oauth/token', async (c) => {
   try {
-    const provider = createMcpOAuthProvider(c.env);
-    const response = await provider.handleTokenRequest(c.req.raw);
-    return response;
+    const body = await c.req.parseBody();
+    const grant_type = body.grant_type as string;
+
+    if (grant_type === 'authorization_code') {
+      // Exchange code for tokens
+      const code = body.code as string;
+      const code_verifier = body.code_verifier as string;
+      const client_id = body.client_id as string;
+      const redirect_uri = body.redirect_uri as string;
+
+      if (!code || !code_verifier || !client_id || !redirect_uri) {
+        return c.json({
+          error: 'invalid_request',
+          error_description: 'Missing required parameters'
+        }, 400);
+      }
+
+      const tokens = await exchangeCodeForToken(c.env, code, code_verifier, client_id, redirect_uri);
+      return c.json(tokens);
+
+    } else if (grant_type === 'refresh_token') {
+      // Refresh access token
+      const refresh_token = body.refresh_token as string;
+
+      if (!refresh_token) {
+        return c.json({
+          error: 'invalid_request',
+          error_description: 'Missing refresh_token'
+        }, 400);
+      }
+
+      const tokens = await refreshAccessToken(c.env, refresh_token);
+      return c.json(tokens);
+
+    } else {
+      return c.json({
+        error: 'unsupported_grant_type',
+        error_description: `Grant type '${grant_type}' not supported`
+      }, 400);
+    }
   } catch (error) {
-    console.error('Token exchange failed:', error);
+    console.error('Token endpoint error:', error);
     return c.json({
-      error: 'server_error',
+      error: 'invalid_grant',
       error_description: error instanceof Error ? error.message : 'Token exchange failed'
-    }, 500);
+    }, 400);
   }
 });
 
@@ -147,9 +184,22 @@ app.post('/oauth/token', async (c) => {
 // Allows MCP clients to auto-register without manual configuration
 app.post('/oauth/register', async (c) => {
   try {
-    const provider = createMcpOAuthProvider(c.env);
-    const response = await provider.handleClientRegistration(c.req.raw);
-    return response;
+    const body = await c.req.json();
+
+    if (!body.client_name || !body.redirect_uris || !Array.isArray(body.redirect_uris)) {
+      return c.json({
+        error: 'invalid_request',
+        error_description: 'Missing client_name or redirect_uris'
+      }, 400);
+    }
+
+    const client = await registerClient(c.env, {
+      client_name: body.client_name,
+      redirect_uris: body.redirect_uris,
+      grant_types: body.grant_types
+    });
+
+    return c.json(client);
   } catch (error) {
     console.error('Client registration failed:', error);
     return c.json({
@@ -162,9 +212,18 @@ app.post('/oauth/register', async (c) => {
 // Token revocation
 app.post('/oauth/revoke', async (c) => {
   try {
-    const provider = createMcpOAuthProvider(c.env);
-    const response = await provider.handleRevocation(c.req.raw);
-    return response;
+    const body = await c.req.parseBody();
+    const token = body.token as string;
+
+    if (!token) {
+      return c.json({
+        error: 'invalid_request',
+        error_description: 'Missing token'
+      }, 400);
+    }
+
+    await revokeOAuthToken(c.env, token);
+    return c.json({ success: true });
   } catch (error) {
     console.error('Token revocation failed:', error);
     return c.json({

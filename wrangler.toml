@@ -17,6 +17,9 @@ preview_id = "placeholder-for-preview"
 [vars]
 LOG_LEVEL = "info"
 
+[dev]
+port = 8789
+
 [assets]
 directory = "./frontend/dist"
 

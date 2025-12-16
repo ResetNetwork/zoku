@@ -84,14 +84,11 @@ export async function validateMcpToken(
   // Try OAuth token first (if OAuth is configured)
   if (env.AUTH_KV && env.APP_URL) {
     try {
-      const { createMcpOAuthProvider } = await import('./mcp-oauth');
-      const provider = createMcpOAuthProvider(env);
+      const { validateOAuthToken } = await import('./mcp-oauth');
+      const tokenData = await validateOAuthToken(env, token);
 
-      // Validate OAuth access token
-      const tokenData = await provider.validateAccessToken(token);
-
-      if (tokenData?.props?.user_id) {
-        const user = await db.getZoku(tokenData.props.user_id);
+      if (tokenData?.user_id) {
+        const user = await db.getZoku(tokenData.user_id);
         if (!user) throw new Error('OAuth token valid but user not found');
         if (user.access_tier === 'observed') throw new Error('Access revoked');
         return user;
