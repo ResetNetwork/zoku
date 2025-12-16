@@ -46,6 +46,10 @@ export default function QuptItem({ qupt, showEntanglementName = false }: QuptIte
     }
   }
 
+  const getGmailIcon = () => {
+    return '📧' // Email icon for Gmail
+  }
+
   const getEventTypeColor = (eventType: string) => {
     switch (eventType) {
       case 'PushEvent':
@@ -129,6 +133,22 @@ export default function QuptItem({ qupt, showEntanglementName = false }: QuptIte
       }
     }
 
+    // Gmail formatting
+    if (qupt.source === 'gmail') {
+      const from = metadata.from || 'Unknown sender';
+      const subject = metadata.subject || '(no subject)';
+      
+      // Determine if incoming or outgoing
+      // Simple heuristic: if 'from' contains common outgoing indicators
+      const isOutgoing = from.toLowerCase().includes('me') || 
+                        from.toLowerCase().includes('you') ||
+                        from.toLowerCase().includes(metadata.user_email || '');
+      
+      const direction = isOutgoing ? '→' : '←';
+      
+      return `${direction} ${from}: ${subject}`;
+    }
+
     // Fallback to stored content
     return qupt.content;
   }
@@ -192,6 +212,14 @@ export default function QuptItem({ qupt, showEntanglementName = false }: QuptIte
                     title={metadata.type}
                   >
                     {metadata.type === 'revision' ? '←' : '💬'}
+                  </span>
+                )}
+                {qupt.source === 'gmail' && (
+                  <span
+                    className="text-sm text-blue-400"
+                    title="Gmail message"
+                  >
+                    {getGmailIcon()}
                   </span>
                 )}
               </div>
@@ -386,8 +414,45 @@ export default function QuptItem({ qupt, showEntanglementName = false }: QuptIte
               </div>
             )}
 
+            {/* Gmail-specific metadata */}
+            {qupt.source === 'gmail' && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-3 text-sm">
+                  {metadata.from && (
+                    <span className="text-gray-600 dark:text-gray-400">
+                      <span className="font-semibold">From:</span> {metadata.from}
+                    </span>
+                  )}
+                  {metadata.date && (
+                    <span className="text-gray-600 dark:text-gray-400">
+                      <span className="font-semibold">Date:</span> {metadata.date}
+                    </span>
+                  )}
+                </div>
+
+                {metadata.subject && (
+                  <div className="text-gray-600 dark:text-gray-400 text-sm">
+                    <span className="font-semibold">Subject:</span> {metadata.subject}
+                  </div>
+                )}
+
+                {metadata.label && (
+                  <div className="text-gray-600 dark:text-gray-400 text-sm">
+                    <span className="font-semibold">Label:</span> <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 text-xs">{metadata.label}</span>
+                  </div>
+                )}
+
+                {metadata.body_preview && (
+                  <div className="text-gray-700 dark:text-gray-300 mt-2 p-3 bg-gray-100 dark:bg-quantum-900/30 rounded border-l-2 border-blue-500">
+                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Message Preview:</div>
+                    <div className="text-sm whitespace-pre-wrap">{metadata.body_preview}</div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Fallback for other sources */}
-            {!['github', 'zammad', 'gdrive'].includes(qupt.source) && (
+            {!['github', 'zammad', 'gdrive', 'gmail'].includes(qupt.source) && (
               <pre className="p-2 bg-gray-200 dark:bg-quantum-900/50 rounded text-xs overflow-x-auto">
                 {JSON.stringify(metadata, null, 2)}
               </pre>
