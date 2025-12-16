@@ -105,6 +105,11 @@ export async function validateMcpToken(
     const secret = new TextEncoder().encode(env.JWT_SECRET);
     const { payload } = await jwtVerify(token, secret);
 
+    // Reject OAuth tokens (they should be handled above)
+    if (payload.token_type === 'oauth' || payload.token_type === 'oauth_refresh') {
+      throw new Error('OAuth token must be validated via OAuth flow');
+    }
+
     const jti = payload.jti as string;
     const userId = payload.sub as string;
 
