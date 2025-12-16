@@ -64,28 +64,51 @@ async function collectFolderFiles(
   console.log(`📁 Listing files in folder ${folder_id}...`);
   
   // Build query: files in this folder, created after 'since'
+  // If no since (initial sync), get files from last 30 days
   let query = `'${folder_id}' in parents and trashed = false`;
   if (since) {
-    const sinceDate = new Date(since * 1000).toISOString();
+    // Use >= instead of > to catch files created at the same second
+    // Subtract 1 second to avoid missing files during sync timing
+    const sinceDate = new Date((since - 1) * 1000).toISOString();
     query += ` and createdTime > '${sinceDate}'`;
+    console.log(`📁 Incremental sync since: ${sinceDate} (${since - 1})`);
+  } else {
+    // Initial sync: get files from last 30 days
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    query += ` and createdTime > '${thirtyDaysAgo}'`;
+    console.log(`📁 Initial sync: getting files from last 30 days (since ${thirtyDaysAgo})`);
   }
   
-  const filesResponse = await fetch(
-    `https://www.googleapis.com/drive/v3/files?` +
-    `q=${encodeURIComponent(query)}&` +
-    `fields=files(id,name,mimeType,createdTime,owners,webViewLink)&` +
-    `pageSize=100&` +
-    `orderBy=createdTime desc`,
-    { headers }
-  );
+  console.log(`📁 Query: ${query}`);
+  
+  // Build API URL with shared drives support
+  const apiUrl = new URL('https://www.googleapis.com/drive/v3/files');
+  apiUrl.searchParams.set('q', query);
+  apiUrl.searchParams.set('fields', 'files(id,name,mimeType,createdTime,owners,webViewLink)');
+  apiUrl.searchParams.set('pageSize', '100');
+  apiUrl.searchParams.set('orderBy', 'createdTime desc');
+  apiUrl.searchParams.set('supportsAllDrives', 'true');
+  apiUrl.searchParams.set('includeItemsFromAllDrives', 'true');
+  apiUrl.searchParams.set('corpora', 'allDrives');
+  
+  console.log(`📁 API URL: ${apiUrl.toString()}`);
+  
+  const filesResponse = await fetch(apiUrl.toString(), { headers });
 
+  console.log(`📁 API Response status: ${filesResponse.status}`);
+  
   if (!filesResponse.ok) {
     const errorText = await filesResponse.text();
+    console.error(`❌ Google Drive API error: ${errorText}`);
     throw new Error(`Google Drive API error (${filesResponse.status}): ${errorText}`);
   }
 
   const filesData = await filesResponse.json() as { files?: any[] };
   console.log(`📁 Found ${filesData.files?.length || 0} new files`);
+  
+  if (filesData.files && filesData.files.length > 0) {
+    console.log(`📁 First file: ${filesData.files[0].name} (created: ${filesData.files[0].createdTime})`);
+  }
 
   for (const file of filesData.files || []) {
     const createdTime = new Date(file.createdTime).getTime() / 1000;
