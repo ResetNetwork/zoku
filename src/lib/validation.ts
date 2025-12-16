@@ -65,7 +65,6 @@ export const batchCreateQuptsSchema = z.object({
 
 // Source schemas
 export const createSourceSchema = z.object({
-  entanglement_id: uuidSchema,
   type: z.enum(['github', 'zammad', 'gdocs', 'gdrive']),
   config: z.record(z.unknown()),
   jewels: z.record(z.unknown()).optional(),
