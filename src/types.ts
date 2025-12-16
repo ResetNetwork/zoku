@@ -73,9 +73,22 @@ export interface Jewel {
   name: string;
   type: string;
   data: string;  // Encrypted JSON
+  oauth_app_id: string | null;  // Reference to oauth_applications table
   owner_id: string | null;
   last_validated: number | null;
   validation_metadata: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface OAuthApplication {
+  id: string;
+  name: string;
+  provider: string;  // 'google', 'microsoft', 'slack', etc.
+  client_id: string;
+  client_secret: string;  // Encrypted with ENCRYPTION_KEY
+  scopes: string[] | string;  // JSON array of OAuth scopes
+  metadata: Record<string, any> | string | null;  // Provider-specific config
   created_at: number;
   updated_at: number;
 }

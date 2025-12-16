@@ -15,6 +15,7 @@ import googleOAuthRoutes from './api/google-oauth';
 import mcpTokensRoutes from './api/mcp-tokens';
 import { mcpOAuthPublicRoutes, mcpOAuthProtectedRoutes } from './api/mcp-oauth';
 import auditLogsRoutes from './api/audit-logs';
+import oauthAppsRoutes from './api/oauth-apps';
 
 const app = new Hono<HonoEnv>();
 
@@ -67,6 +68,7 @@ app.route('/api/jewels', jewelsRoutes);
 app.route('/api/oauth', googleOAuthRoutes);  // Google OAuth for jewels
 app.route('/api/mcp-tokens', mcpTokensRoutes);  // Personal Access Tokens
 app.route('/api/audit-logs', auditLogsRoutes);  // Audit log (Prime only)
+app.route('/api/oauth-apps', oauthAppsRoutes);  // OAuth Applications (Prime only)
 
 // MCP endpoint (has its own Bearer token authentication inside handler)
 import { handleMcpRequest } from './mcp/server';
