@@ -112,12 +112,13 @@ app.post('/oauth/authorize', authMiddleware(), async (c) => {
       scope: (body.scope as string) || 'mcp'
     });
 
-    // Redirect to client with authorization code
+    // Build redirect URL with code
     const redirect = new URL(redirect_uri);
     redirect.searchParams.set('code', code);
     if (state) redirect.searchParams.set('state', state);
 
-    return c.redirect(redirect.toString());
+    // Show success page with auto-redirect
+    return c.html(renderSuccessPage(redirect.toString()));
   } catch (error) {
     console.error('Failed to generate authorization code:', error);
     const redirect = new URL(redirect_uri);
@@ -549,6 +550,95 @@ function renderError(message: string): string {
     <h1>Invalid Request</h1>
     <p>${escapeHtml(message)}</p>
   </div>
+</body>
+</html>`;
+}
+
+function renderSuccessPage(redirectUrl: string): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Authorization Successful</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #0a0e1a 0%, #1e1b4b 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      color: #e5e7eb;
+    }
+    .card {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 40px;
+      max-width: 500px;
+      width: 100%;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      text-align: center;
+    }
+    .success-icon {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 24px;
+      color: #22c55e;
+    }
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      color: #22c55e;
+    }
+    p {
+      font-size: 16px;
+      color: #9ca3af;
+      margin-bottom: 8px;
+    }
+    .countdown {
+      font-size: 14px;
+      color: #6b7280;
+      margin-top: 24px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <svg class="success-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+    </svg>
+    <h1>Authorization Successful!</h1>
+    <p>You can close this window.</p>
+    <p>Return to Claude Code.</p>
+    <p class="countdown">Closing automatically in <span id="timer">5</span> seconds...</p>
+  </div>
+
+  <script>
+    let seconds = 5;
+    const timerEl = document.getElementById('timer');
+
+    const countdown = setInterval(() => {
+      seconds--;
+      if (timerEl) timerEl.textContent = seconds.toString();
+
+      if (seconds <= 0) {
+        clearInterval(countdown);
+        window.location.href = '${escapeHtml(redirectUrl)}';
+      }
+    }, 1000);
+
+    // Also redirect immediately if user clicks anywhere
+    document.addEventListener('click', () => {
+      clearInterval(countdown);
+      window.location.href = '${escapeHtml(redirectUrl)}';
+    });
+  </script>
 </body>
 </html>`;
 }
