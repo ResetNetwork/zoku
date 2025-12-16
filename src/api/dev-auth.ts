@@ -8,7 +8,7 @@ const app = new Hono<{ Bindings: Bindings }>();
 
 // Generate dev JWT for testing
 // Only works when CF_ACCESS_TEAM_DOMAIN is not configured
-app.post('/dev/login', async (c) => {
+app.post('/login', async (c) => {
   // Only allow in dev mode
   if (c.env.CF_ACCESS_TEAM_DOMAIN || c.env.CF_ACCESS_AUD) {
     return c.json({ error: 'Dev endpoints disabled in production' }, 403);
@@ -34,7 +34,7 @@ app.post('/dev/login', async (c) => {
 });
 
 // Simple login page for browser testing
-app.get('/dev/login', async (c) => {
+app.get('/login', async (c) => {
   // Only allow in dev mode
   if (c.env.CF_ACCESS_TEAM_DOMAIN || c.env.CF_ACCESS_AUD) {
     return c.json({ error: 'Dev endpoints disabled in production' }, 403);
