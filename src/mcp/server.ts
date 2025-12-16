@@ -1518,10 +1518,10 @@ export async function mcpHandler(c: Context<{ Bindings: Bindings }>) {
     // Parse request body
     const body = await c.req.json().catch(() => undefined);
 
-    // Authenticate MCP request (unless dev bypass)
+    // Authenticate MCP request (unless MCP dev bypass)
     let user = null;
-    if (c.env.DEV_AUTH_BYPASS === 'true' && c.env.DEV_USER_EMAIL) {
-      // Dev bypass
+    if (c.env.DEV_MCP_AUTH_BYPASS === 'true' && c.env.DEV_USER_EMAIL) {
+      // MCP dev bypass (separate from web auth bypass)
       user = await db.getZokuByEmail(c.env.DEV_USER_EMAIL);
       if (!user) {
         user = await db.createZoku({

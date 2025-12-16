@@ -12,7 +12,8 @@ export interface Bindings {
   // OAuth KV storage
   AUTH_KV?: KVNamespace;
   // Development
-  DEV_AUTH_BYPASS?: string;
+  DEV_AUTH_BYPASS?: string;  // For web UI
+  DEV_MCP_AUTH_BYPASS?: string;  // For MCP (separate from web)
   DEV_USER_EMAIL?: string;
   APP_URL?: string;
 }
