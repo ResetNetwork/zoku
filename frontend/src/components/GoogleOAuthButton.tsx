@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import { useNotifications } from '../lib/notifications'
 
@@ -15,14 +16,30 @@ interface GoogleOAuthButtonProps {
 
 export default function GoogleOAuthButton({ onSuccess, onCancel, jewelType = 'gdrive', initialValues }: GoogleOAuthButtonProps) {
   const [name, setName] = useState(initialValues?.name || '')
-  const [clientId, setClientId] = useState(initialValues?.clientId || '')
-  const [clientSecret, setClientSecret] = useState(initialValues?.clientSecret || '')
   const [authorizing, setAuthorizing] = useState(false)
   const { addNotification } = useNotifications()
 
+  // Fetch OAuth application for Google
+  const { data: oauthApp, isLoading: loadingOAuthApp } = useQuery({
+    queryKey: ['oauth-app', 'google'],
+    queryFn: async () => {
+      const response = await fetch('/api/oauth-apps?provider=google')
+      if (!response.ok) {
+        throw new Error('Failed to load OAuth application')
+      }
+      const data = await response.json()
+      return data.oauth_applications?.[0] || null
+    }
+  })
+
   const handleStartOAuth = async () => {
-    if (!name || !clientId || !clientSecret) {
-      addNotification('error', 'Please provide all fields')
+    if (!name) {
+      addNotification('error', 'Please provide a jewel name')
+      return
+    }
+
+    if (!oauthApp) {
+      addNotification('error', 'No Google OAuth application configured. Ask admin to configure in Settings.')
       return
     }
 
@@ -30,11 +47,14 @@ export default function GoogleOAuthButton({ onSuccess, onCancel, jewelType = 'gd
     console.log('🔐 Starting Google OAuth flow...')
 
     try {
-      // Get authorization URL from backend
+      // Get authorization URL from backend using OAuth app credentials
       const authData = await fetch('/api/oauth/google/authorize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ client_id: clientId, client_secret: clientSecret })
+        body: JSON.stringify({ 
+          client_id: oauthApp.client_id,
+          client_secret: '[USE_SERVER_CONFIG]' // Signal to use server-side OAuth app
+        })
       }).then(r => r.json())
 
       if (authData.error) {
@@ -92,16 +112,15 @@ export default function GoogleOAuthButton({ onSuccess, onCancel, jewelType = 'gd
             }
 
             console.log('🎫 Creating jewel with tokens...')
-            console.log('Jewel data:', { name, type: jewelType })
+            console.log('Jewel data:', { name, type: jewelType, oauth_app_id: oauthApp.id })
 
-            // Create jewel with the tokens + client credentials
+            // Create jewel with the tokens + link to OAuth application
             const jewel = await api.createJewel({
               name: name,
               type: jewelType,
+              oauth_app_id: oauthApp.id,
               data: {
-                refresh_token: tokens.refresh_token,
-                client_id: tokens.client_id,
-                client_secret: tokens.client_secret
+                refresh_token: tokens.refresh_token
               }
             })
 
@@ -152,21 +171,46 @@ export default function GoogleOAuthButton({ onSuccess, onCancel, jewelType = 'gd
   const serviceLabel = jewelType === 'gmail' ? 'Gmail' : 'Google Drive'
   const placeholderName = jewelType === 'gmail' ? 'My Gmail' : 'My Google Drive'
 
+  if (loadingOAuthApp) {
+    return (
+      <div className="card space-y-4">
+        <p className="text-gray-400">Loading OAuth configuration...</p>
+      </div>
+    )
+  }
+
+  if (!oauthApp) {
+    return (
+      <div className="card space-y-4">
+        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-md p-4">
+          <h3 className="text-lg font-semibold text-yellow-500 mb-2">OAuth Application Not Configured</h3>
+          <p className="text-sm text-gray-400 mb-3">
+            Google OAuth must be configured by an admin before you can connect {serviceLabel}.
+          </p>
+          <p className="text-sm text-gray-400">
+            Ask a prime tier user to configure Google OAuth in <strong>Settings → OAuth Applications</strong>.
+          </p>
+        </div>
+        {onCancel && (
+          <button onClick={onCancel} className="btn btn-secondary w-full">
+            Cancel
+          </button>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="card space-y-4">
       <div>
         <h3 className="text-lg font-semibold mb-2">Connect {serviceLabel}</h3>
-        <p className="text-sm text-gray-400 mb-4">
-          Enter your Google Cloud project OAuth jewels.
-          <a
-            href="https://console.cloud.google.com/apis/jewels"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-quantum-500 hover:text-quantum-400 ml-1"
-          >
-            Get jewels →
-          </a>
+        <p className="text-sm text-gray-400 mb-2">
+          Click below to authorize your Google account.
         </p>
+        <div className="text-xs text-gray-500 bg-gray-100 dark:bg-quantum-800 rounded p-3">
+          <p className="font-medium mb-1">Using configured OAuth application:</p>
+          <p className="text-quantum-400">{oauthApp.name}</p>
+        </div>
       </div>
 
       <div>
@@ -180,32 +224,10 @@ export default function GoogleOAuthButton({ onSuccess, onCancel, jewelType = 'gd
         />
       </div>
 
-      <div>
-        <label className="block text-sm text-gray-400 mb-2">Client ID</label>
-        <input
-          type="text"
-          value={clientId}
-          onChange={(e) => setClientId(e.target.value)}
-          placeholder="123456789.apps.googleusercontent.com"
-          className="w-full px-3 py-2 rounded-md bg-gray-100 dark:bg-quantum-700 border border-gray-300 dark:border-quantum-600 text-gray-900 dark:text-gray-100"
-        />
-      </div>
-
-      <div>
-        <label className="block text-sm text-gray-400 mb-2">Client Secret</label>
-        <input
-          type="password"
-          value={clientSecret}
-          onChange={(e) => setClientSecret(e.target.value)}
-          placeholder="GOCSPX-..."
-          className="w-full px-3 py-2 rounded-md bg-gray-100 dark:bg-quantum-700 border border-gray-300 dark:border-quantum-600 text-gray-900 dark:text-gray-100"
-        />
-      </div>
-
       <div className="flex gap-2">
         <button
           onClick={handleStartOAuth}
-          disabled={authorizing || !name || !clientId || !clientSecret}
+          disabled={authorizing || !name}
           className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed flex-1 flex items-center justify-center gap-2"
         >
           {authorizing ? (

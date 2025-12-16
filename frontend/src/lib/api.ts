@@ -180,7 +180,7 @@ export const api = {
     return data.jewels || []
   },
 
-  async createJewel(credential: { name: string; type: string; data: any }) {
+  async createJewel(credential: { name: string; type: string; data: any; oauth_app_id?: string }) {
     console.log('📡 API: Creating jewel...', { name: credential.name, type: credential.type })
     const res = await fetch(`${API_BASE}/jewels`, {
       method: 'POST',
