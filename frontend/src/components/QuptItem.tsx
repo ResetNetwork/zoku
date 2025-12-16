@@ -442,10 +442,14 @@ export default function QuptItem({ qupt, showEntanglementName = false }: QuptIte
                   </div>
                 )}
 
-                {metadata.body_preview && (
+                {(metadata.body || metadata.body_preview) && (
                   <div className="text-gray-700 dark:text-gray-300 mt-2 p-3 bg-gray-100 dark:bg-quantum-900/30 rounded border-l-2 border-blue-500">
-                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Message Preview:</div>
-                    <div className="text-sm whitespace-pre-wrap">{metadata.body_preview}</div>
+                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">
+                      {metadata.body ? 'Message Body:' : 'Message Preview:'}
+                    </div>
+                    <div className="text-sm whitespace-pre-wrap max-h-96 overflow-y-auto">
+                      {metadata.body || metadata.body_preview}
+                    </div>
                   </div>
                 )}
               </div>

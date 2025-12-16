@@ -119,16 +119,19 @@ export const gmailHandler: SourceHandler = {
           const from = headers_map.get('from') || 'unknown';
           const date = headers_map.get('date') || '';
 
-          // Extract body (simplified - gets first text part)
-          let bodyPreview = '';
+          // Extract body (full text + preview)
+          let fullBody = '';
           if (message.payload.body?.data) {
-            bodyPreview = Buffer.from(message.payload.body.data, 'base64').toString('utf-8').substring(0, 200);
+            fullBody = Buffer.from(message.payload.body.data, 'base64').toString('utf-8');
           } else if (message.payload.parts) {
             const textPart = message.payload.parts.find(p => p.mimeType === 'text/plain');
             if (textPart?.body?.data) {
-              bodyPreview = Buffer.from(textPart.body.data, 'base64').toString('utf-8').substring(0, 200);
+              fullBody = Buffer.from(textPart.body.data, 'base64').toString('utf-8');
             }
           }
+
+          const bodyPreview = fullBody.substring(0, 200).trim();
+          const bodyText = fullBody.trim();
 
           const timestamp = Math.floor(parseInt(message.internalDate) / 1000);
 
@@ -149,7 +152,8 @@ export const gmailHandler: SourceHandler = {
               from,
               date,
               label,
-              body_preview: bodyPreview.trim(),
+              body_preview: bodyPreview,
+              body: bodyText, // Full body text
               url: `https://mail.google.com/mail/u/0/#inbox/${message.id}`
             },
             created_at: timestamp
