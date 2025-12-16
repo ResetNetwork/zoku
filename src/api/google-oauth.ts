@@ -227,13 +227,14 @@ app.post('/google/authorize', async (c) => {
   const state = generateState();
   const codeVerifier = generateCodeVerifier();
 
-  // Store credentials and code_verifier in state for callback
+  // Store state data in KV for callback (expires in 10 minutes)
   const stateData = JSON.stringify({
-    nonce: state,
-    client_id,
-    client_secret,
-    code_verifier: codeVerifier
+    client_id: actualClientId,
+    client_secret: actualClientSecret,
+    code_verifier: codeVerifier,
+    timestamp: Date.now()
   });
+  await c.env.AUTH_KV.put(`oauth_state:${state}`, stateData, { expirationTtl: 600 });
 
   // Arctic automatically adds PKCE parameters (code_challenge, code_challenge_method)
   // and configures for offline access (refresh token)
@@ -249,7 +250,7 @@ app.post('/google/authorize', async (c) => {
 
   return c.json({
     authorization_url: authUrl.toString(),
-    state: btoa(stateData)
+    state: state
   });
 });
 
@@ -272,10 +273,19 @@ app.get('/google/callback', async (c) => {
     return c.redirect(errorUrl.toString());
   }
 
-  // Decode state to get credentials and code_verifier
+  // Fetch state data from KV
+  const stateDataStr = await c.env.AUTH_KV.get(`oauth_state:${encodedState}`);
+  if (!stateDataStr) {
+    const errorUrl = new URL('/api/oauth/google/callback-page', new URL(c.req.url).origin);
+    errorUrl.hash = 'error=invalid_state';
+    return c.redirect(errorUrl.toString());
+  }
+
+  // Parse state data and delete from KV (one-time use)
   let stateData: any;
   try {
-    stateData = JSON.parse(atob(encodedState));
+    stateData = JSON.parse(stateDataStr);
+    await c.env.AUTH_KV.delete(`oauth_state:${encodedState}`);
   } catch (e) {
     const errorUrl = new URL('/api/oauth/google/callback-page', new URL(c.req.url).origin);
     errorUrl.hash = 'error=invalid_state';
