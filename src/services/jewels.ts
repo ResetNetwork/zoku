@@ -2,6 +2,7 @@ import { BaseService } from './base';
 import { createJewelSchema, updateJewelSchema } from '../lib/validation';
 import { NotFoundError, ForbiddenError, ValidationError } from '../lib/errors';
 import { validateJewel } from '../handlers/validate';
+import { encryptJewel } from '../lib/crypto';
 import type { Jewel, Env } from '../types';
 
 export class JewelService extends BaseService {
@@ -75,10 +76,13 @@ export class JewelService extends BaseService {
       throw new ValidationError(`Jewel validation failed: ${validation.error}`);
     }
 
+    // Encrypt jewel data
+    const encryptedData = await encryptJewel(JSON.stringify(data.data), this.env.ENCRYPTION_KEY);
+
     const jewel = await this.db.createJewel({
       name: data.name,
       type: data.type,
-      data: data.data,
+      data: encryptedData,
       owner_id: this.user.id,
       validation_result: validation.info
     });
@@ -124,7 +128,9 @@ export class JewelService extends BaseService {
       if (!validation.valid) {
         throw new ValidationError(`Jewel validation failed: ${validation.error}`);
       }
-      updates.data = data.data;
+      // Encrypt jewel data
+      const encryptedData = await encryptJewel(JSON.stringify(data.data), this.env.ENCRYPTION_KEY);
+      updates.data = encryptedData;
       updates.validation_result = validation.info;
       updates.last_validated_at = new Date().toISOString();
     }
