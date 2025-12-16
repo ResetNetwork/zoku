@@ -182,41 +182,42 @@ export default function QuptItem({ qupt, showEntanglementName = false, onDelete 
 
   return (
     <div className="bg-gray-100 dark:bg-quantum-700/30 rounded-lg border border-gray-300 dark:border-quantum-600 overflow-hidden">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full p-3 text-left hover:bg-gray-200 dark:hover:bg-quantum-700/50 transition-colors"
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <p className="text-gray-900 dark:text-gray-200 flex-1">{formatContent()}</p>
-              {metadata?.url && (
-                <a
-                  href={metadata.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  className="text-gray-400 hover:text-quantum-500 transition-colors flex-shrink-0"
-                  title="View source"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                  </svg>
-                </a>
-              )}
-              {canWrite && (
-                <button
-                  onClick={handleDelete}
-                  disabled={deleting}
-                  className="text-gray-400 hover:text-red-500 transition-colors flex-shrink-0 disabled:opacity-50"
-                  title="Delete activity"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
-              )}
-            </div>
+      <div className="relative">
+        {canWrite && (
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            className="absolute top-2 right-2 z-10 p-1 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+            title="Delete activity"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+        )}
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="w-full p-3 text-left hover:bg-gray-200 dark:hover:bg-quantum-700/50 transition-colors"
+        >
+          <div className="flex items-start justify-between gap-3 pr-8">
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <p className="text-gray-900 dark:text-gray-200 flex-1">{formatContent()}</p>
+                {metadata?.url && (
+                  <a
+                    href={metadata.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-gray-400 hover:text-quantum-500 transition-colors flex-shrink-0"
+                    title="View source"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
+                )}
+              </div>
             <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
               <div className="flex items-center gap-1">
                 {showEntanglementName && qupt.entanglement_name && (
@@ -278,10 +279,11 @@ export default function QuptItem({ qupt, showEntanglementName = false, onDelete 
           </svg>
         </div>
       </button>
+    </div>
 
-      {expanded && metadata && (
-        <div className="px-3 pb-3 border-t border-gray-300 dark:border-quantum-600 pt-3 mt-0">
-          <div className="text-sm space-y-2">
+    {expanded && metadata && (
+      <div className="px-3 pb-3 border-t border-gray-300 dark:border-quantum-600 pt-3 mt-0">
+        <div className="text-sm space-y-2">
             {/* GitHub-specific metadata */}
             {qupt.source === 'github' && (
               <div className="space-y-2">
@@ -500,9 +502,9 @@ export default function QuptItem({ qupt, showEntanglementName = false, onDelete 
                 {JSON.stringify(metadata, null, 2)}
               </pre>
             )}
-          </div>
         </div>
-      )}
-    </div>
+      </div>
+    )}
+  </div>
   )
 }
