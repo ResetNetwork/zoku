@@ -41,7 +41,15 @@ export default function AddSourceForm({ entanglementId, onSuccess, onCancel }: A
     } else if (type === 'zammad') {
       setConfig({ tag: '', include_articles: true })
     } else if (type === 'gdrive') {
-      setConfig({ document_id: '', track_suggestions: false })
+      setConfig({ 
+        mode: 'document',
+        document_id: '',
+        folder_id: '',
+        label: '',
+        track_new_files: true,
+        track_revisions: true,
+        track_comments: true
+      })
     } else if (type === 'gmail') {
       setConfig({ label: '' })
     }
@@ -62,9 +70,20 @@ export default function AddSourceForm({ entanglementId, onSuccess, onCancel }: A
       addNotification('error', 'Please provide tag for Zammad source')
       return
     }
-    if (sourceType === 'gdrive' && !config.document_id) {
-      addNotification('error', 'Please provide document ID for Google Docs source')
-      return
+    if (sourceType === 'gdrive') {
+      const mode = config.mode || 'document'
+      if (mode === 'document' && !config.document_id) {
+        addNotification('error', 'Please provide document URL or ID')
+        return
+      }
+      if (mode === 'folder' && !config.folder_id) {
+        addNotification('error', 'Please provide folder URL or ID')
+        return
+      }
+      if (mode === 'label' && !config.label) {
+        addNotification('error', 'Please provide label name')
+        return
+      }
     }
     if (sourceType === 'gmail' && !config.label) {
       addNotification('error', 'Please provide label for Gmail source')
@@ -250,39 +269,134 @@ export default function AddSourceForm({ entanglementId, onSuccess, onCancel }: A
       {sourceType === 'gdrive' && (
         <>
           <div>
-            <label className="block text-sm text-gray-400 mb-2">File or Folder URL</label>
-            <input
-              type="text"
-              value={config.document_id}
-              onChange={(e) => {
-                // Extract document/folder ID from URL if pasted
-                const url = e.target.value
-                let id = url
-
-                // Extract from Google Docs URL: https://docs.google.com/document/d/DOCUMENT_ID/...
-                const docsMatch = url.match(/\/document\/d\/([a-zA-Z0-9-_]+)/)
-                if (docsMatch) {
-                  id = docsMatch[1]
-                }
-
-                // Extract from Google Drive URL: https://drive.google.com/drive/folders/FOLDER_ID
-                const folderMatch = url.match(/\/folders\/([a-zA-Z0-9-_]+)/)
-                if (folderMatch) {
-                  id = folderMatch[1]
-                }
-
-                // Extract from file URL: https://drive.google.com/file/d/FILE_ID/...
-                const fileMatch = url.match(/\/file\/d\/([a-zA-Z0-9-_]+)/)
-                if (fileMatch) {
-                  id = fileMatch[1]
-                }
-
-                setConfig({ ...config, document_id: id })
-              }}
-              placeholder="https://docs.google.com/document/d/... or ID"
+            <label className="block text-sm text-gray-400 mb-2">Source Type</label>
+            <select
+              value={config.mode || 'document'}
+              onChange={(e) => setConfig({ 
+                mode: e.target.value,
+                document_id: '',
+                folder_id: '',
+                label: '',
+                track_comments: true,
+                track_revisions: true
+              })}
               className="w-full px-3 py-2 rounded-md bg-gray-100 dark:bg-quantum-700 border border-gray-300 dark:border-quantum-600 text-gray-900 dark:text-gray-100"
-            />
-            <p className="text-xs text-gray-500 mt-1">Paste Google Docs/Drive URL or enter ID directly</p>
+            >
+              <option value="document">Individual Document</option>
+              <option value="folder">Folder</option>
+              <option value="label">Label</option>
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              {config.mode === 'document' && 'Track revisions and comments on a single document'}
+              {config.mode === 'folder' && 'Track new files, revisions, and comments in a folder'}
+              {config.mode === 'label' && 'Track new files, revisions, and comments with a specific label'}
+            </p>
+          </div>
+
+          {config.mode === 'document' && (
+            <div>
+              <label className="block text-sm text-gray-400 mb-2">Document URL or ID</label>
+              <input
+                type="text"
+                value={config.document_id || ''}
+                onChange={(e) => {
+                  const url = e.target.value
+                  let id = url
+
+                  // Extract from Google Docs URL: https://docs.google.com/document/d/DOCUMENT_ID/...
+                  const docsMatch = url.match(/\/document\/d\/([a-zA-Z0-9-_]+)/)
+                  if (docsMatch) {
+                    id = docsMatch[1]
+                  }
+
+                  // Extract from file URL: https://drive.google.com/file/d/FILE_ID/...
+                  const fileMatch = url.match(/\/file\/d\/([a-zA-Z0-9-_]+)/)
+                  if (fileMatch) {
+                    id = fileMatch[1]
+                  }
+
+                  setConfig({ ...config, document_id: id })
+                }}
+                placeholder="https://docs.google.com/document/d/abc123..."
+                className="w-full px-3 py-2 rounded-md bg-gray-100 dark:bg-quantum-700 border border-gray-300 dark:border-quantum-600 text-gray-900 dark:text-gray-100"
+              />
+              <p className="text-xs text-gray-500 mt-1">Paste Google Docs URL or enter document ID</p>
+            </div>
+          )}
+
+          {config.mode === 'folder' && (
+            <div>
+              <label className="block text-sm text-gray-400 mb-2">Folder URL or ID</label>
+              <input
+                type="text"
+                value={config.folder_id || ''}
+                onChange={(e) => {
+                  const url = e.target.value
+                  let id = url
+
+                  // Extract from Google Drive folder URL: https://drive.google.com/drive/folders/FOLDER_ID
+                  const folderMatch = url.match(/\/folders\/([a-zA-Z0-9-_]+)/)
+                  if (folderMatch) {
+                    id = folderMatch[1]
+                  }
+
+                  setConfig({ ...config, folder_id: id })
+                }}
+                placeholder="https://drive.google.com/drive/folders/abc123..."
+                className="w-full px-3 py-2 rounded-md bg-gray-100 dark:bg-quantum-700 border border-gray-300 dark:border-quantum-600 text-gray-900 dark:text-gray-100"
+              />
+              <p className="text-xs text-gray-500 mt-1">Paste Google Drive folder URL or enter folder ID</p>
+            </div>
+          )}
+
+          {config.mode === 'label' && (
+            <div>
+              <label className="block text-sm text-gray-400 mb-2">Label Name</label>
+              <input
+                type="text"
+                value={config.label || ''}
+                onChange={(e) => setConfig({ ...config, label: e.target.value })}
+                placeholder="zoku"
+                className="w-full px-3 py-2 rounded-md bg-gray-100 dark:bg-quantum-700 border border-gray-300 dark:border-quantum-600 text-gray-900 dark:text-gray-100"
+              />
+              <p className="text-xs text-gray-500 mt-1">Files with this label will be tracked</p>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <label className="block text-sm text-gray-400">Qupt Types</label>
+            {config.mode !== 'document' && (
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="track-new-files"
+                  checked={config.track_new_files !== false}
+                  onChange={(e) => setConfig({ ...config, track_new_files: e.target.checked })}
+                  className="rounded"
+                />
+                <label htmlFor="track-new-files" className="text-sm text-gray-400">Track new files</label>
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="track-revisions"
+                checked={config.track_revisions !== false}
+                onChange={(e) => setConfig({ ...config, track_revisions: e.target.checked })}
+                className="rounded"
+              />
+              <label htmlFor="track-revisions" className="text-sm text-gray-400">Track revisions</label>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="track-comments"
+                checked={config.track_comments !== false}
+                onChange={(e) => setConfig({ ...config, track_comments: e.target.checked })}
+                className="rounded"
+              />
+              <label htmlFor="track-comments" className="text-sm text-gray-400">Track comments</label>
+            </div>
           </div>
         </>
       )}
