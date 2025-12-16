@@ -243,16 +243,288 @@ get_entanglement({ id: "..." })  // Returns: { name, children_count, qupts_count
 get_entanglement({ id: "...", detailed: true })  // Returns: { name, children: [...], matrix, qupts: [...] }
 ```
 
-## Deployment
+## Production Deployment
+
+### Prerequisites
+
+1. **Cloudflare Account** with Workers and D1 enabled
+2. **Wrangler CLI** authenticated: `npx wrangler login`
+
+### One-Command Deployment Script
+
+Save this as `deploy.sh`:
 
 ```bash
-# Deploy to Cloudflare
-npm run deploy
+#!/bin/bash
+set -e
 
-# Run migrations on production
+echo "🚀 Deploying The Great Game to Cloudflare..."
+
+# 1. Create KV namespace (skip if exists)
+echo "📦 Creating KV namespace..."
+KV_OUTPUT=$(npx wrangler kv namespace create AUTH_KV 2>&1 || true)
+if echo "$KV_OUTPUT" | grep -q "id ="; then
+  KV_ID=$(echo "$KV_OUTPUT" | grep "id =" | cut -d'"' -f2)
+  echo "✅ KV created: $KV_ID"
+  echo "⚠️  Update wrangler.toml: [[kv_namespaces]] id = \"$KV_ID\""
+  read -p "Press Enter after updating wrangler.toml..."
+fi
+
+# 2. Set secrets
+echo "🔐 Setting secrets..."
+echo "Generate ENCRYPTION_KEY:"
+openssl rand -base64 32
+read -p "Copy above key, then press Enter..."
+npx wrangler secret put ENCRYPTION_KEY
+
+echo "Generate JWT_SECRET:"
+openssl rand -base64 32
+read -p "Copy above key, then press Enter..."
+npx wrangler secret put JWT_SECRET
+
+read -p "Enter admin email (e.g., admin@example.com): " ADMIN_EMAIL
+echo "$ADMIN_EMAIL" | npx wrangler secret put ADMIN_EMAIL
+
+# 3. Initialize database
+echo "🗄️  Initializing database..."
+npx wrangler d1 execute the-great-game --remote --file=./schema.sql
+npx wrangler d1 execute the-great-game --remote --file=./seed.sql
+
+# 4. Build frontend
+echo "🎨 Building frontend..."
+cd frontend && npm install && npm run build && cd ..
+
+# 5. Deploy
+echo "🚢 Deploying worker..."
+npx wrangler deploy
+
+echo "✅ Deployment complete!"
+echo "🌐 Testing deployment..."
+WORKER_URL=$(npx wrangler deployments list --json 2>/dev/null | grep -o 'https://[^"]*' | head -1)
+curl -s "$WORKER_URL/health" | jq .
+
+echo ""
+echo "📋 Next steps:"
+echo "1. Configure custom domain (if needed): npx wrangler domains add zoku.205.dev"
+echo "2. Setup Cloudflare Access at: https://one.dash.cloudflare.com/"
+echo "3. Visit your app and login to create admin user"
+```
+
+Make executable and run:
+```bash
+chmod +x deploy.sh
+./deploy.sh
+```
+
+### Manual Step-by-Step Deployment
+
+#### 1. Create Production KV Namespace
+
+```bash
+# Create KV namespace for OAuth state and sessions
+npx wrangler kv namespace create AUTH_KV
+
+# Example output:
+# { binding = "AUTH_KV", id = "abc123xyz456" }
+```
+
+Update `wrangler.toml`:
+```toml
+[[kv_namespaces]]
+binding = "AUTH_KV"
+id = "abc123xyz456"              # Replace with your actual ID
+preview_id = "def789uvw012"      # Optional, from: npx wrangler kv namespace create AUTH_KV --preview
+```
+
+#### 2. Set Production Secrets
+
+```bash
+# Generate and set encryption key
+openssl rand -base64 32  # Copy output
+npx wrangler secret put ENCRYPTION_KEY
+# Paste the key when prompted
+
+# Generate and set JWT secret
+openssl rand -base64 32  # Copy output
+npx wrangler secret put JWT_SECRET
+# Paste the key when prompted
+
+# Set admin email
+npx wrangler secret put ADMIN_EMAIL
+# Enter: your-email@example.com
+
+# Verify secrets are set
+npx wrangler secret list
+```
+
+#### 3. Initialize Database
+
+```bash
+# Apply schema (creates all tables)
+npx wrangler d1 execute the-great-game --remote --file=./schema.sql
+
+# Load seed data (taxonomy dimensions)
+npx wrangler d1 execute the-great-game --remote --file=./seed.sql
+
+# Verify tables exist
+npx wrangler d1 execute the-great-game --remote \
+  --command "SELECT name FROM sqlite_master WHERE type='table'"
+```
+
+#### 4. Build and Deploy
+
+```bash
+# Install frontend dependencies
+cd frontend && npm install && cd ..
+
+# Build frontend assets
+npm run build:frontend
+
+# Deploy worker with assets
+npx wrangler deploy
+
+# View deployment URL
+npx wrangler deployments list
+```
+
+#### 5. Configure Custom Domain
+
+```bash
+# Add custom domain via Wrangler
+npx wrangler domains add zoku.205.dev
+
+# Or manually add route to wrangler.toml and redeploy:
+# routes = [{ pattern = "zoku.205.dev/*", zone_name = "205.dev" }]
+npx wrangler deploy
+```
+
+#### 6. Setup Cloudflare Access (Web UI Auth)
+
+```bash
+# Open Cloudflare dashboard
+npx wrangler open
+
+# Navigate to: Zero Trust → Access → Applications → Add an application
+# - Type: Self-hosted
+# - Name: The Great Game  
+# - Domain: zoku.205.dev
+# - Policy: Allow emails @reset.tech (or your domain)
+```
+
+#### 7. Verify Deployment
+
+```bash
+# Get worker URL
+npx wrangler deployments list
+
+# Test health endpoint
+curl https://the-great-game.your-subdomain.workers.dev/health
+
+# Test OAuth metadata
+curl https://the-great-game.your-subdomain.workers.dev/.well-known/oauth-authorization-server | jq .
+
+# Tail logs
+npx wrangler tail --format pretty
+```
+
+#### 8. Create First Admin User
+
+```bash
+# Visit your deployed URL and login via Cloudflare Access
+# User will be auto-created as 'prime' tier if email matches ADMIN_EMAIL
+
+# Or manually promote after first login:
+npx wrangler d1 execute the-great-game --remote \
+  --command "SELECT id, email, access_tier FROM zoku WHERE type='human'"
+
+# Promote to prime tier (replace YOUR-USER-ID)
+npx wrangler d1 execute the-great-game --remote \
+  --command "UPDATE zoku SET access_tier='prime' WHERE id='YOUR-USER-ID'"
+
+# Verify promotion
+npx wrangler d1 execute the-great-game --remote \
+  --command "SELECT id, name, email, access_tier FROM zoku WHERE type='human'"
+```
+
+### Post-Deployment Checklist
+
+- [ ] KV namespace created and configured
+- [ ] Secrets set (ENCRYPTION_KEY, JWT_SECRET, ADMIN_EMAIL)
+- [ ] Database migrated and seeded
+- [ ] Frontend built and deployed
+- [ ] Cloudflare Access configured (or dev JWT setup)
+- [ ] Worker deployed successfully
+- [ ] Custom domain configured (optional)
+- [ ] Health endpoint responds
+- [ ] Admin user created and verified
+- [ ] MCP OAuth endpoint accessible
+- [ ] Cron trigger active (check Workers dashboard)
+
+### Environment Variables
+
+**Production Secrets (via `wrangler secret put`):**
+- `ENCRYPTION_KEY` - AES-256-GCM key for jewels/OAuth apps (required)
+- `JWT_SECRET` - HMAC key for MCP tokens (required)
+- `ADMIN_EMAIL` - Auto-promote user to prime tier (optional)
+
+**Public Variables (in `wrangler.toml`):**
+- `LOG_LEVEL` - Logging level: info, warn, error, fatal (default: info)
+
+**Bindings (in `wrangler.toml`):**
+- `DB` - D1 database binding
+- `AUTH_KV` - KV namespace for OAuth state and sessions
+
+### Rollback
+
+```bash
+# View recent deployments
+npx wrangler deployments list
+
+# Rollback to previous version
+npx wrangler rollback <version-id>
+```
+
+### Monitoring
+
+```bash
+# Tail logs in production
+npx wrangler tail --format pretty
+
+# Filter errors only
+npx wrangler tail --format pretty | grep '"level":"error"'
+
+# View specific request
+npx wrangler tail --format pretty | grep '"request_id":"abc12345"'
+```
+
+### Troubleshooting
+
+**"No such table" errors:**
+```bash
 npm run db:migrate:remote
 npm run db:seed:remote
 ```
+
+**"ENCRYPTION_KEY not configured":**
+```bash
+npx wrangler secret put ENCRYPTION_KEY
+# Paste: openssl rand -base64 32 output
+```
+
+**"Invalid authentication token" on web UI:**
+- Verify Cloudflare Access is configured
+- Check `Cf-Access-Jwt-Assertion` header exists
+- Ensure ADMIN_EMAIL matches your login email
+
+**MCP OAuth not working:**
+- Verify JWT_SECRET is set
+- Check AUTH_KV namespace is bound
+- Test metadata: `curl https://zoku.205.dev/.well-known/oauth-authorization-server`
+
+**Cron not running:**
+- Check Workers dashboard → Triggers → Crons
+- Should show: `*/5 * * * *` (every 5 minutes)
+- View logs: `npx wrangler tail | grep scheduled`
 
 ## Project Structure
 
