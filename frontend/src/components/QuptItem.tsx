@@ -164,7 +164,7 @@ export default function QuptItem({ qupt, showEntanglementName = false, onDelete 
       if (metadata.type === 'rename') {
         const oldName = metadata.old_title || metadata.old_name;
         const newName = metadata.new_title || metadata.new_name;
-        return `Renamed: "${oldName}" → "${newName}"`;
+        return `${oldName} → ${newName}`;
       }
     }
 
