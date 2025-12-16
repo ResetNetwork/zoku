@@ -4,21 +4,33 @@ import { useState, useEffect } from 'react';
 import { PatMetadata } from '../lib/types';
 import { useNotifications } from '../lib/notifications';
 
+interface OAuthSession {
+  id: string;
+  client_id: string;
+  client_name: string;
+  scope: string;
+  created_at: number;
+  last_used: number;
+}
+
 export default function AccountPage() {
   const { user } = useAuth();
   const { addNotification } = useNotifications();
   const [tokens, setTokens] = useState<PatMetadata[]>([]);
+  const [oauthSessions, setOauthSessions] = useState<OAuthSession[]>([]);
   const [showNewToken, setShowNewToken] = useState<string | null>(null);
   const [tokenName, setTokenName] = useState('');
   const [tokenExpiration, setTokenExpiration] = useState<30 | 60 | 90 | 365>(90);
   const [showTokenForm, setShowTokenForm] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [sessionsLoading, setSessionsLoading] = useState(true);
 
   // Use current domain for MCP URL examples
   const mcpUrl = `${window.location.origin}/mcp`;
 
   useEffect(() => {
     fetchTokens();
+    fetchOAuthSessions();
   }, []);
 
   const fetchTokens = async () => {
@@ -30,6 +42,39 @@ export default function AccountPage() {
       console.error('Failed to fetch tokens:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchOAuthSessions = async () => {
+    try {
+      const response = await fetch('/oauth/sessions');
+      const data = await response.json();
+      setOauthSessions(data.sessions || []);
+    } catch (error) {
+      console.error('Failed to fetch OAuth sessions:', error);
+    } finally {
+      setSessionsLoading(false);
+    }
+  };
+
+  const revokeOAuthSession = async (sessionId: string) => {
+    if (!confirm('Are you sure you want to revoke this OAuth session? The client will need to re-authorize.')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/oauth/sessions/${sessionId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to revoke session');
+      }
+
+      setOauthSessions(oauthSessions.filter(s => s.id !== sessionId));
+      addNotification('success', 'OAuth session revoked successfully');
+    } catch (error) {
+      addNotification('error', 'Failed to revoke OAuth session');
     }
   };
 
@@ -161,6 +206,63 @@ export default function AccountPage() {
           <p className="text-xs text-blue-700 dark:text-blue-300 mt-2">
             The client will automatically open your browser to authorize access.
           </p>
+        </div>
+
+        {/* Active OAuth Sessions */}
+        <div className="border-t border-gray-200 dark:border-gray-700 pt-6 mb-6">
+          <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Active OAuth Sessions</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            Authorized MCP clients with active access tokens.
+          </p>
+
+          {sessionsLoading ? (
+            <div className="text-center py-4 text-gray-500 dark:text-gray-400">Loading sessions...</div>
+          ) : oauthSessions.length === 0 ? (
+            <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+              No active OAuth sessions. Connect an MCP client to create one.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 dark:bg-gray-900">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Client</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Scope</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Created</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Last Used</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {oauthSessions.map(session => (
+                    <tr key={session.id}>
+                      <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                        {session.client_name}
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          {session.client_id.substring(0, 20)}...
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{session.scope}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                        {new Date(session.created_at * 1000).toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                        {new Date(session.last_used * 1000).toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        <button
+                          onClick={() => revokeOAuthSession(session.id)}
+                          className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
+                        >
+                          Revoke
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {/* Personal Access Tokens */}

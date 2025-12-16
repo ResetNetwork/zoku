@@ -9,6 +9,7 @@ const OAUTH_CODE_PREFIX = 'oauth:code:';
 const OAUTH_ACCESS_PREFIX = 'oauth:access:';
 const OAUTH_REFRESH_PREFIX = 'oauth:refresh:';
 const OAUTH_CLIENT_PREFIX = 'oauth:client:';
+const OAUTH_USER_SESSIONS_PREFIX = 'oauth:user:sessions:';
 
 export interface OAuthAuthorizationCode {
   code: string;
@@ -35,6 +36,18 @@ export interface OAuthClient {
   redirect_uris: string[];
   client_name: string;
   grant_types: string[];
+}
+
+export interface OAuthSession {
+  id: string;
+  client_id: string;
+  client_name: string;
+  user_id: string;
+  scope: string;
+  access_token_id: string;
+  refresh_token_id: string;
+  created_at: number;
+  last_used: number;
 }
 
 /**
@@ -144,6 +157,26 @@ export async function exchangeCodeForToken(
     JSON.stringify({ user_id: storedData.user_id, tier: storedData.tier, scope: storedData.scope }),
     { expirationTtl: 2592000 }
   );
+
+  // Track session for user (for Account page display)
+  const sessionId = `session_${crypto.randomUUID().replace(/-/g, '')}`;
+  const session: OAuthSession = {
+    id: sessionId,
+    client_id: storedData.client_id,
+    client_name: storedData.client_id, // Will be updated with actual name if available
+    user_id: storedData.user_id,
+    scope: storedData.scope,
+    access_token_id: accessTokenId,
+    refresh_token_id: refreshTokenId,
+    created_at: now,
+    last_used: now
+  };
+
+  // Add to user's session list
+  const userSessionsKey = `${OAUTH_USER_SESSIONS_PREFIX}${storedData.user_id}`;
+  const existingSessions = (await env.AUTH_KV.get(userSessionsKey, 'json')) as OAuthSession[] || [];
+  existingSessions.push(session);
+  await env.AUTH_KV.put(userSessionsKey, JSON.stringify(existingSessions));
 
   return {
     access_token: accessToken,
@@ -294,7 +327,56 @@ async function computeCodeChallenge(verifier: string): Promise<string> {
 }
 
 /**
- * Revoke OAuth token
+ * List user's OAuth sessions (for Account page)
+ */
+export async function listOAuthSessions(
+  env: Bindings,
+  userId: string
+): Promise<OAuthSession[]> {
+  const userSessionsKey = `${OAUTH_USER_SESSIONS_PREFIX}${userId}`;
+  const sessions = (await env.AUTH_KV.get(userSessionsKey, 'json')) as OAuthSession[] || [];
+
+  // Filter out expired sessions (access token > 30 days old)
+  const now = Math.floor(Date.now() / 1000);
+  const activeSessions = sessions.filter(s => (now - s.created_at) < 2592000);
+
+  // Update list if changed
+  if (activeSessions.length !== sessions.length) {
+    await env.AUTH_KV.put(userSessionsKey, JSON.stringify(activeSessions));
+  }
+
+  return activeSessions;
+}
+
+/**
+ * Revoke OAuth session (removes access + refresh tokens)
+ */
+export async function revokeOAuthSession(
+  env: Bindings,
+  userId: string,
+  sessionId: string
+): Promise<void> {
+  // Get user's sessions
+  const userSessionsKey = `${OAUTH_USER_SESSIONS_PREFIX}${userId}`;
+  const sessions = (await env.AUTH_KV.get(userSessionsKey, 'json')) as OAuthSession[] || [];
+
+  // Find session
+  const session = sessions.find(s => s.id === sessionId);
+  if (!session) {
+    throw new Error('Session not found');
+  }
+
+  // Delete tokens
+  await env.AUTH_KV.delete(`${OAUTH_ACCESS_PREFIX}${session.access_token_id}`);
+  await env.AUTH_KV.delete(`${OAUTH_REFRESH_PREFIX}${session.refresh_token_id}`);
+
+  // Remove from user's session list
+  const remainingSessions = sessions.filter(s => s.id !== sessionId);
+  await env.AUTH_KV.put(userSessionsKey, JSON.stringify(remainingSessions));
+}
+
+/**
+ * Revoke OAuth token (backward compat with old function name)
  */
 export async function revokeOAuthToken(
   env: Bindings,
@@ -306,11 +388,18 @@ export async function revokeOAuthToken(
 
     const tokenId = payload.jti as string;
     const tokenType = payload.token_type as string;
+    const userId = payload.sub as string;
 
     if (tokenType === 'oauth') {
       await env.AUTH_KV.delete(`${OAUTH_ACCESS_PREFIX}${tokenId}`);
     } else if (tokenType === 'oauth_refresh') {
       await env.AUTH_KV.delete(`${OAUTH_REFRESH_PREFIX}${tokenId}`);
+
+      // Also remove from user's session list
+      const userSessionsKey = `${OAUTH_USER_SESSIONS_PREFIX}${userId}`;
+      const sessions = (await env.AUTH_KV.get(userSessionsKey, 'json')) as OAuthSession[] || [];
+      const remaining = sessions.filter(s => s.refresh_token_id !== tokenId);
+      await env.AUTH_KV.put(userSessionsKey, JSON.stringify(remaining));
     }
   } catch (error) {
     // Token already invalid or expired

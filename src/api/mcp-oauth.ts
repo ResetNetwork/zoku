@@ -10,7 +10,9 @@ import {
   refreshAccessToken,
   registerClient,
   validateOAuthToken,
-  revokeOAuthToken
+  revokeOAuthToken,
+  listOAuthSessions,
+  revokeOAuthSession
 } from '../lib/mcp-oauth';
 import type { Bindings, Zoku } from '../types';
 
@@ -231,6 +233,28 @@ app.post('/oauth/revoke', async (c) => {
       error: 'server_error',
       error_description: error instanceof Error ? error.message : 'Revocation failed'
     }, 500);
+  }
+});
+
+// List user's OAuth sessions (for Account page)
+app.get('/oauth/sessions', authMiddleware(), async (c) => {
+  const user = c.get('user') as Zoku;
+  const sessions = await listOAuthSessions(c.env, user.id);
+  return c.json({ sessions });
+});
+
+// Revoke OAuth session by ID (for Account page)
+app.delete('/oauth/sessions/:id', authMiddleware(), async (c) => {
+  const user = c.get('user') as Zoku;
+  const sessionId = c.req.param('id');
+
+  try {
+    await revokeOAuthSession(c.env, user.id, sessionId);
+    return c.json({ success: true });
+  } catch (error) {
+    return c.json({
+      error: error instanceof Error ? error.message : 'Failed to revoke session'
+    }, 400);
   }
 });
 
