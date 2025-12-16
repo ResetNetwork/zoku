@@ -17,6 +17,8 @@ interface GoogleOAuthButtonProps {
 export default function GoogleOAuthButton({ onSuccess, onCancel, jewelType = 'gdrive', initialValues }: GoogleOAuthButtonProps) {
   const [name, setName] = useState(initialValues?.name || '')
   const [authorizing, setAuthorizing] = useState(false)
+  const [popup, setPopup] = useState<Window | null>(null)
+  const [messageHandler, setMessageHandler] = useState<((event: MessageEvent) => void) | null>(null)
   const { addNotification } = useNotifications()
 
   // Fetch OAuth application for Google
@@ -31,6 +33,18 @@ export default function GoogleOAuthButton({ onSuccess, onCancel, jewelType = 'gd
       return data.oauth_applications?.[0] || null
     }
   })
+
+  const cleanup = () => {
+    if (popup && !popup.closed) {
+      popup.close()
+      setPopup(null)
+    }
+    if (messageHandler) {
+      window.removeEventListener('message', messageHandler)
+      setMessageHandler(null)
+    }
+    setAuthorizing(false)
+  }
 
   const handleStartOAuth = async () => {
     if (!name) {
@@ -64,15 +78,17 @@ export default function GoogleOAuthButton({ onSuccess, onCancel, jewelType = 'gd
       console.log('📱 Opening OAuth popup...')
 
       // Open popup window
-      const popup = window.open(
+      const newPopup = window.open(
         authData.authorization_url,
         'google-oauth',
         'width=600,height=700,left=100,top=100'
       )
 
-      if (!popup) {
+      if (!newPopup) {
         throw new Error('Popup blocked. Please allow popups for this site.')
       }
+
+      setPopup(newPopup)
 
       // Listen for postMessage from callback page
       const handleMessage = async (event: MessageEvent) => {
@@ -127,21 +143,13 @@ export default function GoogleOAuthButton({ onSuccess, onCancel, jewelType = 'gd
             console.log(`✅ Jewel created: ${jewel.id}`)
             const successMsg = jewelType === 'gmail' ? 'Gmail connected successfully' : 'Google Drive connected successfully'
             addNotification('success', successMsg)
+            cleanup()
             onSuccess(jewel)
-            setAuthorizing(false)
-
-            // Close popup if still open
-            if (popup && !popup.closed) {
-              popup.close()
-            }
-
-            // Remove event listener
-            window.removeEventListener('message', handleMessage)
 
           } catch (error) {
             console.error('❌ Failed to create jewel:', error)
             addNotification('error', error instanceof Error ? error.message : 'Failed to create jewel')
-            setAuthorizing(false)
+            cleanup()
           }
         }
       }
@@ -243,7 +251,10 @@ export default function GoogleOAuthButton({ onSuccess, onCancel, jewelType = 'gd
           )}
         </button>
         <button
-          onClick={() => onCancel?.()}
+          onClick={() => {
+            setAuthorizing(false)
+            onCancel?.()
+          }}
           className="btn btn-secondary"
           disabled={authorizing}
         >

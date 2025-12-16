@@ -140,10 +140,54 @@ app.post('/google/authorize', async (c) => {
     }, 400);
   }
 
+  // Determine scopes and credentials to use
+  let scopes = GOOGLE_OAUTH_SCOPES; // Default fallback
+  let actualClientId = client_id;
+  let actualClientSecret = client_secret;
+
+  // If using server-side OAuth app (signaled by special value), fetch from OAuth app
+  if (client_secret === '[USE_SERVER_CONFIG]') {
+    try {
+      // Fetch OAuth application for Google to get configured scopes and credentials
+      const oauthAppResult = await c.env.DB
+        .prepare('SELECT client_id, client_secret, scopes FROM oauth_applications WHERE provider = ? ORDER BY created_at DESC LIMIT 1')
+        .bind('google')
+        .first();
+
+      if (!oauthAppResult) {
+        return c.json({
+          error: {
+            code: 'NO_OAUTH_APP',
+            message: 'No Google OAuth application configured. Ask admin to configure in Settings.'
+          }
+        }, 400);
+      }
+
+      // Use credentials and scopes from OAuth application
+      actualClientId = oauthAppResult.client_id as string;
+      actualClientSecret = oauthAppResult.client_secret as string; // Still encrypted - need to decrypt!
+      scopes = JSON.parse(oauthAppResult.scopes as string);
+      
+      // Decrypt the client_secret
+      const { decryptJewel } = await import('../lib/crypto');
+      actualClientSecret = await decryptJewel(actualClientSecret, c.env.ENCRYPTION_KEY);
+      
+      console.log('Using OAuth application:', { client_id: actualClientId, scopes });
+    } catch (error) {
+      console.error('Failed to fetch OAuth application:', error);
+      return c.json({
+        error: {
+          code: 'OAUTH_APP_ERROR',
+          message: 'Failed to fetch OAuth application configuration'
+        }
+      }, 500);
+    }
+  }
+
   const redirectUri = `${new URL(c.req.url).origin}/api/oauth/google/callback`;
 
-  // Initialize Arctic Google provider
-  const google = new Google(client_id, client_secret, redirectUri);
+  // Initialize Arctic Google provider with actual credentials
+  const google = new Google(actualClientId, actualClientSecret, redirectUri);
 
   // Generate state and code_verifier for PKCE
   const state = generateState();
@@ -162,7 +206,7 @@ app.post('/google/authorize', async (c) => {
   const authUrl = google.createAuthorizationURL(
     state,
     codeVerifier,
-    GOOGLE_OAUTH_SCOPES
+    scopes // Use dynamic scopes from OAuth application
   );
 
   // Add extra parameters for refresh token
