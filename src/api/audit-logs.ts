@@ -2,9 +2,9 @@
 import { Hono } from 'hono';
 import { requireTier } from '../middleware/auth';
 import { DB } from '../db';
-import type { Bindings } from '../types';
+import type { HonoEnv, Bindings } from '../types';
 
-const app = new Hono<{ Bindings: Bindings }>();
+const app = new Hono<HonoEnv>();
 
 // List audit logs (Prime only)
 app.get('/', requireTier('prime'), async (c) => {

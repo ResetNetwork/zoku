@@ -14,13 +14,13 @@ import {
   listOAuthSessions,
   revokeOAuthSession
 } from '../lib/mcp-oauth';
-import type { Bindings, Zoku } from '../types';
+import type { HonoEnv, Bindings, Zoku } from '../types';
 
 // Public routes (no authentication required - for OAuth flow)
 export const mcpOAuthPublicRoutes = new Hono<{ Bindings: Bindings }>();
 
 // Protected routes (CF Access JWT required - for user interaction)
-export const mcpOAuthProtectedRoutes = new Hono<{ Bindings: Bindings }>();
+export const mcpOAuthProtectedRoutes = new Hono<HonoEnv>();
 
 // ============================================================================
 // PUBLIC ROUTES (No authentication required)

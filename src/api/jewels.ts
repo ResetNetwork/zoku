@@ -1,10 +1,10 @@
 import { Hono } from 'hono';
-import type { Bindings, Zoku } from '../types';
+import type { HonoEnv, Bindings, Zoku } from '../types';
 import { DB } from '../db';
 import { Logger } from '../lib/logger';
 import { JewelService } from '../services/jewels';
 
-const app = new Hono<{ Bindings: Bindings }>();
+const app = new Hono<HonoEnv>();
 
 const getService = (c: any) => {
   const db = new DB(c.env.DB);

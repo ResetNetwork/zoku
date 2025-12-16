@@ -3,9 +3,9 @@
 
 import { Hono } from 'hono';
 import { Google, generateState, generateCodeVerifier } from 'arctic';
-import type { Bindings } from '../types';
+import type { HonoEnv, Bindings } from '../types';
 
-const app = new Hono<{ Bindings: Bindings }>();
+const app = new Hono<HonoEnv>();
 
 // Google OAuth configuration
 const GOOGLE_OAUTH_SCOPES = [
@@ -226,15 +226,25 @@ app.get('/google/callback', async (c) => {
 
     // Redirect to backend callback page with tokens in URL hash
     const callbackUrl = new URL('/api/oauth/google/callback-page', new URL(c.req.url).origin);
+    
+    // Arctic library uses method properties - call them and ensure string types
+    const refreshToken: string = typeof tokens.refreshToken === 'function' ? tokens.refreshToken() : tokens.refreshToken;
+    const accessToken: string = typeof tokens.accessToken === 'function' ? tokens.accessToken() : tokens.accessToken;
+    const expiresAt: Date | undefined = typeof tokens.accessTokenExpiresAt === 'function' ? tokens.accessTokenExpiresAt() : tokens.accessTokenExpiresAt;
+    const scopes: string[] = typeof tokens.scopes === 'function' ? tokens.scopes() : tokens.scopes;
+    
+    const expiresIn = expiresAt ?
+      Math.floor((expiresAt.getTime() - Date.now()) / 1000).toString() :
+      '3600';
+    const scopeString = Array.isArray(scopes) ? scopes.join(' ') : GOOGLE_OAUTH_SCOPES.join(' ');
+    
     callbackUrl.hash = new URLSearchParams({
-      refresh_token: tokens.refreshToken || '',
-      access_token: tokens.accessToken,
+      refresh_token: refreshToken || '',
+      access_token: accessToken,
       client_id,
       client_secret,
-      expires_in: tokens.accessTokenExpiresAt ?
-        Math.floor((tokens.accessTokenExpiresAt.getTime() - Date.now()) / 1000).toString() :
-        '3600',
-      scope: tokens.scopes?.join(' ') || GOOGLE_OAUTH_SCOPES.join(' ')
+      expires_in: expiresIn,
+      scope: scopeString
     }).toString();
 
     return c.redirect(callbackUrl.toString());
@@ -274,7 +284,7 @@ app.post('/google/verify', async (c) => {
       })
     });
 
-    const data = await response.json();
+    const data = await response.json() as any;
 
     if (!data.access_token) {
       throw new Error(`Token refresh failed: ${data.error_description || data.error}`);
@@ -283,9 +293,9 @@ app.post('/google/verify', async (c) => {
     return c.json({
       valid: true,
       metadata: {
-        token_type: data.token_type,
-        scope: data.scope,
-        expires_in: data.expires_in
+        token_type: data.token_type as string,
+        scope: data.scope as string,
+        expires_in: data.expires_in as number
       }
     });
 

@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
-import type { Bindings } from '../types';
+import type { HonoEnv, Bindings } from '../types';
 import { DB } from '../db';
 
-const app = new Hono<{ Bindings: Bindings }>();
+const app = new Hono<HonoEnv>();
 
 // List all dimensions with their values
 app.get('/', async (c) => {

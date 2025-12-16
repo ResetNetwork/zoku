@@ -1,4 +1,5 @@
 // Shared TypeScript types
+import type { Logger } from './lib/logger';
 
 export interface Bindings {
   DB: D1Database;
@@ -13,6 +14,19 @@ export interface Bindings {
   AUTH_KV?: KVNamespace;
   // App configuration
   APP_URL?: string;
+}
+
+// Variables available in Hono context
+export interface Variables {
+  user: Zoku;
+  logger: Logger;
+  request_id: string;
+}
+
+// Combined type for Hono app
+export type HonoEnv = {
+  Bindings: Bindings;
+  Variables: Variables;
 }
 
 export interface Entanglement {

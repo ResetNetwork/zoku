@@ -3,7 +3,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPTransport } from '@hono/mcp';
 import { z } from 'zod';
 import type { Context } from 'hono';
-import type { Bindings } from '../types';
+import type { HonoEnv } from '../types';
 import { DB } from '../db';
 import { Logger } from '../lib/logger';
 import { createServices, mcpToolWrapper } from './mcp-helpers';
@@ -557,7 +557,7 @@ function createMcpServer(db: DB, env: any, logger: Logger, user: any): McpServer
 }
 
 // HTTP handler for MCP requests (UNCHANGED)
-export async function handleMcpRequest(c: Context<{ Bindings: Bindings }>) {
+export async function handleMcpRequest(c: Context<HonoEnv>) {
   const db = new DB(c.env.DB);
   const encryptionKey = c.env.ENCRYPTION_KEY;
   const minLogLevel = (c.env.LOG_LEVEL || 'info') as 'info' | 'warn' | 'error' | 'fatal';

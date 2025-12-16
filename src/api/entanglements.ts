@@ -1,11 +1,11 @@
 import { Hono } from 'hono';
-import type { Bindings, Zoku } from '../types';
+import type { HonoEnv, Bindings, Zoku } from '../types';
 import { DB } from '../db';
 import { Logger } from '../lib/logger';
 import { EntanglementService } from '../services/entanglements';
 import { SourceService } from '../services/sources';
 
-const app = new Hono<{ Bindings: Bindings }>();
+const app = new Hono<HonoEnv>();
 
 // Helper to create service
 const getService = (c: any) => {

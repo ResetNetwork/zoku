@@ -3,12 +3,12 @@ import { Hono } from 'hono';
 import { requireTier } from '../middleware/auth';
 import { generateMcpToken, listMcpTokens, revokeMcpToken } from '../lib/mcp-tokens';
 import { DB } from '../db';
-import type { Bindings, Zoku } from '../types';
+import type { HonoEnv, Zoku } from '../types';
 import { validateBody } from '../lib/errors';
 import { createMcpTokenSchema } from '../lib/validation';
 import { ForbiddenError } from '../lib/errors';
 
-const app = new Hono<{ Bindings: Bindings }>();
+const app = new Hono<HonoEnv>();
 
 // List user's tokens (from KV)
 app.get('/', async (c) => {
