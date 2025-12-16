@@ -36,6 +36,10 @@ export const gdriveHandler: SourceHandler = {
         if (cursor) {
           await detectFolderRenames(source, folder_id, headers, cursor, qupts);
         }
+        // Track revisions and comments for all Google Docs in folder
+        if (track_revisions || track_comments) {
+          await collectFolderDocumentsActivity(source, folder_id, headers, since, track_revisions, track_comments, qupts);
+        }
         console.log(`Google Drive handler collected ${qupts.length} qupts for folder ${folder_id}`);
         // Store current file names in cursor for next sync
         const fileMap = await buildFileMap(folder_id, headers);
@@ -294,6 +298,140 @@ async function buildFileMap(folder_id: string, headers: any): Promise<Record<str
   }
   
   return map;
+}
+
+// Collect revisions and comments from all Google Docs in a folder
+async function collectFolderDocumentsActivity(
+  source: any,
+  folder_id: string,
+  headers: any,
+  since: number | undefined,
+  track_revisions: boolean,
+  track_comments: boolean,
+  qupts: QuptInput[]
+) {
+  try {
+    console.log('📄 Collecting document activity from folder...');
+    
+    // Get all Google Docs in folder
+    const apiUrl = new URL('https://www.googleapis.com/drive/v3/files');
+    apiUrl.searchParams.set('q', `'${folder_id}' in parents and mimeType='application/vnd.google-apps.document' and trashed = false`);
+    apiUrl.searchParams.set('fields', 'files(id,name)');
+    apiUrl.searchParams.set('pageSize', '100');
+    apiUrl.searchParams.set('supportsAllDrives', 'true');
+    apiUrl.searchParams.set('includeItemsFromAllDrives', 'true');
+    apiUrl.searchParams.set('corpora', 'allDrives');
+    
+    const response = await fetch(apiUrl.toString(), { headers });
+    
+    if (!response.ok) {
+      console.error('Failed to list documents in folder:', response.status);
+      return;
+    }
+    
+    const data = await response.json() as { files?: Array<{ id: string, name: string }> };
+    const docs = data.files || [];
+    
+    console.log(`📄 Found ${docs.length} Google Docs in folder`);
+    
+    // For each document, collect revisions and comments
+    for (const doc of docs) {
+      console.log(`📄 Checking document: ${doc.name} (${doc.id})`);
+      
+      // Fetch document title from Docs API
+      const docResponse = await fetch(
+        `https://docs.googleapis.com/v1/documents/${doc.id}?fields=title`,
+        { headers }
+      );
+      
+      if (!docResponse.ok) {
+        console.error(`Failed to fetch document ${doc.id}:`, docResponse.status);
+        continue;
+      }
+      
+      const docData = await docResponse.json() as { title: string };
+      const docTitle = docData.title;
+      
+      // Collect revisions
+      if (track_revisions) {
+        const revisionsResponse = await fetch(
+          `https://www.googleapis.com/drive/v3/files/${doc.id}/revisions?fields=revisions(id,modifiedTime,lastModifyingUser)&pageSize=100`,
+          { headers }
+        );
+        
+        if (revisionsResponse.ok) {
+          const revisionsData = await revisionsResponse.json() as { revisions?: any[] };
+          
+          for (const revision of revisionsData.revisions || []) {
+            const revisionTime = new Date(revision.modifiedTime).getTime() / 1000;
+            
+            // Skip if before 'since' timestamp
+            if (since && revisionTime <= since) continue;
+            
+            qupts.push({
+              entanglement_id: source.entanglement_id,
+              content: `${docTitle}: Edited by ${revision.lastModifyingUser?.displayName || 'Someone'}`,
+              source: 'gdrive',
+              external_id: `gdrive:${doc.id}:rev:${revision.id}`,
+              metadata: {
+                type: 'revision',
+                document_id: doc.id,
+                document_title: docTitle,
+                revision_id: revision.id,
+                modified_by: revision.lastModifyingUser?.displayName,
+                modified_by_email: revision.lastModifyingUser?.emailAddress,
+                url: `https://docs.google.com/document/d/${doc.id}/edit`
+              },
+              created_at: Math.floor(revisionTime)
+            });
+          }
+        }
+      }
+      
+      // Collect comments
+      if (track_comments) {
+        const commentsResponse = await fetch(
+          `https://www.googleapis.com/drive/v3/files/${doc.id}/comments?fields=comments(id,content,createdTime,author,resolved,quotedFileContent)&pageSize=100`,
+          { headers }
+        );
+        
+        if (commentsResponse.ok) {
+          const commentsData = await commentsResponse.json() as { comments?: any[] };
+          
+          for (const comment of commentsData.comments || []) {
+            const commentTime = new Date(comment.createdTime).getTime() / 1000;
+            
+            // Skip if before 'since' timestamp
+            if (since && commentTime <= since) continue;
+            
+            qupts.push({
+              entanglement_id: source.entanglement_id,
+              content: `${docTitle}: Comment by ${comment.author?.displayName || 'Someone'}`,
+              source: 'gdrive',
+              external_id: `gdrive:${doc.id}:comment:${comment.id}`,
+              metadata: {
+                type: 'comment',
+                document_id: doc.id,
+                document_title: docTitle,
+                comment_id: comment.id,
+                comment_text: comment.content,
+                author: comment.author?.displayName,
+                author_email: comment.author?.emailAddress,
+                resolved: comment.resolved,
+                url: `https://docs.google.com/document/d/${doc.id}/edit`
+              },
+              created_at: Math.floor(commentTime)
+            });
+          }
+        }
+      }
+    }
+    
+    console.log(`📄 Collected ${qupts.length} document activities from folder`);
+  } catch (error) {
+    console.error('Failed to collect folder documents activity:', error);
+    // Don't throw - continue with other qupts
+  }
 }
 
 // Detect renamed files in a folder
