@@ -161,10 +161,14 @@ export default function GoogleOAuthButton({ onSuccess, onCancel, jewelType = 'gd
 
       // Also check if popup closes without completing
       const checkClosed = setInterval(() => {
-        if (newPopup && newPopup.closed) {
-          clearInterval(checkClosed)
-          cleanup()
-          console.log('❌ OAuth popup closed without completing')
+        try {
+          if (newPopup && newPopup.closed) {
+            clearInterval(checkClosed)
+            cleanup()
+            console.log('❌ OAuth popup closed without completing')
+          }
+        } catch (e) {
+          // Ignore Cross-Origin-Opener-Policy errors when checking popup.closed
         }
       }, 500)
 
