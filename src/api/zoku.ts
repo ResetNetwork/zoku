@@ -14,6 +14,12 @@ const getService = (c: any) => {
   return new ZokuService(db, user, logger, requestId);
 };
 
+// Get current user
+app.get('/me', async (c) => {
+  const user = c.get('user') as Zoku;
+  return c.json({ user });
+});
+
 // List zoku
 app.get('/', async (c) => {
   const service = getService(c);
