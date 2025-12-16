@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/api'
-import { useAuth } from '../lib/auth'
+import { useIsPrime } from '../lib/auth'
 import { useNotifications } from '../lib/notifications'
 import type { AccessTier } from '../lib/types'
 
@@ -11,9 +11,8 @@ interface ZokuDetailProps {
 }
 
 export default function ZokuDetail({ zokuId, onSelectEntanglement }: ZokuDetailProps) {
-  const { user } = useAuth()
+  const isPrime = useIsPrime()
   const { addNotification } = useNotifications()
-  const isPrime = user?.access_tier === 'prime'
   const [isEditing, setIsEditing] = useState(false)
   const [changingTier, setChangingTier] = useState(false)
   const [newTier, setNewTier] = useState<AccessTier>('observed')

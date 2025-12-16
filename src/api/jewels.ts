@@ -4,12 +4,12 @@ import { DB } from '../db';
 import type { Bindings, Zoku } from '../types';
 import { encryptJewel, decryptJewel } from '../lib/crypto';
 import { validateGitHubCredential, validateZammadCredential, validateGoogleDocsCredential } from '../handlers/validate';
-import { authMiddleware, requireTier } from '../middleware/auth';
+import { requireTier } from '../middleware/auth';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
 // List jewels (filter by ownership, hide others' encrypted data)
-app.get('/', authMiddleware(), async (c) => {
+app.get('/', async (c) => {
   const user = c.get('user') as Zoku;
   const db = new DB(c.env.DB);
   const type = c.req.query('type');
@@ -57,7 +57,7 @@ app.get('/', authMiddleware(), async (c) => {
 });
 
 // Create jewel with validation (auto-assign owner)
-app.post('/', authMiddleware(), requireTier('coherent'), async (c) => {
+app.post('/', requireTier('coherent'), async (c) => {
   const user = c.get('user') as Zoku;
   const db = new DB(c.env.DB);
   const body = await c.req.json();
@@ -158,7 +158,7 @@ app.post('/', authMiddleware(), requireTier('coherent'), async (c) => {
 });
 
 // Get single jewel (without encrypted data)
-app.get('/:id', authMiddleware(), async (c) => {
+app.get('/:id', async (c) => {
   const user = c.get('user') as Zoku;
   const db = new DB(c.env.DB);
   const id = c.req.param('id');
@@ -181,7 +181,7 @@ app.get('/:id', authMiddleware(), async (c) => {
 });
 
 // Update jewel (must own it, unless Prime)
-app.patch('/:id', authMiddleware(), requireTier('coherent'), async (c) => {
+app.patch('/:id', requireTier('coherent'), async (c) => {
   const user = c.get('user') as Zoku;
   const db = new DB(c.env.DB);
   const id = c.req.param('id');
@@ -261,7 +261,7 @@ app.patch('/:id', authMiddleware(), requireTier('coherent'), async (c) => {
 });
 
 // Re-authorize Google jewel (uses existing client_id/secret)
-app.post('/:id/reauthorize', authMiddleware(), requireTier('coherent'), async (c) => {
+app.post('/:id/reauthorize', requireTier('coherent'), async (c) => {
   const user = c.get('user') as Zoku;
   const db = new DB(c.env.DB);
   const id = c.req.param('id');
@@ -309,7 +309,7 @@ app.post('/:id/reauthorize', authMiddleware(), requireTier('coherent'), async (c
 });
 
 // Delete jewel (must own it, unless Prime)
-app.delete('/:id', authMiddleware(), requireTier('coherent'), async (c) => {
+app.delete('/:id', requireTier('coherent'), async (c) => {
   const user = c.get('user') as Zoku;
   const db = new DB(c.env.DB);
   const id = c.req.param('id');

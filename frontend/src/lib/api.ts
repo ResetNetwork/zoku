@@ -1,4 +1,4 @@
-import type { Entanglement, Qupt, Zoku, PASCIMatrix, Source } from './types'
+import type { Entanglement, Qupt, Zoku, PASCIMatrix, Source, AccessTier } from './types'
 
 const API_BASE = '/api'
 
@@ -219,5 +219,18 @@ export const api = {
       throw new Error(error.error?.message || 'Failed to delete jewel')
     }
     return res.json()
+  },
+
+  // User management (Prime only)
+  async updateZokuTier(zokuId: string, tier: AccessTier) {
+    const res = await fetch(`${API_BASE}/zoku/${zokuId}/tier`, {
+      method: 'PATCH',
+      headers: getHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ tier })
+    })
+    if (!res.ok) {
+      throw new Error('Failed to update tier')
+    }
+    return await res.json()
   }
 }

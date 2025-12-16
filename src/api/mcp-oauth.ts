@@ -16,12 +16,28 @@ import {
 } from '../lib/mcp-oauth';
 import type { Bindings, Zoku } from '../types';
 
-const app = new Hono<{ Bindings: Bindings }>();
+// Public routes (no authentication required - for OAuth flow)
+export const mcpOAuthPublicRoutes = new Hono<{ Bindings: Bindings }>();
+
+// Protected routes (CF Access JWT required - for user interaction)
+export const mcpOAuthProtectedRoutes = new Hono<{ Bindings: Bindings }>();
+
+// ============================================================================
+// PUBLIC ROUTES (No authentication required)
+// ============================================================================
 
 // RFC 8414 - OAuth 2.0 Authorization Server Metadata Discovery
 // MCP clients query this to discover OAuth endpoints
-app.get('/.well-known/oauth-authorization-server', async (c) => {
-  const baseUrl = c.env.APP_URL || new URL(c.req.url).origin;
+mcpOAuthPublicRoutes.get('/.well-known/oauth-authorization-server', async (c) => {
+  // Use request origin dynamically (supports proxy via X-Forwarded-Host)
+  const forwardedHost = c.req.header('x-forwarded-host');
+  const forwardedProto = c.req.header('x-forwarded-proto') || 'http';
+  const requestOrigin = new URL(c.req.url).origin;
+  
+  // If behind a proxy (e.g., Vite dev server), use forwarded host
+  const baseUrl = forwardedHost 
+    ? `${forwardedProto}://${forwardedHost}`
+    : (c.env.APP_URL || requestOrigin);
 
   return c.json({
     issuer: baseUrl,
@@ -37,8 +53,12 @@ app.get('/.well-known/oauth-authorization-server', async (c) => {
   });
 });
 
+// ============================================================================
+// PROTECTED ROUTES (CF Access JWT required - for user interaction in browser)
+// ============================================================================
+
 // Authorization UI - requires user to be authenticated via Cloudflare Access
-app.get('/oauth/authorize', authMiddleware(), async (c) => {
+mcpOAuthProtectedRoutes.get('/authorize', authMiddleware(), async (c) => {
   const user = c.get('user') as Zoku;
   const query = c.req.query();
 
@@ -78,7 +98,7 @@ app.get('/oauth/authorize', authMiddleware(), async (c) => {
 });
 
 // Handle user approval/denial
-app.post('/oauth/authorize', authMiddleware(), async (c) => {
+mcpOAuthProtectedRoutes.post('/authorize', authMiddleware(), async (c) => {
   const user = c.get('user') as Zoku;
   const body = await c.req.parseBody();
 
@@ -114,6 +134,20 @@ app.post('/oauth/authorize', authMiddleware(), async (c) => {
       scope: (body.scope as string) || 'mcp'
     });
 
+    // Audit log - OAuth authorization
+    const { DB } = await import('../db');
+    const db = new DB(c.env.DB);
+    await db.createAuditLog({
+      zoku_id: user.id,
+      action: 'authorize',
+      resource_type: 'oauth_session',
+      resource_id: body.client_id as string,
+      details: JSON.stringify({ client_id: body.client_id, scope: body.scope || 'mcp' }),
+      ip_address: c.req.header('cf-connecting-ip') || null,
+      user_agent: c.req.header('user-agent') || null,
+      request_id: c.get('request_id') || null
+    });
+
     // Build redirect URL with code
     const redirect = new URL(redirect_uri);
     redirect.searchParams.set('code', code);
@@ -132,7 +166,7 @@ app.post('/oauth/authorize', authMiddleware(), async (c) => {
 });
 
 // Token endpoint - exchange authorization code for access token, or refresh token
-app.post('/oauth/token', async (c) => {
+mcpOAuthPublicRoutes.post('/token', async (c) => {
   try {
     const body = await c.req.parseBody();
     const grant_type = body.grant_type as string;
@@ -185,7 +219,7 @@ app.post('/oauth/token', async (c) => {
 
 // Dynamic client registration (RFC 7591)
 // Allows MCP clients to auto-register without manual configuration
-app.post('/oauth/register', async (c) => {
+mcpOAuthPublicRoutes.post('/register', async (c) => {
   try {
     const body = await c.req.json();
 
@@ -213,7 +247,7 @@ app.post('/oauth/register', async (c) => {
 });
 
 // Token revocation
-app.post('/oauth/revoke', async (c) => {
+mcpOAuthPublicRoutes.post('/revoke', async (c) => {
   try {
     const body = await c.req.parseBody();
     const token = body.token as string;
@@ -237,19 +271,34 @@ app.post('/oauth/revoke', async (c) => {
 });
 
 // List user's OAuth sessions (for Account page)
-app.get('/oauth/sessions', authMiddleware(), async (c) => {
+mcpOAuthProtectedRoutes.get('/sessions', authMiddleware(), async (c) => {
   const user = c.get('user') as Zoku;
   const sessions = await listOAuthSessions(c.env, user.id);
   return c.json({ sessions });
 });
 
 // Revoke OAuth session by ID (for Account page)
-app.delete('/oauth/sessions/:id', authMiddleware(), async (c) => {
+mcpOAuthProtectedRoutes.delete('/sessions/:id', authMiddleware(), async (c) => {
   const user = c.get('user') as Zoku;
   const sessionId = c.req.param('id');
 
   try {
     await revokeOAuthSession(c.env, user.id, sessionId);
+
+    // Audit log
+    const { DB } = await import('../db');
+    const db = new DB(c.env.DB);
+    await db.createAuditLog({
+      zoku_id: user.id,
+      action: 'revoke',
+      resource_type: 'oauth_session',
+      resource_id: sessionId,
+      details: JSON.stringify({ action: 'manual_revocation' }),
+      ip_address: c.req.header('cf-connecting-ip') || null,
+      user_agent: c.req.header('user-agent') || null,
+      request_id: c.get('request_id') || null
+    });
+
     return c.json({ success: true });
   } catch (error) {
     return c.json({
@@ -677,4 +726,4 @@ function escapeHtml(unsafe: string): string {
     .replace(/'/g, '&#039;');
 }
 
-export default app;
+

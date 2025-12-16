@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import type { Bindings, Zoku } from '../types';
 import { DB } from '../db';
 import { encryptJewel } from '../lib/crypto';
-import { authMiddleware, requireTier } from '../middleware/auth';
+import { requireTier } from '../middleware/auth';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -29,7 +29,7 @@ app.get('/:id', async (c) => {
 });
 
 // Update source (Entangled and Prime only)
-app.patch('/:id', authMiddleware(), requireTier('entangled'), async (c) => {
+app.patch('/:id', requireTier('entangled'), async (c) => {
   const db = new DB(c.env.DB);
   const id = c.req.param('id');
   const body = await c.req.json();
@@ -55,7 +55,7 @@ app.patch('/:id', authMiddleware(), requireTier('entangled'), async (c) => {
 });
 
 // Delete source (Entangled and Prime only)
-app.delete('/:id', authMiddleware(), requireTier('entangled'), async (c) => {
+app.delete('/:id', requireTier('entangled'), async (c) => {
   const db = new DB(c.env.DB);
   const id = c.req.param('id');
 
@@ -69,7 +69,7 @@ app.delete('/:id', authMiddleware(), requireTier('entangled'), async (c) => {
 });
 
 // Trigger manual sync (Entangled and Prime only)
-app.post('/:id/sync', authMiddleware(), requireTier('entangled'), async (c) => {
+app.post('/:id/sync', requireTier('entangled'), async (c) => {
   const db = new DB(c.env.DB);
   const id = c.req.param('id');
 

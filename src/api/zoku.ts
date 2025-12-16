@@ -1,12 +1,12 @@
 import { Hono } from 'hono';
 import type { Bindings, Zoku } from '../types';
 import { DB } from '../db';
-import { authMiddleware, requireTier } from '../middleware/auth';
+import { requireTier } from '../middleware/auth';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
 // Get current authenticated user
-app.get('/me', authMiddleware(), async (c) => {
+app.get('/me', async (c) => {
   const user = c.get('user') as Zoku;
   return c.json({ user });
 });
@@ -43,7 +43,7 @@ app.get('/:id', async (c) => {
 });
 
 // Create zoku (Entangled and Prime only)
-app.post('/', authMiddleware(), requireTier('entangled'), async (c) => {
+app.post('/', requireTier('entangled'), async (c) => {
   const currentUser = c.get('user') as Zoku;
   const db = new DB(c.env.DB);
   const body = await c.req.json();
@@ -122,7 +122,7 @@ app.delete('/:id', async (c) => {
 });
 
 // Promote/demote user tier (Prime only)
-app.patch('/:id/tier', authMiddleware(), requireTier('prime'), async (c) => {
+app.patch('/:id/tier', requireTier('prime'), async (c) => {
   const currentUser = c.get('user') as Zoku;
   const targetId = c.req.param('id');
   const body = await c.req.json();

@@ -69,8 +69,8 @@ export interface Source {
   entanglement_id: string;
   type: string;
   config: string;
-  credentials: string | null;  // Inline credentials (backward compat)
-  jewel_id: string | null;  // Reference to credentials table
+  credentials: string | null;  // Inline credentials (legacy support for sources created before jewel store)
+  jewel_id: string | null;  // Reference to jewels table (preferred method)
   enabled: number;
   last_sync: number | null;
   sync_cursor: string | null;

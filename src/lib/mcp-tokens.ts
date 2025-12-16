@@ -81,8 +81,8 @@ export async function validateMcpToken(
     throw new Error('JWT_SECRET not configured');
   }
 
-  // Try OAuth token first (if OAuth is configured)
-  if (env.AUTH_KV && env.APP_URL) {
+  // Try OAuth token first (if OAuth KV is configured)
+  if (env.AUTH_KV) {
     try {
       const { validateOAuthToken } = await import('./mcp-oauth');
       const tokenData = await validateOAuthToken(env, token);

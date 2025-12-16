@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../lib/api'
-import { useAuth } from '../lib/auth'
+import { useCanWrite } from '../lib/auth'
 import { useNotifications } from '../lib/notifications'
 import EntanglementCard from './EntanglementCard'
 
@@ -10,14 +10,12 @@ interface EntanglementsListProps {
 }
 
 export default function EntanglementsList({ onSelectEntanglement }: EntanglementsListProps) {
-  const { user } = useAuth()
+  const canWrite = useCanWrite()
   const { addNotification } = useNotifications()
   const [showAddForm, setShowAddForm] = useState(false)
   const [newEntanglementName, setNewEntanglementName] = useState('')
   const [newEntanglementDescription, setNewEntanglementDescription] = useState('')
   const [saving, setSaving] = useState(false)
-
-  const canWrite = user?.access_tier === 'entangled' || user?.access_tier === 'prime'
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [functionFilter, setFunctionFilter] = useState<string>('all')
 

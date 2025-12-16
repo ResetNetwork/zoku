@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Bindings } from '../types';
 import { DB } from '../db';
-import { authMiddleware, requireTier } from '../middleware/auth';
+import { requireTier } from '../middleware/auth';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -42,7 +42,7 @@ app.get('/:id', async (c) => {
 });
 
 // Create qupt (Entangled and Prime only)
-app.post('/', authMiddleware(), requireTier('entangled'), async (c) => {
+app.post('/', requireTier('entangled'), async (c) => {
   const db = new DB(c.env.DB);
   const body = await c.req.json();
 
@@ -97,7 +97,7 @@ app.post('/batch', async (c) => {
 });
 
 // Delete qupt (Entangled and Prime only)
-app.delete('/:id', authMiddleware(), requireTier('entangled'), async (c) => {
+app.delete('/:id', requireTier('entangled'), async (c) => {
   const db = new DB(c.env.DB);
   const id = c.req.param('id');
 

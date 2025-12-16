@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Bindings, Zoku } from '../types';
 import { DB } from '../db';
-import { authMiddleware, requireTier } from '../middleware/auth';
+import { requireTier } from '../middleware/auth';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -115,7 +115,7 @@ app.get('/:id', async (c) => {
 });
 
 // Create entanglement (Entangled and Prime only)
-app.post('/', authMiddleware(), requireTier('entangled'), async (c) => {
+app.post('/', requireTier('entangled'), async (c) => {
   const db = new DB(c.env.DB);
   const body = await c.req.json();
 
@@ -154,7 +154,7 @@ app.post('/', authMiddleware(), requireTier('entangled'), async (c) => {
 });
 
 // Update entanglement (Entangled and Prime only)
-app.patch('/:id', authMiddleware(), requireTier('entangled'), async (c) => {
+app.patch('/:id', requireTier('entangled'), async (c) => {
   const db = new DB(c.env.DB);
   const id = c.req.param('id');
   const body = await c.req.json();
@@ -189,7 +189,7 @@ app.patch('/:id', authMiddleware(), requireTier('entangled'), async (c) => {
 });
 
 // Delete entanglement (Entangled and Prime only)
-app.delete('/:id', authMiddleware(), requireTier('entangled'), async (c) => {
+app.delete('/:id', requireTier('entangled'), async (c) => {
   const db = new DB(c.env.DB);
   const id = c.req.param('id');
 
@@ -217,7 +217,7 @@ app.get('/:id/matrix', async (c) => {
 });
 
 // Assign to matrix (Entangled and Prime only)
-app.post('/:id/matrix', authMiddleware(), requireTier('entangled'), async (c) => {
+app.post('/:id/matrix', requireTier('entangled'), async (c) => {
   const db = new DB(c.env.DB);
   const entanglementId = c.req.param('id');
   const body = await c.req.json();
@@ -257,7 +257,7 @@ app.post('/:id/matrix', authMiddleware(), requireTier('entangled'), async (c) =>
 });
 
 // Remove from matrix (Entangled and Prime only)
-app.delete('/:id/matrix/:zoku_id/:role', authMiddleware(), requireTier('entangled'), async (c) => {
+app.delete('/:id/matrix/:zoku_id/:role', requireTier('entangled'), async (c) => {
   const db = new DB(c.env.DB);
   const entanglementId = c.req.param('id');
   const zokuId = c.req.param('zoku_id');
@@ -318,7 +318,7 @@ app.get('/:id/attributes', async (c) => {
 });
 
 // Set attributes (replace all) - Entangled and Prime only
-app.put('/:id/attributes', authMiddleware(), requireTier('entangled'), async (c) => {
+app.put('/:id/attributes', requireTier('entangled'), async (c) => {
   const db = new DB(c.env.DB);
   const id = c.req.param('id');
   const body = await c.req.json();
@@ -357,7 +357,7 @@ app.put('/:id/attributes', authMiddleware(), requireTier('entangled'), async (c)
 });
 
 // Add single attribute (Entangled and Prime only)
-app.post('/:id/attributes', authMiddleware(), requireTier('entangled'), async (c) => {
+app.post('/:id/attributes', requireTier('entangled'), async (c) => {
   const db = new DB(c.env.DB);
   const id = c.req.param('id');
   const body = await c.req.json();
@@ -389,7 +389,7 @@ app.post('/:id/attributes', authMiddleware(), requireTier('entangled'), async (c
 });
 
 // Remove attributes for dimension (Entangled and Prime only)
-app.delete('/:id/attributes/:dimension_id', authMiddleware(), requireTier('entangled'), async (c) => {
+app.delete('/:id/attributes/:dimension_id', requireTier('entangled'), async (c) => {
   const db = new DB(c.env.DB);
   const entanglementId = c.req.param('id');
   const dimensionId = c.req.param('dimension_id');
@@ -449,7 +449,7 @@ app.get('/:id/sources', async (c) => {
 });
 
 // Add source to entanglement (Entangled and Prime only, must use own jewel)
-app.post('/:id/sources', authMiddleware(), requireTier('entangled'), async (c) => {
+app.post('/:id/sources', requireTier('entangled'), async (c) => {
   const user = c.get('user') as Zoku;
   const db = new DB(c.env.DB);
   const entanglementId = c.req.param('id');

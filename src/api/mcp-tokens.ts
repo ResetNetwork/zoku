@@ -1,6 +1,6 @@
 // MCP Personal Access Token (PAT) management API
 import { Hono } from 'hono';
-import { authMiddleware, requireTier } from '../middleware/auth';
+import { requireTier } from '../middleware/auth';
 import { generateMcpToken, listMcpTokens, revokeMcpToken } from '../lib/mcp-tokens';
 import { DB } from '../db';
 import type { Bindings, Zoku } from '../types';
@@ -8,7 +8,7 @@ import type { Bindings, Zoku } from '../types';
 const app = new Hono<{ Bindings: Bindings }>();
 
 // List user's tokens (from KV)
-app.get('/', authMiddleware(), async (c) => {
+app.get('/', async (c) => {
   const user = c.get('user') as Zoku;
   const tokens = await listMcpTokens(c.env, user.id);
 
@@ -16,7 +16,7 @@ app.get('/', authMiddleware(), async (c) => {
 });
 
 // Create new token (JWT-based PAT)
-app.post('/', authMiddleware(), requireTier('coherent'), async (c) => {
+app.post('/', requireTier('coherent'), async (c) => {
   const user = c.get('user') as Zoku;
   const body = await c.req.json();
   const db = new DB(c.env.DB);
@@ -33,6 +33,18 @@ app.post('/', authMiddleware(), requireTier('coherent'), async (c) => {
     body.expires_in_days
   );
 
+  // Audit log
+  await db.createAuditLog({
+    zoku_id: user.id,
+    action: 'create',
+    resource_type: 'pat_token',
+    resource_id: metadata.id,
+    details: JSON.stringify({ name: metadata.name, expires_in_days: body.expires_in_days }),
+    ip_address: c.req.header('cf-connecting-ip') || null,
+    user_agent: c.req.header('user-agent') || null,
+    request_id: c.get('request_id') || null
+  });
+
   return c.json({
     token,     // JWT - shown only once
     metadata   // Token info for display
@@ -40,7 +52,7 @@ app.post('/', authMiddleware(), requireTier('coherent'), async (c) => {
 });
 
 // Revoke token (add to KV blocklist)
-app.delete('/:id', authMiddleware(), async (c) => {
+app.delete('/:id', async (c) => {
   const user = c.get('user') as Zoku;
   const tokenId = c.req.param('id');
 
@@ -53,6 +65,19 @@ app.delete('/:id', authMiddleware(), async (c) => {
   }
 
   await revokeMcpToken(c.env, user.id, tokenId);
+
+  // Audit log
+  const db = new DB(c.env.DB);
+  await db.createAuditLog({
+    zoku_id: user.id,
+    action: 'revoke',
+    resource_type: 'pat_token',
+    resource_id: tokenId,
+    details: JSON.stringify({ name: token?.name || 'Unknown' }),
+    ip_address: c.req.header('cf-connecting-ip') || null,
+    user_agent: c.req.header('user-agent') || null,
+    request_id: c.get('request_id') || null
+  });
 
   return c.json({ success: true });
 });

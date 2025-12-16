@@ -9,19 +9,70 @@ import ActivityList from './components/ActivityList'
 import SourcesList from './components/SourcesList'
 import JewelsList from './components/JewelsList'
 import AccountPage from './components/AccountPage'
+import AdminUsers from './components/AdminUsers'
+import AuditLog from './components/AuditLog'
 import { useTheme } from './lib/theme'
 import { useNotifications } from './lib/notifications'
 import { useAuth } from './lib/auth'
 import { api } from './lib/api'
 
-type View = 'dashboard' | 'entanglements' | 'zoku' | 'qupts' | 'sources' | 'jewels' | 'account'
+type View = 'dashboard' | 'entanglements' | 'zoku' | 'qupts' | 'sources' | 'jewels' | 'account' | 'admin-users' | 'audit-log'
 
 export default function App() {
-  const { user } = useAuth()
+  const { user, loading, error } = useAuth()
+
+  // Show loading state while checking authentication (EARLY RETURN - no queries run yet)
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-quantum-900">
+        <div className="text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-quantum-400 border-r-transparent mb-4"></div>
+          <p className="text-gray-400">Checking authentication...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show 401 error page if authentication failed (EARLY RETURN - no queries run)
+  if (error || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-quantum-900">
+        <div className="max-w-md w-full mx-4">
+          <div className="bg-quantum-800 border border-red-500/30 rounded-lg p-8 text-center">
+            <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+            </div>
+            <h1 className="text-2xl font-bold text-red-500 mb-2">401 Unauthorized</h1>
+            <p className="text-gray-400 mb-6">
+              {error || 'Authentication required. Please log in to continue.'}
+            </p>
+            <div className="text-sm text-gray-500 bg-quantum-900/50 rounded p-4">
+              <p className="font-mono">
+                {error?.includes('Failed to fetch') 
+                  ? 'Unable to connect to authentication server. Please check your network connection.'
+                  : 'You need valid credentials to access this application.'}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // User is authenticated - proceed with app rendering
+  return <AuthenticatedApp user={user} />
+}
+
+// Separate component for authenticated app (all hooks run only when authenticated)
+function AuthenticatedApp({ user }: { user: any }) {
+  // const isPrime = useIsPrime()  // For future nav menu implementation
   const [currentView, setCurrentView] = useState<View>(() => {
     const params = new URLSearchParams(window.location.search)
-    const view = params.get('view')
-    if (view === 'entanglements' || view === 'zoku' || view === 'qupts' || view === 'sources' || view === 'jewels' || view === 'account') {
+    const view = params.get('view') as View | null
+    const validViews: View[] = ['entanglements', 'zoku', 'qupts', 'sources', 'jewels', 'account', 'admin-users', 'audit-log']
+    if (view && validViews.includes(view)) {
       return view
     }
     return 'dashboard'
@@ -59,8 +110,9 @@ export default function App() {
       const params = new URLSearchParams(window.location.search)
       setSelectedEntanglementId(params.get('entanglement'))
       setSelectedEntangledId(params.get('zoku'))
-      const view = params.get('view')
-      if (view === 'entanglements' || view === 'zoku' || view === 'qupts' || view === 'sources' || view === 'jewels' || view === 'account') {
+      const view = params.get('view') as View | null
+      const validViews: View[] = ['entanglements', 'zoku', 'qupts', 'sources', 'jewels', 'account', 'admin-users', 'audit-log']
+      if (view && validViews.includes(view)) {
         setCurrentView(view)
       } else {
         setCurrentView('dashboard')
@@ -263,6 +315,10 @@ export default function App() {
           <JewelsList />
         ) : currentView === 'account' ? (
           <AccountPage />
+        ) : currentView === 'admin-users' ? (
+          <AdminUsers />
+        ) : currentView === 'audit-log' ? (
+          <AuditLog />
         ) : (
           <Dashboard
             onSelectEntanglement={handleSelectEntanglement}

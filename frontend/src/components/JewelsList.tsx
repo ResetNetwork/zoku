@@ -5,6 +5,7 @@ import { useNotifications } from '../lib/notifications'
 import GoogleOAuthButton from './GoogleOAuthButton'
 
 export default function JewelsList() {
+  // Note: useIsPrime hook available for future use (delete others' jewels)
   const [showAddForm, setShowAddForm] = useState<'github' | 'zammad' | 'gdrive' | null>(null)
   const [editingJewel, setEditingJewel] = useState<any>(null)
   const [formData, setFormData] = useState<any>({ name: '', token: '', url: '' })

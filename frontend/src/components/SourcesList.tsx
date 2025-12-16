@@ -5,6 +5,7 @@ import { useNotifications } from '../lib/notifications'
 import EditSourceForm from './EditSourceForm'
 
 export default function SourcesList() {
+  // Note: useCanWrite hook available for future use (edit/delete buttons)
   const [editingSource, setEditingSource] = useState<any>(null)
   const queryClient = useQueryClient()
   const { addNotification } = useNotifications()

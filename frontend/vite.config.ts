@@ -6,10 +6,47 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
-      '/api': 'http://localhost:8789',
-      '/mcp': 'http://localhost:8789',
-      '/.well-known': 'http://localhost:8789',
-      '/oauth': 'http://localhost:8789'
+      '/api': {
+        target: 'http://localhost:8789',
+        changeOrigin: false,
+        configure: (proxy, _options) => {
+          proxy.on('proxyReq', (proxyReq, req, _res) => {
+            // Forward original host so backend knows the client's URL
+            proxyReq.setHeader('X-Forwarded-Host', req.headers.host || 'localhost:3000');
+            proxyReq.setHeader('X-Forwarded-Proto', 'http');
+          });
+        }
+      },
+      '/mcp': {
+        target: 'http://localhost:8789',
+        changeOrigin: false,
+        configure: (proxy, _options) => {
+          proxy.on('proxyReq', (proxyReq, req, _res) => {
+            proxyReq.setHeader('X-Forwarded-Host', req.headers.host || 'localhost:3000');
+            proxyReq.setHeader('X-Forwarded-Proto', 'http');
+          });
+        }
+      },
+      '/.well-known': {
+        target: 'http://localhost:8789',
+        changeOrigin: false,
+        configure: (proxy, _options) => {
+          proxy.on('proxyReq', (proxyReq, req, _res) => {
+            proxyReq.setHeader('X-Forwarded-Host', req.headers.host || 'localhost:3000');
+            proxyReq.setHeader('X-Forwarded-Proto', 'http');
+          });
+        }
+      },
+      '/oauth': {
+        target: 'http://localhost:8789',
+        changeOrigin: false,
+        configure: (proxy, _options) => {
+          proxy.on('proxyReq', (proxyReq, req, _res) => {
+            proxyReq.setHeader('X-Forwarded-Host', req.headers.host || 'localhost:3000');
+            proxyReq.setHeader('X-Forwarded-Proto', 'http');
+          });
+        }
+      }
     }
   },
   build: {

@@ -1,5 +1,5 @@
 // Account Page - User profile and MCP token management
-import { useAuth } from '../lib/auth';
+import { useAuth, useIsPrime } from '../lib/auth';
 import { useState, useEffect } from 'react';
 import { PatMetadata } from '../lib/types';
 import { useNotifications } from '../lib/notifications';
@@ -15,6 +15,7 @@ interface OAuthSession {
 
 export default function AccountPage() {
   const { user } = useAuth();
+  const isPrime = useIsPrime();
   const { addNotification } = useNotifications();
   const [tokens, setTokens] = useState<PatMetadata[]>([]);
   const [oauthSessions, setOauthSessions] = useState<OAuthSession[]>([]);
@@ -146,6 +147,59 @@ export default function AccountPage() {
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Account</h1>
         <p className="text-gray-600 dark:text-gray-400">Manage your profile and MCP access</p>
       </div>
+
+      {/* Admin Menu - Prime Only */}
+      {isPrime && (
+        <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 dark:from-yellow-500/20 dark:to-orange-500/20 rounded-lg shadow p-6 border border-yellow-500/30">
+          <div className="flex items-center gap-2 mb-4">
+            <svg className="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Admin Tools</h2>
+          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            You have Prime access - manage users and view audit logs
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <a
+              href="?view=admin-users"
+              className="flex items-center gap-3 p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-700 hover:border-yellow-500 dark:hover:border-yellow-500 transition-colors group"
+            >
+              <div className="flex-shrink-0">
+                <svg className="w-8 h-8 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900 dark:text-white group-hover:text-yellow-500 dark:group-hover:text-yellow-400">
+                  User Management
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  View and manage user access tiers
+                </p>
+              </div>
+            </a>
+            <a
+              href="?view=audit-log"
+              className="flex items-center gap-3 p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-700 hover:border-yellow-500 dark:hover:border-yellow-500 transition-colors group"
+            >
+              <div className="flex-shrink-0">
+                <svg className="w-8 h-8 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900 dark:text-white group-hover:text-yellow-500 dark:group-hover:text-yellow-400">
+                  Audit Log
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Review system activity and changes
+                </p>
+              </div>
+            </a>
+          </div>
+        </div>
+      )}
 
       {/* User Information */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">

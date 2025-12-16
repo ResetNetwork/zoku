@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/api'
-import { useAuth } from '../lib/auth'
+import { useCanWrite } from '../lib/auth'
 import { useNotifications } from '../lib/notifications'
 import { formatDate, getSourceColor } from '../lib/formatting'
 import QuptItem from './QuptItem'
@@ -14,8 +14,7 @@ interface EntanglementDetailProps {
 }
 
 export default function EntanglementDetail({ entanglementId }: EntanglementDetailProps) {
-  const { user } = useAuth()
-  const canWrite = user?.access_tier === 'entangled' || user?.access_tier === 'prime'
+  const canWrite = useCanWrite()
   const [showAddSource, setShowAddSource] = useState(false)
   const [showAddQupt, setShowAddQupt] = useState(false)
   const [newQuptContent, setNewQuptContent] = useState('')

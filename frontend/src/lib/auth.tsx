@@ -35,7 +35,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(data.user);
       setError(null);
     } catch (err) {
-      console.error('Failed to load user:', err);
+      // Don't log 401s as errors - they're expected when not authenticated
+      if (err instanceof Error && !err.message.includes('Unauthorized')) {
+        console.error('Failed to load user:', err);
+      }
       setError(err instanceof Error ? err.message : 'Failed to load user');
       setUser(null);
     } finally {

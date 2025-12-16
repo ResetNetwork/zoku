@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../lib/api'
-import { useAuth } from '../lib/auth'
+import { useCanWrite } from '../lib/auth'
 import { useNotifications } from '../lib/notifications'
 
 interface ZokuListProps {
@@ -10,7 +10,7 @@ interface ZokuListProps {
 }
 
 export default function ZokuList({ onSelectZoku, onSelectEntanglement }: ZokuListProps) {
-  const { user } = useAuth()
+  const canWrite = useCanWrite()
   const { addNotification } = useNotifications()
   const [showAllMatrix, setShowAllMatrix] = useState(false)
   const [showAddForm, setShowAddForm] = useState(false)
@@ -18,8 +18,6 @@ export default function ZokuList({ onSelectZoku, onSelectEntanglement }: ZokuLis
   const [newZokuType, setNewZokuType] = useState<'human' | 'agent'>('human')
   const [newZokuEmail, setNewZokuEmail] = useState('')
   const [saving, setSaving] = useState(false)
-
-  const canWrite = user?.access_tier === 'entangled' || user?.access_tier === 'prime'
 
   const { data: zoku = [], isLoading } = useQuery({
     queryKey: ['zoku'],
