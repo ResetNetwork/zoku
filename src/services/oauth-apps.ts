@@ -35,9 +35,9 @@ export class OAuthApplicationService extends BaseService {
 
     query += ' ORDER BY created_at DESC';
 
-    const stmt = this.db.d1.prepare(query);
+    let stmt = this.db.d1.prepare(query);
     if (params.length > 0) {
-      stmt.bind(...params);
+      stmt = stmt.bind(...params);
     }
     const result = await stmt.all();
     const results = result.results as OAuthApplication[];
