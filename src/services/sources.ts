@@ -118,13 +118,12 @@ export class SourceService extends BaseService {
         qupts_deleted: result.meta.changes 
       });
       
-      await this.audit('source.delete_with_qupts', { 
-        source_id: id,
+      await this.audit('delete_with_qupts', 'source', id, { 
         source_type: source.type,
         qupts_deleted: result.meta.changes 
       });
     } else {
-      await this.audit('source.delete', { source_id: id });
+      await this.audit('delete', 'source', id);
     }
 
     await this.db.deleteSource(id);
