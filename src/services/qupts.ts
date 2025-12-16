@@ -12,10 +12,12 @@ export class QuptService extends BaseService {
     recursive?: boolean;
     zoku_id?: string;
     source?: string;
+    since?: number;
+    until?: number;
     limit?: number;
     offset?: number;
   } = {}) {
-    return this.db.listQupts({
+    const qupts = await this.db.listQupts({
       entanglement_id: filters.entanglement_id,
       recursive: filters.recursive ?? true,
       zoku_id: filters.zoku_id,
@@ -23,6 +25,17 @@ export class QuptService extends BaseService {
       limit: filters.limit || 20,
       offset: filters.offset || 0
     });
+
+    // Apply date range filters (done in memory since DB doesn't support it yet)
+    let filtered = qupts;
+    if (filters.since) {
+      filtered = filtered.filter(q => q.created_at >= filters.since!);
+    }
+    if (filters.until) {
+      filtered = filtered.filter(q => q.created_at <= filters.until!);
+    }
+
+    return filtered;
   }
 
   /**

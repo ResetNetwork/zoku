@@ -20,6 +20,9 @@ export default function EntanglementDetail({ entanglementId }: EntanglementDetai
   const [newQuptContent, setNewQuptContent] = useState('')
   const [editingSource, setEditingSource] = useState<any>(null)
   const [savingQupt, setSavingQupt] = useState(false)
+  const [quptSourceFilter, setQuptSourceFilter] = useState<string>('all')
+  const [quptDateFilter, setQuptDateFilter] = useState<string>('all')
+  const [quptsToShow, setQuptsToShow] = useState(20)
   const queryClient = useQueryClient()
   const { addNotification } = useNotifications()
 
@@ -35,8 +38,36 @@ export default function EntanglementDetail({ entanglementId }: EntanglementDetai
 
   const { data: qupts = [], isLoading: quptsLoading } = useQuery({
     queryKey: ['qupts', entanglementId],
-    queryFn: () => api.listQupts(entanglementId, { limit: 50, detailed: true })
+    queryFn: () => api.listQupts(entanglementId, { limit: 1000, detailed: true })
   })
+
+  // Filter qupts
+  const filteredQupts = qupts.filter(qupt => {
+    // Source filter
+    if (quptSourceFilter !== 'all' && qupt.source !== quptSourceFilter) {
+      return false
+    }
+
+    // Date filter
+    if (quptDateFilter !== 'all') {
+      const now = Math.floor(Date.now() / 1000)
+      const dayInSeconds = 86400
+      const quptAge = now - qupt.created_at
+
+      if (quptDateFilter === '24h' && quptAge > dayInSeconds) return false
+      if (quptDateFilter === '7d' && quptAge > dayInSeconds * 7) return false
+      if (quptDateFilter === '30d' && quptAge > dayInSeconds * 30) return false
+    }
+
+    return true
+  })
+
+  // Pagination
+  const visibleQupts = filteredQupts.slice(0, quptsToShow)
+  const hasMore = filteredQupts.length > quptsToShow
+
+  // Get unique sources for filter dropdown
+  const uniqueSources = Array.from(new Set(qupts.map(q => q.source)))
 
   const { data: sources = [] } = useQuery({
     queryKey: ['sources', entanglementId],
@@ -251,7 +282,7 @@ export default function EntanglementDetail({ entanglementId }: EntanglementDetai
       {/* Activity Feed */}
       <div className="card">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold">Qupts</h2>
+          <h2 className="text-xl font-bold">Qupts ({visibleQupts.length})</h2>
           {canWrite && !showAddQupt && (
             <button
               onClick={() => setShowAddQupt(true)}
@@ -259,6 +290,58 @@ export default function EntanglementDetail({ entanglementId }: EntanglementDetai
             >
               + Add Qupt
             </button>
+          )}
+        </div>
+
+        {/* Filters */}
+        <div className="flex gap-4 mb-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Source</label>
+            <select
+              value={quptSourceFilter}
+              onChange={(e) => {
+                setQuptSourceFilter(e.target.value)
+                setQuptsToShow(20) // Reset pagination
+              }}
+              className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
+            >
+              <option value="all">All Sources</option>
+              {uniqueSources.map(source => (
+                <option key={source} value={source}>
+                  {source.charAt(0).toUpperCase() + source.slice(1)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Date Range</label>
+            <select
+              value={quptDateFilter}
+              onChange={(e) => {
+                setQuptDateFilter(e.target.value)
+                setQuptsToShow(20) // Reset pagination
+              }}
+              className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
+            >
+              <option value="all">All Time</option>
+              <option value="24h">Last 24 Hours</option>
+              <option value="7d">Last 7 Days</option>
+              <option value="30d">Last 30 Days</option>
+            </select>
+          </div>
+          {(quptSourceFilter !== 'all' || quptDateFilter !== 'all') && (
+            <div className="flex items-end">
+              <button
+                onClick={() => {
+                  setQuptSourceFilter('all')
+                  setQuptDateFilter('all')
+                  setQuptsToShow(20)
+                }}
+                className="px-3 py-2 text-sm text-quantum-500 hover:text-quantum-400"
+              >
+                Clear Filters
+              </button>
+            </div>
           )}
         </div>
 
@@ -322,17 +405,32 @@ export default function EntanglementDetail({ entanglementId }: EntanglementDetai
         )}
         {quptsLoading ? (
           <div className="text-gray-400 text-center py-8">Loading activity...</div>
-        ) : qupts.length === 0 ? (
-          <div className="text-gray-400 text-center py-8">No activity yet</div>
-        ) : (
-          <div className="space-y-2">
-            {qupts.map(qupt => (
-              <QuptItem
-                key={qupt.id}
-                qupt={qupt}
-              />
-            ))}
+        ) : filteredQupts.length === 0 ? (
+          <div className="text-gray-400 text-center py-8">
+            {qupts.length === 0 ? 'No activity yet' : 'No qupts match the current filters'}
           </div>
+        ) : (
+          <>
+            <div className="space-y-2">
+              {visibleQupts.map(qupt => (
+                <QuptItem
+                  key={qupt.id}
+                  qupt={qupt}
+                />
+              ))}
+            </div>
+            
+            {hasMore && (
+              <div className="text-center mt-4">
+                <button
+                  onClick={() => setQuptsToShow(prev => prev + 20)}
+                  className="px-6 py-2 bg-quantum-600 hover:bg-quantum-700 text-white rounded"
+                >
+                  Show More ({filteredQupts.length - quptsToShow} remaining)
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

@@ -22,6 +22,8 @@ app.get('/', async (c) => {
     recursive: c.req.query('recursive') !== 'false',
     zoku_id: c.req.query('zoku_id'),
     source: c.req.query('source'),
+    since: c.req.query('since') ? parseInt(c.req.query('since')!) : undefined,
+    until: c.req.query('until') ? parseInt(c.req.query('until')!) : undefined,
     limit: c.req.query('limit') ? parseInt(c.req.query('limit')!) : 20,
     offset: c.req.query('offset') ? parseInt(c.req.query('offset')!) : 0
   });

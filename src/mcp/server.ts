@@ -68,7 +68,10 @@ const schemas = {
     entanglement_id: z.string(),
     recursive: z.boolean().optional().default(true).describe('Include qupts from child entanglements'),
     source: z.string().optional().describe('Filter by source (github, gmail, zammad, etc.)'),
-    limit: z.number().optional().default(20),
+    since: z.number().optional().describe('Unix timestamp - only return qupts created after this time'),
+    until: z.number().optional().describe('Unix timestamp - only return qupts created before this time'),
+    limit: z.number().optional().default(20).describe('Maximum number of qupts to return (1-1000)'),
+    offset: z.number().optional().default(0).describe('Number of qupts to skip (for pagination)'),
     detailed: z.boolean().optional().default(false).describe('Include full metadata. Default: false (omits metadata for brevity)')
   }),
 
@@ -386,7 +389,7 @@ function createMcpServer(db: DB, env: any, logger: Logger, user: any): McpServer
 
   server.registerTool(
     'list_qupts',
-    { description: 'List activity for an entanglement', inputSchema: schemas.list_qupts },
+    { description: 'List activity for an entanglement with filtering and pagination. Supports source filter, date range (since/until), limit, and offset for paging through results.', inputSchema: schemas.list_qupts },
     async (args, extra) => mcpToolWrapper('list_qupts', logger, extra.sessionId, async () => {
       const qupts = await services.qupts.list(args);
       
@@ -400,10 +403,18 @@ function createMcpServer(db: DB, env: any, logger: Logger, user: any): McpServer
             source: q.source,
             external_id: q.external_id,
             created_at: q.created_at
-          }))
+          })),
+          total: qupts.length,
+          offset: args.offset || 0,
+          limit: args.limit || 20
         };
       }
-      return { qupts };
+      return { 
+        qupts,
+        total: qupts.length,
+        offset: args.offset || 0,
+        limit: args.limit || 20
+      };
     })
   );
 
