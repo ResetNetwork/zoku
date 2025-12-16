@@ -102,22 +102,26 @@ export class SourceService extends BaseService {
       throw new NotFoundError('Source', id);
     }
 
-    // If cascade is requested, delete all qupts from this source
+    // If cascade is requested, delete all qupts from this source type for this entanglement
+    // NOTE: Qupts don't store source_id, only source type, so this deletes ALL qupts
+    // of this source type (e.g., all 'gdrive' qupts) for this entanglement
     if (cascadeQupts) {
       const result = await this.db.d1
         .prepare('DELETE FROM qupts WHERE source = ? AND entanglement_id = ?')
         .bind(source.type, source.entanglement_id)
         .run();
       
-      this.logger.info('Cascade deleted qupts', { 
+      this.logger.info('Cascade deleted qupts by source type', { 
         source_id: id, 
         source_type: source.type,
-        changes: result.changes 
+        entanglement_id: source.entanglement_id,
+        qupts_deleted: result.meta.changes 
       });
       
       await this.audit('source.delete_with_qupts', { 
         source_id: id,
-        qupts_deleted: result.changes 
+        source_type: source.type,
+        qupts_deleted: result.meta.changes 
       });
     } else {
       await this.audit('source.delete', { source_id: id });
