@@ -56,20 +56,56 @@ A project/initiative tracking system inspired by the Quantum Thief trilogy. Stat
 ### Setup
 
 ```bash
-# Install backend dependencies
+# 1. Install backend dependencies
 npm install
 
-# Install frontend dependencies
+# 2. Install frontend dependencies
 cd frontend && npm install && cd ..
 
-# Run database migrations
-npm run db:migrate
-npm run db:seed
+# 3. Initialize local database (REQUIRED for first run)
+npm run db:reset
+# This creates all tables and loads seed data
+# Without this, you'll get "no such table" errors
 
-# Start development servers (in separate terminals)
-npm run dev              # Backend on :8787
-cd frontend && npm run dev  # Frontend on :5173
+# 4. Start development servers (in separate terminals)
+npm run dev              # Backend on :8789
+cd frontend && npm run dev  # Frontend on :3000
 ```
+
+### Database Initialization
+
+**⚠️ IMPORTANT**: The D1 database must be initialized before first use.
+
+#### Local Development (First Time Setup)
+```bash
+# Create tables and load seed data
+npm run db:reset
+
+# Or run separately:
+npm run db:migrate  # Creates all tables from schema.sql
+npm run db:seed     # Loads taxonomy dimensions from seed.sql
+```
+
+#### Production Deployment (One-Time Setup)
+```bash
+# Create remote database tables
+npm run db:migrate:remote
+
+# Load seed data
+npm run db:seed:remote
+```
+
+**Why this is needed:**
+- Cloudflare D1 databases are created empty (no tables)
+- The schema is NOT automatically applied
+- You must manually run migrations before the app can function
+- Without migrations, you'll get: `D1_ERROR: no such table: zoku`
+
+**When to run migrations:**
+- First time setting up local development
+- After `rm -rf .wrangler/state` (clears local database)
+- First time deploying to production
+- After adding new tables/columns (run new migration files)
 
 ### Local Development
 

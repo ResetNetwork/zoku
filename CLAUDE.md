@@ -659,13 +659,28 @@ Complete four-tier authentication with OAuth 2.1 and PAT support.
 - ✅ Beautiful UI (quantum-themed authorization pages)
 - ✅ Dev mode (skip validation for local testing)
 
-### Local Development
+### Local Development Setup
+
+**⚠️ CRITICAL: Initialize database before first run!**
+
 ```bash
-# Generate dev JWT for web UI
+# 1. Install dependencies
+npm install
+cd frontend && npm install && cd ..
+
+# 2. Initialize database (REQUIRED - creates all tables)
+npm run db:reset
+# Without this: D1_ERROR: no such table: zoku
+
+# 3. Generate dev JWT for web UI
 node scripts/generate-dev-jwt.js dev@reset.tech
 
-# Add header via ModHeader extension:
+# 4. Add header via ModHeader extension:
 # cf-access-jwt-assertion: <jwt>
+
+# 5. Start servers (separate terminals)
+npm run dev              # Backend on :8789
+cd frontend && npm run dev  # Frontend on :3000
 
 # MCP clients use OAuth (no manual config needed):
 {
@@ -674,6 +689,24 @@ node scripts/generate-dev-jwt.js dev@reset.tech
   }
 }
 ```
+
+**Database Commands:**
+```bash
+# Local database
+npm run db:reset          # Drop and recreate (schema + seed)
+npm run db:migrate        # Apply schema.sql
+npm run db:seed          # Load taxonomy seed data
+
+# Production database
+npm run db:migrate:remote # Apply schema to production
+npm run db:seed:remote   # Load seed data to production
+```
+
+**When to run migrations:**
+- First time setup (local or production)
+- After `rm -rf .wrangler/state` (nukes local DB)
+- After schema changes (new tables/columns)
+- Production deployment (one-time initial setup)
 
 ### Documentation
 See [docs/authentication.md](docs/authentication.md) for:
