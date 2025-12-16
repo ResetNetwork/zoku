@@ -68,7 +68,7 @@ export async function generateMcpToken(
 
 /**
  * Validate MCP token and return user
- * Supports both OAuth tokens (from KV) and PATs (JWT)
+ * Tries OAuth tokens first (from OAuth provider), then falls back to PAT (JWT)
  * Uses session-aware caching: full check on initialize, cached on subsequent calls
  */
 export async function validateMcpToken(
@@ -80,9 +80,29 @@ export async function validateMcpToken(
   if (!env.JWT_SECRET) {
     throw new Error('JWT_SECRET not configured');
   }
-  // AUTH_KV is optional in dev - just skip revocation check
 
-  // PAT validation (JWT-based)
+  // Try OAuth token first (if OAuth is configured)
+  if (env.AUTH_KV && env.APP_URL) {
+    try {
+      const { createMcpOAuthProvider } = await import('./mcp-oauth');
+      const provider = createMcpOAuthProvider(env);
+
+      // Validate OAuth access token
+      const tokenData = await provider.validateAccessToken(token);
+
+      if (tokenData?.props?.user_id) {
+        const user = await db.getZoku(tokenData.props.user_id);
+        if (!user) throw new Error('OAuth token valid but user not found');
+        if (user.access_tier === 'observed') throw new Error('Access revoked');
+        return user;
+      }
+    } catch (oauthError) {
+      // Not an OAuth token or validation failed, fall back to PAT
+      // Don't log error - PAT validation will be attempted
+    }
+  }
+
+  // PAT validation (JWT-based) - fallback or primary in dev
   try {
     // Verify JWT signature
     const secret = new TextEncoder().encode(env.JWT_SECRET);

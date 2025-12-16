@@ -11,6 +11,7 @@ import dimensionsRoutes from './api/dimensions';
 import jewelsRoutes from './api/jewels';
 import googleOAuthRoutes from './api/google-oauth';
 import mcpTokensRoutes from './api/mcp-tokens';
+import mcpOAuthRoutes from './api/mcp-oauth';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -19,6 +20,10 @@ app.use('/*', cors());
 
 // Enable logging for all requests
 app.use('/*', loggingMiddleware());
+
+// OAuth routes (must be before API routes for /.well-known to work)
+app.route('/', mcpOAuthRoutes);  // OAuth discovery (/.well-known/oauth-authorization-server)
+app.route('/oauth', mcpOAuthRoutes);  // OAuth endpoints (/oauth/authorize, /oauth/token, etc.)
 
 // API routes
 app.route('/api/entanglements', entanglementsRoutes);
