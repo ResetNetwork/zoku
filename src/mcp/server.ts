@@ -1518,52 +1518,37 @@ export async function mcpHandler(c: Context<{ Bindings: Bindings }>) {
     // Parse request body
     const body = await c.req.json().catch(() => undefined);
 
-    // Authenticate MCP request (unless MCP dev bypass)
+    // Authenticate MCP request - always required (no dev bypass)
+    const authHeader = c.req.header('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      logger.warn('Missing MCP Bearer token');
+      return c.json({
+        jsonrpc: '2.0',
+        error: { code: -32001, message: 'Authentication required - provide Bearer token' },
+        id: null
+      }, 401);
+    }
+
+    const token = authHeader.substring(7);
+    const { validateMcpToken } = await import('../lib/mcp-tokens');
+    const isInitialize = body?.method === 'initialize';
+
     let user = null;
-    if (c.env.DEV_MCP_AUTH_BYPASS === 'true' && c.env.DEV_USER_EMAIL) {
-      // MCP dev bypass (separate from web auth bypass)
-      user = await db.getZokuByEmail(c.env.DEV_USER_EMAIL);
-      if (!user) {
-        user = await db.createZoku({
-          name: 'Dev User',
-          type: 'human',
-          email: c.env.DEV_USER_EMAIL,
-          access_tier: 'prime',
-        });
-      }
-      logger.info('MCP dev auth bypass', { user_id: user.id });
-    } else {
-      // Validate Bearer token
-      const authHeader = c.req.header('Authorization');
-      if (!authHeader?.startsWith('Bearer ')) {
-        logger.warn('Missing MCP Bearer token');
-        return c.json({
-          jsonrpc: '2.0',
-          error: { code: -32001, message: 'Authentication required - provide Bearer token' },
-          id: null
-        }, 401);
-      }
-
-      const token = authHeader.substring(7);
-      const { validateMcpToken } = await import('../lib/mcp-tokens');
-      const isInitialize = body?.method === 'initialize';
-
-      try {
-        user = await validateMcpToken(token, c.env, db, isInitialize);
-        logger.info('MCP token validated', {
-          user_id: user.id,
-          tier: user.access_tier,
-          method: body?.method,
-          cached: !isInitialize
-        });
-      } catch (error) {
-        logger.error('MCP token validation failed', error as Error);
-        return c.json({
-          jsonrpc: '2.0',
-          error: { code: -32001, message: `Authentication failed: ${error instanceof Error ? error.message : 'Invalid token'}` },
-          id: null
-        }, 401);
-      }
+    try {
+      user = await validateMcpToken(token, c.env, db, isInitialize);
+      logger.info('MCP token validated', {
+        user_id: user.id,
+        tier: user.access_tier,
+        method: body?.method,
+        cached: !isInitialize
+      });
+    } catch (error) {
+      logger.error('MCP token validation failed', error as Error);
+      return c.json({
+        jsonrpc: '2.0',
+        error: { code: -32001, message: `Authentication failed: ${error instanceof Error ? error.message : 'Invalid token'}` },
+        id: null
+      }, 401);
     }
 
     c.set('user', user);

@@ -18,26 +18,6 @@ export function authMiddleware() {
       operation: 'auth_middleware'
     });
 
-    // Development bypass
-    if (env.DEV_AUTH_BYPASS === 'true' && env.DEV_USER_EMAIL) {
-      const db = new DB(env.DB);
-      let user = await db.getZokuByEmail(env.DEV_USER_EMAIL);
-
-      if (!user) {
-        // Create dev user with Prime access
-        user = await db.createZoku({
-          name: 'Dev User',
-          type: 'human',
-          email: env.DEV_USER_EMAIL,
-          access_tier: 'prime',
-        });
-      }
-
-      c.set('user', user);
-      logger.info('Dev auth bypass enabled', { user_id: user.id, email: user.email });
-      return next();
-    }
-
     // Extract JWT
     const token = extractCloudflareAccessToken(c.req.raw);
     if (!token) {

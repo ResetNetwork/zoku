@@ -11,10 +11,7 @@ export interface Bindings {
   JWT_SECRET?: string;
   // OAuth KV storage
   AUTH_KV?: KVNamespace;
-  // Development
-  DEV_AUTH_BYPASS?: string;  // For web UI
-  DEV_MCP_AUTH_BYPASS?: string;  // For MCP (separate from web)
-  DEV_USER_EMAIL?: string;
+  // App configuration
   APP_URL?: string;
 }
 
