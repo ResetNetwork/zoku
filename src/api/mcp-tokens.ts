@@ -4,6 +4,9 @@ import { requireTier } from '../middleware/auth';
 import { generateMcpToken, listMcpTokens, revokeMcpToken } from '../lib/mcp-tokens';
 import { DB } from '../db';
 import type { Bindings, Zoku } from '../types';
+import { validateBody } from '../lib/errors';
+import { createMcpTokenSchema } from '../lib/validation';
+import { ForbiddenError } from '../lib/errors';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -18,12 +21,8 @@ app.get('/', async (c) => {
 // Create new token (JWT-based PAT)
 app.post('/', requireTier('coherent'), async (c) => {
   const user = c.get('user') as Zoku;
-  const body = await c.req.json();
+  const body = await validateBody(c, createMcpTokenSchema);
   const db = new DB(c.env.DB);
-
-  if (!body.expires_in_days || ![30, 60, 90, 365].includes(body.expires_in_days)) {
-    return c.json({ error: 'expires_in_days must be 30, 60, 90, or 365' }, 400);
-  }
 
   const { token, metadata } = await generateMcpToken(
     c.env,
@@ -61,7 +60,7 @@ app.delete('/:id', async (c) => {
   const token = tokens.find((t) => t.id === tokenId);
 
   if (!token && user.access_tier !== 'prime') {
-    return c.json({ error: 'Can only revoke your own tokens' }, 403);
+    throw new ForbiddenError('Can only revoke your own tokens');
   }
 
   await revokeMcpToken(c.env, user.id, tokenId);

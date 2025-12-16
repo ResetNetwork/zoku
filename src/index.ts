@@ -3,6 +3,7 @@ import { cors } from 'hono/cors';
 import type { Bindings } from './types';
 import { loggingMiddleware } from './middleware/logging';
 import { authMiddleware } from './middleware/auth';
+import { errorHandler } from './lib/errors';
 
 import entanglementsRoutes from './api/entanglements';
 import zokuRoutes from './api/zoku';
@@ -22,6 +23,9 @@ app.use('/*', cors());
 
 // Enable logging for all requests
 app.use('/*', loggingMiddleware());
+
+// Enable global error handling (catches all errors, sanitizes messages)
+app.use('/*', errorHandler());
 
 // ============================================================================
 // PUBLIC ROUTES (No authentication required)
