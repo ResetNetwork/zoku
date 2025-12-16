@@ -21,7 +21,6 @@ export async function validateJewel(type: string, data: any, env: Env): Promise<
     case 'zammad':
       return await validateZammadCredential(data);
     case 'gdrive':
-    case 'gdocs':
       return await validateGoogleDocsCredential(data, data.client_id, data.client_secret);
     case 'gmail':
       return await validateGmailCredential(data, data.client_id, data.client_secret);

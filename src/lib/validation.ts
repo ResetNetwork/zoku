@@ -65,7 +65,7 @@ export const batchCreateQuptsSchema = z.object({
 
 // Source schemas
 export const createSourceSchema = z.object({
-  type: z.enum(['github', 'zammad', 'gdocs', 'gdrive', 'gmail']),
+  type: z.enum(['github', 'zammad', 'gdrive', 'gmail']),
   config: z.record(z.unknown()),
   jewels: z.record(z.unknown()).optional(),
   jewel_id: z.string().optional()
@@ -80,7 +80,7 @@ export const updateSourceSchema = z.object({
 // Jewel schemas
 export const createJewelSchema = z.object({
   name: nameSchema,
-  type: z.enum(['github', 'zammad', 'gdocs', 'gdrive', 'gmail']),
+  type: z.enum(['github', 'zammad', 'gdrive', 'gmail']),
   data: z.record(z.unknown())
 });
 

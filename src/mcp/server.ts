@@ -149,20 +149,10 @@ const schemas = {
     }),
     z.object({
       entanglement_id: z.string(),
-      type: z.literal('gdocs'),
+      type: z.literal('gdrive'),
       config: z.object({
         document_id: z.string(),
         track_suggestions: z.boolean().optional()
-      }).describe('Source-specific configuration (e.g., owner, repo for GitHub)'),
-      jewels: z.record(z.any()).optional().describe('Inline authentication jewels (will be validated and encrypted). Omit if using jewel_id.'),
-      jewel_id: z.string().optional().describe('ID of stored jewel to use. Omit if providing inline jewels.')
-    }),
-    z.object({
-      entanglement_id: z.string(),
-      type: z.literal('gdrive'),
-      config: z.object({
-        folder_id: z.string().optional(),
-        file_types: z.array(z.string()).optional()
       }).describe('Source-specific configuration (e.g., owner, repo for GitHub)'),
       jewels: z.record(z.any()).optional().describe('Inline authentication jewels (will be validated and encrypted). Omit if using jewel_id.'),
       jewel_id: z.string().optional().describe('ID of stored jewel to use. Omit if providing inline jewels.')
@@ -204,12 +194,12 @@ const schemas = {
 
   add_jewel: z.object({
     name: z.string().describe('User-friendly name (e.g., "GitHub - Personal")'),
-    type: z.enum(['github', 'gmail', 'zammad', 'gdrive', 'gdocs']),
+    type: z.enum(['github', 'gmail', 'zammad', 'gdrive']),
     data: z.record(z.any()).describe('Authentication credentials (will be validated and encrypted)')
   }),
 
   list_jewels: z.object({
-    type: z.enum(['github', 'gmail', 'zammad', 'gdrive', 'gdocs']).optional().describe('Filter by jewel type'),
+    type: z.enum(['github', 'gmail', 'zammad', 'gdrive']).optional().describe('Filter by jewel type'),
     limit: z.number().optional().default(20)
   }),
 

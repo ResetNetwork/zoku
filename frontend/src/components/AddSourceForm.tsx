@@ -123,7 +123,7 @@ export default function AddSourceForm({ entanglementId, onSuccess, onCancel }: A
         >
           <option value="github">GitHub</option>
           <option value="zammad">Zammad</option>
-          <option value="gdocs">Google Drive</option>
+          <option value="gdrive">Google Drive</option>
           <option value="gmail">Gmail</option>
         </select>
       </div>
