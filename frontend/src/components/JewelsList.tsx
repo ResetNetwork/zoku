@@ -6,7 +6,7 @@ import GoogleOAuthButton from './GoogleOAuthButton'
 
 export default function JewelsList() {
   // Note: useIsPrime hook available for future use (delete others' jewels)
-  const [showAddForm, setShowAddForm] = useState<'github' | 'zammad' | 'gdrive' | null>(null)
+  const [showAddForm, setShowAddForm] = useState<'github' | 'zammad' | 'gdrive' | 'gmail' | null>(null)
   const [editingJewel, setEditingJewel] = useState<any>(null)
   const [formData, setFormData] = useState<any>({ name: '', token: '', url: '' })
   const [saving, setSaving] = useState(false)
@@ -26,7 +26,8 @@ export default function JewelsList() {
     const labels: Record<string, string> = {
       github: 'GitHub',
       zammad: 'Zammad',
-      gdocs: 'Google Drive'
+      gdocs: 'Google Drive',
+      gmail: 'Gmail'
     }
     return labels[type] || type
   }
@@ -35,7 +36,8 @@ export default function JewelsList() {
     const colors: Record<string, string> = {
       github: 'bg-purple-500/20 text-purple-300',
       zammad: 'bg-blue-500/20 text-blue-300',
-      gdocs: 'bg-green-500/20 text-green-300'
+      gdocs: 'bg-green-500/20 text-green-300',
+      gmail: 'bg-red-500/20 text-red-300'
     }
     return colors[type] || 'bg-gray-500/20 text-gray-300'
   }
@@ -212,12 +214,21 @@ export default function JewelsList() {
               </svg>
               Google Drive
             </button>
+            <button
+              onClick={() => setShowAddForm('gmail')}
+              className="btn btn-secondary flex items-center gap-2"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z" fill="#EA4335"/>
+              </svg>
+              Gmail
+            </button>
           </div>
         </div>
       )}
 
       {/* Add GitHub/Zammad Token Form */}
-      {showAddForm && showAddForm !== 'gdrive' && (
+      {showAddForm && showAddForm !== 'gdrive' && showAddForm !== 'gmail' && (
         <div className="card space-y-4">
           <div>
             <h3 className="text-lg font-semibold mb-2">Add {getTypeLabel(showAddForm)} Jewel</h3>
@@ -284,19 +295,20 @@ export default function JewelsList() {
         </div>
       )}
 
-      {/* Google OAuth Form (Add) */}
-      {showAddForm === 'gdrive' && !editingJewel && (
+      {/* Google OAuth Form (Add) - for both Google Drive and Gmail */}
+      {(showAddForm === 'gdrive' || showAddForm === 'gmail') && !editingJewel && (
         <GoogleOAuthButton
           onSuccess={handleGoogleOAuthSuccess}
           onCancel={() => setShowAddForm(null)}
+          jewelType={showAddForm}
         />
       )}
 
-      {/* Google OAuth Re-auth (Edit) */}
-      {editingJewel && editingJewel.type === 'gdrive' && (
+      {/* Google OAuth Re-auth (Edit) - for both Google Drive and Gmail */}
+      {editingJewel && (editingJewel.type === 'gdrive' || editingJewel.type === 'gmail') && (
         <div className="card space-y-4">
           <div>
-            <h3 className="text-lg font-semibold mb-2">Re-authorize Google Drive</h3>
+            <h3 className="text-lg font-semibold mb-2">Re-authorize {getTypeLabel(editingJewel.type)}</h3>
             <p className="text-sm text-gray-400 mb-4">
               Update the jewel name or re-authorize to refresh the access token
             </p>

@@ -5,6 +5,7 @@ import { useNotifications } from '../lib/notifications'
 interface GoogleOAuthButtonProps {
   onSuccess: (jewel: { id: string; name: string }) => void
   onCancel?: () => void
+  jewelType?: 'gdrive' | 'gmail'
   initialValues?: {
     name?: string
     clientId?: string
@@ -12,7 +13,7 @@ interface GoogleOAuthButtonProps {
   }
 }
 
-export default function GoogleOAuthButton({ onSuccess, onCancel, initialValues }: GoogleOAuthButtonProps) {
+export default function GoogleOAuthButton({ onSuccess, onCancel, jewelType = 'gdrive', initialValues }: GoogleOAuthButtonProps) {
   const [name, setName] = useState(initialValues?.name || '')
   const [clientId, setClientId] = useState(initialValues?.clientId || '')
   const [clientSecret, setClientSecret] = useState(initialValues?.clientSecret || '')
@@ -91,12 +92,12 @@ export default function GoogleOAuthButton({ onSuccess, onCancel, initialValues }
             }
 
             console.log('🎫 Creating jewel with tokens...')
-            console.log('Jewel data:', { name, type: 'gdrive' })
+            console.log('Jewel data:', { name, type: jewelType })
 
             // Create jewel with the tokens + client credentials
             const jewel = await api.createJewel({
               name: name,
-              type: 'gdrive',
+              type: jewelType,
               data: {
                 refresh_token: tokens.refresh_token,
                 client_id: tokens.client_id,
@@ -105,7 +106,8 @@ export default function GoogleOAuthButton({ onSuccess, onCancel, initialValues }
             })
 
             console.log(`✅ Jewel created: ${jewel.id}`)
-            addNotification('success', 'Google Drive connected successfully')
+            const successMsg = jewelType === 'gmail' ? 'Gmail connected successfully' : 'Google Drive connected successfully'
+            addNotification('success', successMsg)
             onSuccess(jewel)
             setAuthorizing(false)
 
@@ -147,10 +149,13 @@ export default function GoogleOAuthButton({ onSuccess, onCancel, initialValues }
     }
   }
 
+  const serviceLabel = jewelType === 'gmail' ? 'Gmail' : 'Google Drive'
+  const placeholderName = jewelType === 'gmail' ? 'My Gmail' : 'My Google Drive'
+
   return (
     <div className="card space-y-4">
       <div>
-        <h3 className="text-lg font-semibold mb-2">Connect Google Drive</h3>
+        <h3 className="text-lg font-semibold mb-2">Connect {serviceLabel}</h3>
         <p className="text-sm text-gray-400 mb-4">
           Enter your Google Cloud project OAuth jewels.
           <a
@@ -170,7 +175,7 @@ export default function GoogleOAuthButton({ onSuccess, onCancel, initialValues }
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="My Google Drive"
+          placeholder={placeholderName}
           className="w-full px-3 py-2 rounded-md bg-gray-100 dark:bg-quantum-700 border border-gray-300 dark:border-quantum-600 text-gray-900 dark:text-gray-100"
         />
       </div>
