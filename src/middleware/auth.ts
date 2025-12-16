@@ -18,33 +18,59 @@ export function authMiddleware() {
       operation: 'auth_middleware'
     });
 
+    logger.info('Auth middleware started', {
+      path: c.req.path,
+      method: c.req.method,
+      has_cf_team_domain: !!env.CF_ACCESS_TEAM_DOMAIN,
+      has_cf_aud: !!env.CF_ACCESS_AUD
+    });
+
     // Extract JWT
     const token = extractCloudflareAccessToken(c.req.raw);
     if (!token) {
-      logger.warn('Missing CF Access JWT');
-      return c.json({ error: 'Authentication required' }, 401);
+      logger.warn('Missing CF Access JWT', {
+        headers: Object.fromEntries(c.req.raw.headers.entries())
+      });
+      return c.json({ error: 'Authentication required - No JWT header found' }, 401);
     }
+
+    logger.info('JWT extracted', {
+      token_length: token.length,
+      token_preview: token.substring(0, 50) + '...'
+    });
 
     let payload: any;
 
     // In dev mode (no CF Access configured), skip validation and just decode JWT
     if (!env.CF_ACCESS_TEAM_DOMAIN || !env.CF_ACCESS_AUD) {
+      logger.info('Dev mode detected - skipping JWT signature validation');
       // Dev mode - trust the JWT without validation
       try {
         const parts = token.split('.');
+        logger.info('JWT parts', { parts_count: parts.length });
+        
         if (parts.length === 3) {
           const payloadBase64 = parts[1];
           const payloadJson = atob(payloadBase64);
           payload = JSON.parse(payloadJson);
-          logger.info('Dev mode: JWT decoded without validation', { email: payload.email });
+          logger.info('Dev mode: JWT decoded successfully', { 
+            email: payload.email,
+            sub: payload.sub,
+            iat: payload.iat,
+            exp: payload.exp
+          });
         } else {
+          logger.error('Invalid JWT format - expected 3 parts', { parts_count: parts.length });
           throw new Error('Invalid JWT format');
         }
       } catch (error) {
-        logger.error('Failed to decode JWT in dev mode', error as Error);
-        return c.json({ error: 'Invalid JWT format' }, 401);
+        logger.error('Failed to decode JWT in dev mode', error as Error, {
+          error_message: error instanceof Error ? error.message : String(error)
+        });
+        return c.json({ error: 'Invalid JWT format: ' + (error instanceof Error ? error.message : String(error)) }, 401);
       }
     } else {
+      logger.info('Production mode - validating JWT with CF Access');
       // Production mode - validate with CF Access JWKS
       try {
         payload = await validateCloudflareAccessToken(token, env);
@@ -56,12 +82,14 @@ export function authMiddleware() {
     }
 
     try {
+      logger.info('Looking up user', { email: payload.email });
 
       // Load or create user
       const db = new DB(env.DB);
       let user = await db.getZokuByEmail(payload.email);
 
       if (!user) {
+        logger.info('User not found - creating new user');
         // First-time user: auto-create as Coherent (read-only)
         user = await db.createZoku({
           name: payload.email.split('@')[0],  // Use email prefix as name
@@ -71,7 +99,11 @@ export function authMiddleware() {
           cf_access_sub: payload.sub,
         });
         logger.info('New user auto-created', { user_id: user.id, tier: 'coherent' });
-      } else if (user.access_tier === 'observed') {
+      } else {
+        logger.info('Existing user found', { user_id: user.id, tier: user.access_tier });
+      }
+      
+      if (user.access_tier === 'observed') {
         // Existing user was pre-created for PASCI matrix but never authenticated
         // Auto-promote to Coherent on first login
         await db.updateZokuTier(user.id, 'coherent');
