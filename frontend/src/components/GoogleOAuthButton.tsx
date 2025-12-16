@@ -137,7 +137,9 @@ export default function GoogleOAuthButton({ onSuccess, onCancel, jewelType = 'gd
               type: jewelType,
               oauth_app_id: oauthApp.id,
               data: {
-                refresh_token: tokens.refresh_token
+                refresh_token: tokens.refresh_token,
+                client_id: tokens.client_id,
+                client_secret: tokens.client_secret
               }
             })
 
