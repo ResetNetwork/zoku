@@ -1,6 +1,6 @@
 # Authentication Implementation Progress
-**Date**: 2025-12-13
-**Status**: Core Implementation Complete (Phases 1-4)
+**Date**: 2025-12-15
+**Status**: Full Implementation Complete (Phases 1-4) - Ready for Production Deployment
 
 ## ✅ Completed Phases
 
@@ -40,8 +40,13 @@
 - ✅ Helper hooks: `useCanWrite()`, `useIsPrime()`
 
 ### Phase 4: MCP Authentication ✅ (Complete)
-**Commits**: `832edd6`
+**Commits**: `832edd6`, `9ac35ed`
 
+- ✅ OAuth 2.1 server implementation (`@cloudflare/workers-oauth-provider`)
+- ✅ OAuth discovery endpoint (`/.well-known/oauth-authorization-server`)
+- ✅ Authorization UI with Cloudflare Access integration
+- ✅ Token exchange, refresh, registration, revocation endpoints
+- ✅ Dual authentication: OAuth tokens (primary) + PAT fallback
 - ✅ PAT authentication in `mcpHandler`
 - ✅ Bearer token validation with session caching
 - ✅ Tier-based tool authorization (`requireMcpTier()`)
@@ -49,6 +54,15 @@
 - ✅ Jewel tools check for 'coherent' tier
 - ✅ Read tools accessible to all authenticated users
 - ✅ Dev bypass for local development
+
+**New Files**:
+- `src/lib/mcp-oauth.ts` - OAuth provider setup
+- `src/api/mcp-oauth.ts` - OAuth endpoints (6 total)
+
+**Updated Files**:
+- `src/lib/mcp-tokens.ts` - Try OAuth first, fall back to PAT
+- `src/index.ts` - Mount OAuth routes
+- `.dev.vars` - Add APP_URL for OAuth issuer
 
 ---
 
