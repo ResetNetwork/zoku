@@ -221,6 +221,18 @@ export const api = {
     return res.json()
   },
 
+  async deleteQupt(id: string) {
+    const res = await fetch(`${API_BASE}/qupts/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    })
+    if (!res.ok) {
+      const error = await res.json()
+      throw new Error(error.error?.message || 'Failed to delete qupt')
+    }
+    return res.json()
+  },
+
   // User management (Prime only)
   async updateZokuTier(zokuId: string, tier: AccessTier) {
     const res = await fetch(`${API_BASE}/zoku/${zokuId}/tier`, {

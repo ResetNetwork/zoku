@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import QuptItem from './QuptItem'
 import type { Qupt } from '../lib/types'
@@ -7,6 +7,7 @@ import type { Qupt } from '../lib/types'
 export default function ActivityList() {
   const [selectedEntanglement, setSelectedEntanglement] = useState<string>('all')
   const [selectedSource, setSelectedSource] = useState<string>('all')
+  const queryClient = useQueryClient()
 
   const { data: entanglements = [] } = useQuery({
     queryKey: ['entanglements'],
@@ -26,6 +27,10 @@ export default function ActivityList() {
     },
     enabled: entanglements.length > 0
   })
+
+  const handleQuptDeleted = () => {
+    queryClient.invalidateQueries({ queryKey: ['all-qupts'] })
+  }
 
 
   // Get unique source types from qupts
@@ -97,6 +102,7 @@ export default function ActivityList() {
                 key={qupt.id}
                 qupt={qupt}
                 showEntanglementName={true}
+                onDelete={handleQuptDeleted}
               />
             ))}
           </div>
