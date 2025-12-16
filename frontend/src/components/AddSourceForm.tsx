@@ -10,7 +10,7 @@ interface AddSourceFormProps {
 }
 
 export default function AddSourceForm({ entanglementId, onSuccess, onCancel }: AddSourceFormProps) {
-  const [sourceType, setSourceType] = useState<'github' | 'zammad' | 'gdrive'>('github')
+  const [sourceType, setSourceType] = useState<'github' | 'zammad' | 'gdrive' | 'gmail'>('github')
   const [selectedJewel, setSelectedJewel] = useState('')
   const [config, setConfig] = useState<any>({
     // GitHub defaults
@@ -29,7 +29,7 @@ export default function AddSourceForm({ entanglementId, onSuccess, onCancel }: A
   // Filter jewels by type
   const availableJewels = jewels.filter((c: any) => c.type === sourceType)
 
-  const handleTypeChange = (type: 'github' | 'zammad' | 'gdrive') => {
+  const handleTypeChange = (type: 'github' | 'zammad' | 'gdrive' | 'gmail') => {
     setSourceType(type)
     setSelectedJewel('')
     // Reset config based on type
@@ -39,6 +39,8 @@ export default function AddSourceForm({ entanglementId, onSuccess, onCancel }: A
       setConfig({ tag: '', include_articles: true })
     } else if (type === 'gdrive') {
       setConfig({ document_id: '', track_suggestions: false })
+    } else if (type === 'gmail') {
+      setConfig({ label: '' })
     }
   }
 
@@ -59,6 +61,10 @@ export default function AddSourceForm({ entanglementId, onSuccess, onCancel }: A
     }
     if (sourceType === 'gdrive' && !config.document_id) {
       addNotification('error', 'Please provide document ID for Google Docs source')
+      return
+    }
+    if (sourceType === 'gmail' && !config.label) {
+      addNotification('error', 'Please provide label for Gmail source')
       return
     }
 
@@ -115,6 +121,7 @@ export default function AddSourceForm({ entanglementId, onSuccess, onCancel }: A
           <option value="github">GitHub</option>
           <option value="zammad">Zammad</option>
           <option value="gdocs">Google Drive</option>
+          <option value="gmail">Gmail</option>
         </select>
       </div>
 
@@ -229,6 +236,26 @@ export default function AddSourceForm({ entanglementId, onSuccess, onCancel }: A
               className="w-full px-3 py-2 rounded-md bg-gray-100 dark:bg-quantum-700 border border-gray-300 dark:border-quantum-600 text-gray-900 dark:text-gray-100"
             />
             <p className="text-xs text-gray-500 mt-1">Paste Google Docs/Drive URL or enter ID directly</p>
+          </div>
+        </>
+      )}
+
+      {/* Gmail Config */}
+      {sourceType === 'gmail' && (
+        <>
+          <div>
+            <label className="block text-sm text-gray-400 mb-2">Gmail Label</label>
+            <input
+              type="text"
+              value={config.label}
+              onChange={(e) => setConfig({ ...config, label: e.target.value })}
+              placeholder="zoku"
+              className="w-full px-3 py-2 rounded-md bg-gray-100 dark:bg-quantum-700 border border-gray-300 dark:border-quantum-600 text-gray-900 dark:text-gray-100"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Enter the name of a Gmail label (e.g., "zoku", "project", "important"). 
+              Only messages with this label will be collected.
+            </p>
           </div>
         </>
       )}
