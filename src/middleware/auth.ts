@@ -90,17 +90,34 @@ export function authMiddleware() {
 
       if (!user) {
         logger.info('User not found - creating new user');
-        // First-time user: auto-create as Coherent (read-only)
+        
+        // Check if this is the admin user (from ADMIN_EMAIL env var)
+        const isAdmin = env.ADMIN_EMAIL && payload.email.toLowerCase() === env.ADMIN_EMAIL.toLowerCase();
+        const initialTier = isAdmin ? 'prime' : 'coherent';
+        
+        // First-time user: auto-create as Prime (admin) or Coherent (read-only)
         user = await db.createZoku({
           name: payload.email.split('@')[0],  // Use email prefix as name
           type: 'human',
           email: payload.email,
-          access_tier: 'coherent',
+          access_tier: initialTier,
           cf_access_sub: payload.sub,
         });
-        logger.info('New user auto-created', { user_id: user.id, tier: 'coherent' });
+        logger.info('New user auto-created', { 
+          user_id: user.id, 
+          tier: initialTier,
+          is_admin: isAdmin 
+        });
       } else {
         logger.info('Existing user found', { user_id: user.id, tier: user.access_tier });
+        
+        // Check if existing user should be promoted to admin
+        const isAdmin = env.ADMIN_EMAIL && payload.email.toLowerCase() === env.ADMIN_EMAIL.toLowerCase();
+        if (isAdmin && user.access_tier !== 'prime') {
+          await db.updateZokuTier(user.id, 'prime');
+          user.access_tier = 'prime';
+          logger.info('User promoted to prime (admin)', { user_id: user.id });
+        }
       }
       
       if (user.access_tier === 'observed') {

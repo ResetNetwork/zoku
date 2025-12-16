@@ -672,13 +672,17 @@ cd frontend && npm install && cd ..
 npm run db:reset
 # Without this: D1_ERROR: no such table: zoku
 
-# 3. Generate dev JWT for web UI
+# 3. Configure admin user in .dev.vars (already set)
+# ADMIN_EMAIL=dev@reset.tech
+# This user will auto-promote to 'prime' tier on first login
+
+# 4. Generate dev JWT for web UI
 node scripts/generate-dev-jwt.js dev@reset.tech
 
-# 4. Add header via ModHeader extension:
+# 5. Add header via ModHeader extension:
 # cf-access-jwt-assertion: <jwt>
 
-# 5. Start servers (separate terminals)
+# 6. Start servers (separate terminals)
 npm run dev              # Backend on :8789
 cd frontend && npm run dev  # Frontend on :3000
 
@@ -707,6 +711,34 @@ npm run db:seed:remote   # Load seed data to production
 - After `rm -rf .wrangler/state` (nukes local DB)
 - After schema changes (new tables/columns)
 - Production deployment (one-time initial setup)
+
+**Admin User Bootstrap:**
+
+The `ADMIN_EMAIL` environment variable solves the chicken-and-egg problem:
+- First user to log in normally becomes `coherent` (read-only)
+- But if their email matches `ADMIN_EMAIL`, they become `prime` (admin)
+- This gives you full access to create entanglements, assign roles, etc.
+
+**Local:** Set in `.dev.vars`:
+```bash
+ADMIN_EMAIL=dev@reset.tech
+```
+
+**Production:** Set in Cloudflare dashboard or wrangler secrets:
+```bash
+# Option 1: In wrangler.toml [vars] section
+ADMIN_EMAIL = "your-email@reset.tech"
+
+# Option 2: As a secret (recommended for production)
+wrangler secret put ADMIN_EMAIL
+# Then enter: your-email@reset.tech
+```
+
+**Behavior:**
+- New user with matching email → auto-created as `prime`
+- Existing user with matching email → auto-promoted to `prime` on next login
+- Case-insensitive email matching
+- Logged clearly in authentication logs
 
 ### Documentation
 See [docs/authentication.md](docs/authentication.md) for:

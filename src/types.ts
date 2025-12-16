@@ -14,6 +14,8 @@ export interface Bindings {
   AUTH_KV?: KVNamespace;
   // App configuration
   APP_URL?: string;
+  // Admin user (automatically promoted to prime tier)
+  ADMIN_EMAIL?: string;
 }
 
 // Variables available in Hono context
