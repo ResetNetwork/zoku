@@ -18,79 +18,44 @@ export function authMiddleware() {
       operation: 'auth_middleware'
     });
 
-    // Extract JWT from CF Access header
-    let token = extractCloudflareAccessToken(c.req.raw);
-
-    // In dev mode (no CF Access configured), accept JWT from Authorization header or Cookie
-    if (!token && !env.CF_ACCESS_TEAM_DOMAIN) {
-      // Try Authorization header
-      const authHeader = c.req.header('Authorization');
-      if (authHeader?.startsWith('Bearer ')) {
-        token = authHeader.substring(7);
-      }
-      // Try Cookie (for browser auto-login)
-      if (!token) {
-        const cookie = c.req.header('Cookie');
-        const match = cookie?.match(/dev_auth_token=([^;]+)/);
-        if (match) {
-          token = match[1];
-        }
-      }
-    }
-
+    // Extract JWT
+    const token = extractCloudflareAccessToken(c.req.raw);
     if (!token) {
-      logger.warn('Missing authentication token');
-
-      // In dev mode, redirect to dev login page
-      if (!env.CF_ACCESS_TEAM_DOMAIN) {
-        return c.redirect('/dev/login');
-      }
-
+      logger.warn('Missing CF Access JWT');
       return c.json({ error: 'Authentication required' }, 401);
     }
 
-    // Try dev JWT first (if CF Access not configured)
-    if (!env.CF_ACCESS_TEAM_DOMAIN && !env.CF_ACCESS_AUD) {
-      const { validateDevJWT } = await import('../lib/dev-auth');
-      const devPayload = await validateDevJWT(env, token);
+    let payload: any;
 
-      if (devPayload) {
-        logger.info('Dev JWT validated', { email: devPayload.email });
-
-        // Load or create user (same logic as CF Access)
-        const db = new DB(env.DB);
-        let user = await db.getZokuByEmail(devPayload.email);
-
-        if (!user) {
-          user = await db.createZoku({
-            name: devPayload.email.split('@')[0],
-            type: 'human',
-            email: devPayload.email,
-            access_tier: 'prime', // Dev users get prime access
-            cf_access_sub: devPayload.sub,
-          });
-          logger.info('New user auto-created (dev)', { user_id: user.id });
-        } else if (user.access_tier === 'observed') {
-          await db.updateZokuTier(user.id, 'prime'); // Promote to prime in dev
-          user.access_tier = 'prime';
-          logger.info('User auto-promoted (dev)', { user_id: user.id });
+    // In dev mode (no CF Access configured), skip validation and just decode JWT
+    if (!env.CF_ACCESS_TEAM_DOMAIN || !env.CF_ACCESS_AUD) {
+      // Dev mode - trust the JWT without validation
+      try {
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          const payloadBase64 = parts[1];
+          const payloadJson = atob(payloadBase64);
+          payload = JSON.parse(payloadJson);
+          logger.info('Dev mode: JWT decoded without validation', { email: payload.email });
+        } else {
+          throw new Error('Invalid JWT format');
         }
-
-        await db.updateZoku(user.id, {
-          last_login: Math.floor(Date.now() / 1000),
-          cf_access_sub: devPayload.sub
-        });
-
-        c.set('user', user);
-        logger.info('User authenticated (dev)', { user_id: user.id, tier: user.access_tier });
-        return next();
+      } catch (error) {
+        logger.error('Failed to decode JWT in dev mode', error as Error);
+        return c.json({ error: 'Invalid JWT format' }, 401);
+      }
+    } else {
+      // Production mode - validate with CF Access JWKS
+      try {
+        payload = await validateCloudflareAccessToken(token, env);
+        logger.info('CF Access token validated', { email: payload.email });
+      } catch (error) {
+        logger.error('Authentication failed', error as Error);
+        return c.json({ error: 'Invalid authentication token' }, 401);
       }
     }
 
     try {
-      // Validate real Cloudflare Access JWT
-      const payload = await validateCloudflareAccessToken(token, env);
-      logger.info('CF Access token validated', { email: payload.email });
 
       // Load or create user
       const db = new DB(env.DB);

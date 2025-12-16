@@ -17,18 +17,10 @@ export const SESSION_ID = initSession()
 
 // Helper to create fetch headers with session ID
 function getHeaders(additionalHeaders?: Record<string, string>): HeadersInit {
-  const headers: Record<string, string> = {
+  return {
     'X-Zoku-Session-ID': SESSION_ID,
     ...additionalHeaders
-  };
-
-  // In dev mode, send dev auth token if available
-  const devToken = sessionStorage.getItem('dev_auth_token');
-  if (devToken) {
-    headers['Authorization'] = `Bearer ${devToken}`;
   }
-
-  return headers;
 }
 
 export const api = {
