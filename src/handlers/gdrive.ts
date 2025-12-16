@@ -4,14 +4,20 @@ import { refreshGoogleAccessToken } from './google-auth';
 
 export const gdriveHandler: SourceHandler = {
   async collect({ source, config, credentials, since, cursor }) {
-    const { document_id, track_comments = true } = config;
+    const { 
+      mode = 'document',
+      document_id, 
+      folder_id,
+      track_comments = true,
+      track_revisions = true,
+      track_new_files = true
+    } = config;
 
     const qupts: QuptInput[] = [];
 
     try {
-      console.log(`📄 Fetching Google Doc: ${document_id}`);
+      console.log(`📄 Fetching Google Drive (mode: ${mode})`);
 
-      // Credentials now include client_id and client_secret from user's Google Cloud project
       const accessToken = await refreshGoogleAccessToken(credentials);
       console.log('✅ Got access token');
 
@@ -20,50 +26,136 @@ export const gdriveHandler: SourceHandler = {
         'Content-Type': 'application/json'
       };
 
-      // Get document metadata for title
-      const docResponse = await fetch(
-        `https://docs.googleapis.com/v1/documents/${document_id}?fields=title`,
-        { headers }
-      );
-
-      console.log(`📡 Document fetch status: ${docResponse.status}`);
-
-      if (!docResponse.ok) {
-        const errorText = await docResponse.text();
-        console.error(`❌ Google Docs API error (${docResponse.status}):`, errorText);
-        throw new Error(`Google Docs API error (${docResponse.status}): ${errorText}`);
+      // Route based on mode
+      if (mode === 'folder' && folder_id) {
+        // Folder mode: List new files
+        if (track_new_files) {
+          await collectFolderFiles(source, folder_id, headers, since, qupts);
+        }
+        console.log(`Google Drive handler collected ${qupts.length} qupts for folder ${folder_id}`);
+        return { qupts };
+      } else if (mode === 'document' && document_id) {
+        // Document mode: Track revisions and comments
+        await collectDocumentActivity(source, document_id, headers, since, cursor, track_revisions, track_comments, qupts);
+        const maxRevisionId = qupts
+          .filter(q => q.metadata?.type === 'revision')
+          .reduce((max, q) => Math.max(max, parseInt(q.metadata?.revision_id || '0')), cursor ? parseInt(cursor) : 0);
+        
+        console.log(`Google Drive handler collected ${qupts.length} qupts for document ${document_id}`);
+        return { qupts, cursor: String(maxRevisionId) };
+      } else {
+        throw new Error(`Invalid configuration: mode=${mode}, document_id=${document_id}, folder_id=${folder_id}`);
       }
+    } catch (error) {
+      console.error(`Google Drive handler error for source ${source.id}:`, error);
+      throw error;
+    }
+  }
+};
 
-      const doc = await docResponse.json() as { title: string };
-      const docTitle = doc.title;
+// Collect new files from a folder
+async function collectFolderFiles(
+  source: any,
+  folder_id: string,
+  headers: any,
+  since: number | undefined,
+  qupts: QuptInput[]
+) {
+  console.log(`📁 Listing files in folder ${folder_id}...`);
+  
+  // Build query: files in this folder, created after 'since'
+  let query = `'${folder_id}' in parents and trashed = false`;
+  if (since) {
+    const sinceDate = new Date(since * 1000).toISOString();
+    query += ` and createdTime > '${sinceDate}'`;
+  }
+  
+  const filesResponse = await fetch(
+    `https://www.googleapis.com/drive/v3/files?` +
+    `q=${encodeURIComponent(query)}&` +
+    `fields=files(id,name,mimeType,createdTime,owners,webViewLink)&` +
+    `pageSize=100&` +
+    `orderBy=createdTime desc`,
+    { headers }
+  );
 
-      // Fetch revisions from Drive API
-      const revisionsResponse = await fetch(
-        `https://www.googleapis.com/drive/v3/files/${document_id}/revisions?fields=revisions(id,modifiedTime,lastModifyingUser)&pageSize=100`,
-        { headers }
-      );
+  if (!filesResponse.ok) {
+    const errorText = await filesResponse.text();
+    throw new Error(`Google Drive API error (${filesResponse.status}): ${errorText}`);
+  }
 
-      if (!revisionsResponse.ok) {
-        const errorText = await revisionsResponse.text();
-        throw new Error(`Google Drive API error (${revisionsResponse.status}): ${errorText}`);
-      }
+  const filesData = await filesResponse.json() as { files?: any[] };
+  console.log(`📁 Found ${filesData.files?.length || 0} new files`);
 
+  for (const file of filesData.files || []) {
+    const createdTime = new Date(file.createdTime).getTime() / 1000;
+    
+    qupts.push({
+      entanglement_id: source.entanglement_id,
+      content: `New file: ${file.name}`,
+      source: 'gdrive',
+      external_id: `gdrive:folder:${folder_id}:file:${file.id}`,
+      metadata: {
+        type: 'new_file',
+        folder_id,
+        file_id: file.id,
+        file_name: file.name,
+        mime_type: file.mimeType,
+        created_by: file.owners?.[0]?.displayName,
+        created_by_email: file.owners?.[0]?.emailAddress,
+        url: file.webViewLink
+      },
+      created_at: Math.floor(createdTime)
+    });
+  }
+}
+
+// Collect revisions and comments from a single document
+async function collectDocumentActivity(
+  source: any,
+  document_id: string,
+  headers: any,
+  since: number | undefined,
+  cursor: string | undefined,
+  track_revisions: boolean,
+  track_comments: boolean,
+  qupts: QuptInput[]
+) {
+  // Get document title
+  const docResponse = await fetch(
+    `https://docs.googleapis.com/v1/documents/${document_id}?fields=title`,
+    { headers }
+  );
+
+  if (!docResponse.ok) {
+    const errorText = await docResponse.text();
+    throw new Error(`Google Docs API error (${docResponse.status}): ${errorText}`);
+  }
+
+  const doc = await docResponse.json() as { title: string };
+  const docTitle = doc.title;
+  const lastProcessedId = cursor ? parseInt(cursor) : 0;
+
+  // Fetch revisions
+  if (track_revisions) {
+    const revisionsResponse = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${document_id}/revisions?fields=revisions(id,modifiedTime,lastModifyingUser)&pageSize=100`,
+      { headers }
+    );
+
+    if (revisionsResponse.ok) {
       const revisionsData = await revisionsResponse.json() as { revisions?: any[] };
-      const lastProcessedId = cursor ? parseInt(cursor) : 0;
 
       for (const revision of revisionsData.revisions || []) {
         const revisionId = parseInt(revision.id);
         const revisionTime = new Date(revision.modifiedTime).getTime() / 1000;
 
-        // Skip already processed revisions
         if (revisionId <= lastProcessedId) continue;
-
-        // Skip if before last sync time
         if (since && revisionTime <= since) continue;
 
         qupts.push({
           entanglement_id: source.entanglement_id,
-          content: formatRevisionContent(revision, docTitle),
+          content: `${docTitle}: Edited by ${revision.lastModifyingUser?.displayName || 'Someone'}`,
           source: 'gdrive',
           external_id: `gdrive:${document_id}:rev:${revision.id}`,
           metadata: {
@@ -78,70 +170,43 @@ export const gdriveHandler: SourceHandler = {
           created_at: Math.floor(revisionTime)
         });
       }
-
-      // Fetch comments if enabled
-      if (track_comments) {
-        console.log(`📝 Fetching comments for ${document_id}...`);
-        const commentsResponse = await fetch(
-          `https://www.googleapis.com/drive/v3/files/${document_id}/comments?fields=comments(id,content,createdTime,author,resolved,quotedFileContent)&pageSize=100`,
-          { headers }
-        );
-
-        if (commentsResponse.ok) {
-          const commentsData = await commentsResponse.json() as { comments?: any[] };
-
-          for (const comment of commentsData.comments || []) {
-            const commentTime = new Date(comment.createdTime).getTime() / 1000;
-
-            // Skip if before last sync time
-            if (since && commentTime <= since) continue;
-
-            qupts.push({
-              entanglement_id: source.entanglement_id,
-              content: formatCommentContent(comment, docTitle),
-              source: 'gdrive',
-              external_id: `gdrive:${document_id}:comment:${comment.id}`,
-              metadata: {
-                type: 'comment',
-                document_id,
-                document_title: docTitle,
-                comment_id: comment.id,
-                author: comment.author?.displayName,
-                author_email: comment.author?.emailAddress,
-                resolved: comment.resolved || false,
-                quoted_content: comment.quotedFileContent?.value,
-                url: `https://docs.google.com/document/d/${document_id}/edit`
-              },
-              created_at: Math.floor(commentTime)
-            });
-          }
-          console.log(`📝 Collected ${commentsData.comments?.length || 0} comments`);
-        } else {
-          console.warn(`Could not fetch comments: ${commentsResponse.status}`);
-        }
-      }
-
-      // Use highest revision ID as cursor
-      const maxRevisionId = revisionsData.revisions?.length
-        ? Math.max(...revisionsData.revisions.map((r: any) => parseInt(r.id)))
-        : lastProcessedId;
-
-      console.log(`Google Drive handler collected ${qupts.length} qupts for document ${document_id} (${revisionsData.revisions?.length || 0} revisions, ${track_comments ? 'comments enabled' : 'comments disabled'})`);
-      return { qupts, cursor: String(maxRevisionId) };
-    } catch (error) {
-      console.error(`Google Docs handler error for source ${source.id}:`, error);
-      // Re-throw so sync endpoint can catch and store the error
-      throw error;
     }
   }
-};
 
-function formatRevisionContent(revision: any, docTitle: string): string {
-  const user = revision.lastModifyingUser?.displayName || 'Someone';
-  return `${docTitle}: Edited by ${user}`;
-}
+  // Fetch comments
+  if (track_comments) {
+    const commentsResponse = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${document_id}/comments?fields=comments(id,content,createdTime,author,resolved)&pageSize=100`,
+      { headers }
+    );
 
-function formatCommentContent(comment: any, docTitle: string): string {
-  const author = comment.author?.displayName || 'Someone';
-  return `${docTitle}: Comment by ${author}`;
+    if (commentsResponse.ok) {
+      const commentsData = await commentsResponse.json() as { comments?: any[] };
+
+      for (const comment of commentsData.comments || []) {
+        const commentTime = new Date(comment.createdTime).getTime() / 1000;
+
+        if (since && commentTime <= since) continue;
+
+        qupts.push({
+          entanglement_id: source.entanglement_id,
+          content: `${docTitle}: Comment by ${comment.author?.displayName || 'Someone'}`,
+          source: 'gdrive',
+          external_id: `gdrive:${document_id}:comment:${comment.id}`,
+          metadata: {
+            type: 'comment',
+            document_id,
+            document_title: docTitle,
+            comment_id: comment.id,
+            comment_text: comment.content,
+            author: comment.author?.displayName,
+            author_email: comment.author?.emailAddress,
+            resolved: comment.resolved,
+            url: `https://docs.google.com/document/d/${document_id}/edit`
+          },
+          created_at: Math.floor(commentTime)
+        });
+      }
+    }
+  }
 }
