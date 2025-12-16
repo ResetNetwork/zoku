@@ -21,10 +21,9 @@ export class OAuthApplicationService extends BaseService {
    */
   async list(options: { provider?: string; decrypt?: boolean } = {}): Promise<OAuthApplication[]> {
     // Only prime tier can view OAuth applications
-    this.requireTier('prime', 'list OAuth applications');
+    this.requireTier('prime');
 
-    const logger = this.createChildLogger('list_oauth_apps');
-    logger.info('Listing OAuth applications', { provider: options.provider });
+    this.logger.info('Listing OAuth applications', { provider: options.provider });
 
     let query = 'SELECT * FROM oauth_applications';
     const params: any[] = [];
@@ -44,7 +43,7 @@ export class OAuthApplicationService extends BaseService {
         try {
           app.client_secret = decryptJewel(app.client_secret, this.env.ENCRYPTION_KEY);
         } catch (error) {
-          logger.error('Failed to decrypt client_secret', { oauth_app_id: app.id, error });
+          this.logger.error('Failed to decrypt client_secret', { oauth_app_id: app.id, error });
           app.client_secret = '[DECRYPTION_FAILED]';
         }
       }
@@ -63,7 +62,7 @@ export class OAuthApplicationService extends BaseService {
       }
     }
 
-    logger.info('OAuth applications listed', { count: results.length });
+    this.logger.info('OAuth applications listed', { count: results.length });
     return results;
   }
 
@@ -71,10 +70,9 @@ export class OAuthApplicationService extends BaseService {
    * Get single OAuth application
    */
   async get(id: string, options: { decrypt?: boolean } = {}): Promise<OAuthApplication | null> {
-    this.requireTier('prime', 'view OAuth application');
+    this.requireTier('prime');
 
-    const logger = this.createChildLogger('get_oauth_app');
-    logger.info('Getting OAuth application', { oauth_app_id: id });
+    this.logger.info('Getting OAuth application', { oauth_app_id: id });
 
     const app = await this.db.get<OAuthApplication>(
       'SELECT * FROM oauth_applications WHERE id = ?',
@@ -82,7 +80,7 @@ export class OAuthApplicationService extends BaseService {
     );
 
     if (!app) {
-      logger.info('OAuth application not found', { oauth_app_id: id });
+      this.logger.info('OAuth application not found', { oauth_app_id: id });
       return null;
     }
 
@@ -91,7 +89,7 @@ export class OAuthApplicationService extends BaseService {
       try {
         app.client_secret = decryptJewel(app.client_secret, this.env.ENCRYPTION_KEY);
       } catch (error) {
-        logger.error('Failed to decrypt client_secret', { oauth_app_id: id, error });
+        this.logger.error('Failed to decrypt client_secret', { oauth_app_id: id, error });
         app.client_secret = '[DECRYPTION_FAILED]';
       }
     } else {
@@ -118,9 +116,7 @@ export class OAuthApplicationService extends BaseService {
     scopes: string[];
     metadata?: Record<string, any>;
   }): Promise<OAuthApplication> {
-    this.requireTier('prime', 'create OAuth application');
-
-    const logger = this.createChildLogger('create_oauth_app');
+    this.requireTier('prime');
 
     // Validate input
     if (!input.name || !input.provider || !input.client_id || !input.client_secret) {
@@ -131,7 +127,7 @@ export class OAuthApplicationService extends BaseService {
       throw new Error('Scopes must be a non-empty array');
     }
 
-    logger.info('Creating OAuth application', {
+    this.logger.info('Creating OAuth application', {
       name: input.name,
       provider: input.provider,
       scopes: input.scopes
@@ -160,14 +156,13 @@ export class OAuthApplicationService extends BaseService {
     );
 
     // Audit log
-    await this.auditLog('oauth_app_created', {
-      oauth_app_id: id,
+    await this.audit('oauth_app_created', 'oauth_application', id, {
       name: input.name,
       provider: input.provider,
       scopes: input.scopes
     });
 
-    logger.info('OAuth application created', { oauth_app_id: id });
+    this.logger.info('OAuth application created', { oauth_app_id: id });
 
     return {
       id,
@@ -195,10 +190,9 @@ export class OAuthApplicationService extends BaseService {
       metadata?: Record<string, any>;
     }
   ): Promise<OAuthApplication> {
-    this.requireTier('prime', 'update OAuth application');
+    this.requireTier('prime');
 
-    const logger = this.createChildLogger('update_oauth_app');
-    logger.info('Updating OAuth application', { oauth_app_id: id });
+    this.logger.info('Updating OAuth application', { oauth_app_id: id });
 
     const existing = await this.get(id);
     if (!existing) {
@@ -245,12 +239,11 @@ export class OAuthApplicationService extends BaseService {
     );
 
     // Audit log
-    await this.auditLog('oauth_app_updated', {
-      oauth_app_id: id,
+    await this.audit('oauth_app_updated', 'oauth_application', id, {
       updates: Object.keys(updates)
     });
 
-    logger.info('OAuth application updated', { oauth_app_id: id });
+    this.logger.info('OAuth application updated', { oauth_app_id: id });
 
     return (await this.get(id))!;
   }
@@ -259,10 +252,9 @@ export class OAuthApplicationService extends BaseService {
    * Delete OAuth application
    */
   async delete(id: string): Promise<void> {
-    this.requireTier('prime', 'delete OAuth application');
+    this.requireTier('prime');
 
-    const logger = this.createChildLogger('delete_oauth_app');
-    logger.info('Deleting OAuth application', { oauth_app_id: id });
+    this.logger.info('Deleting OAuth application', { oauth_app_id: id });
 
     const existing = await this.get(id);
     if (!existing) {
@@ -285,13 +277,12 @@ export class OAuthApplicationService extends BaseService {
     await this.db.run('DELETE FROM oauth_applications WHERE id = ?', [id]);
 
     // Audit log
-    await this.auditLog('oauth_app_deleted', {
-      oauth_app_id: id,
+    await this.audit('oauth_app_deleted', 'oauth_application', id, {
       name: existing.name,
       provider: existing.provider
     });
 
-    logger.info('OAuth application deleted', { oauth_app_id: id });
+    this.logger.info('OAuth application deleted', { oauth_app_id: id });
   }
 
   /**
@@ -301,8 +292,7 @@ export class OAuthApplicationService extends BaseService {
     // This method doesn't require prime tier - it's used by OAuth flows
     // But we don't decrypt the secret - that's done server-side only
 
-    const logger = this.createChildLogger('get_oauth_app_by_provider');
-    logger.info('Getting OAuth application by provider', { provider });
+    this.logger.info('Getting OAuth application by provider', { provider });
 
     const app = await this.db.get<OAuthApplication>(
       'SELECT * FROM oauth_applications WHERE provider = ? ORDER BY created_at DESC LIMIT 1',
@@ -310,7 +300,7 @@ export class OAuthApplicationService extends BaseService {
     );
 
     if (!app) {
-      logger.info('No OAuth application found for provider', { provider });
+      this.logger.info('No OAuth application found for provider', { provider });
       return null;
     }
 
@@ -327,10 +317,9 @@ export class OAuthApplicationService extends BaseService {
    * List jewels using this OAuth application
    */
   async listJewelsUsingApp(id: string): Promise<any[]> {
-    this.requireTier('prime', 'list jewels using OAuth application');
+    this.requireTier('prime');
 
-    const logger = this.createChildLogger('list_jewels_using_oauth_app');
-    logger.info('Listing jewels using OAuth application', { oauth_app_id: id });
+    this.logger.info('Listing jewels using OAuth application', { oauth_app_id: id });
 
     const jewels = await this.db.query<any>(
       `SELECT id, name, type, owner_id, created_at, updated_at
@@ -340,7 +329,7 @@ export class OAuthApplicationService extends BaseService {
       [id]
     );
 
-    logger.info('Jewels using OAuth app listed', {
+    this.logger.info('Jewels using OAuth app listed', {
       oauth_app_id: id,
       count: jewels.length
     });
