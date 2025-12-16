@@ -6,8 +6,10 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
-      '/api': 'http://localhost:8792',
-      '/mcp': 'http://localhost:8792'
+      '/api': 'http://localhost:8789',
+      '/mcp': 'http://localhost:8789',
+      '/.well-known': 'http://localhost:8789',
+      '/oauth': 'http://localhost:8789'
     }
   },
   build: {
