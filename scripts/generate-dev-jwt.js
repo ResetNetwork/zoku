@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 // Generate a dev JWT for testing (mimics Cloudflare Access JWT structure)
 // Usage: node scripts/generate-dev-jwt.js dev@reset.tech
 

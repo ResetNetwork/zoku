@@ -3,9 +3,9 @@
 ## Project Overview
 The Great Game is a project/initiative tracking system inspired by the Quantum Thief trilogy. Built as a Cloudflare Worker with D1 database, MCP interface, and web frontend.
 
-## Current Status: ✅ Full-Stack Application Complete
+## Current Status: ✅ Full-Stack Application Complete + Authentication
 
-### Completed Phases (0-5.6)
+### Completed Phases (0-6)
 - **Phase 0**: Infrastructure setup (GitHub, D1, encryption)
 - **Phase 1**: Dependencies and database schema
 - **Phase 2**: Full REST API with CRUD operations
@@ -13,10 +13,17 @@ The Great Game is a project/initiative tracking system inspired by the Quantum T
 - **Phase 4**: MCP Server with 29 tools (includes jewel store)
 - **Phase 5**: React frontend with light/dark mode
 - **Phase 5.5**: Source & Jewel Management + Google OAuth
-- **Phase 5.6**: Comprehensive Structured Logging ✅ NEW
+- **Phase 5.6**: Comprehensive Structured Logging
+- **Phase 5.7**: Complete Authentication System ✅ NEW
+  - OAuth 2.1 for MCP (RFC 8414 compliant, PKCE, dynamic registration)
+  - Personal Access Tokens (PAT) with revocation
+  - Four-tier permissions (observed, coherent, entangled, prime)
+  - Session management (track and revoke OAuth sessions)
+  - Cloudflare Access integration for web UI
+  - Dev mode (skip JWT validation for local testing)
 
 ### Remaining Phases
-- **Phase 6**: Production deployment to zoku.205.dev (pending)
+- **Phase 6**: Production deployment to zoku.205.dev (pending Cloudflare Access setup)
 
 ## Architecture
 
@@ -89,8 +96,12 @@ The Great Game is a project/initiative tracking system inspired by the Quantum T
 - `src/types.ts` - TypeScript type definitions
 - `src/scheduled.ts` - Cron handler for source collection
 - `src/mcp/server.ts` - MCP server implementation (29 tools)
-- `src/lib/logger.ts` - Structured logging class (NEW)
-- `src/middleware/logging.ts` - Hono logging middleware (NEW)
+- `src/lib/logger.ts` - Structured logging class
+- `src/middleware/logging.ts` - Hono logging middleware
+- `src/middleware/auth.ts` - Authentication middleware (CF Access + dev JWT) ✅ NEW
+- `src/lib/cf-access.ts` - Cloudflare Access JWT validation ✅ NEW
+- `src/lib/mcp-oauth.ts` - OAuth 2.1 server implementation ✅ NEW
+- `src/lib/mcp-tokens.ts` - PAT generation and validation ✅ NEW
 
 ### Frontend
 - `frontend/src/App.tsx` - Main app with URL routing and view management
@@ -102,17 +113,23 @@ The Great Game is a project/initiative tracking system inspired by the Quantum T
 - `frontend/src/components/ActivityList.tsx` - All activity across entanglements
 - `frontend/src/components/SourcesList.tsx` - All configured sources
 - `frontend/src/components/QuptItem.tsx` - Expandable activity items with type-specific formatting
+- `frontend/src/components/AccountPage.tsx` - User profile, OAuth sessions, PAT management ✅ NEW
+- `frontend/src/components/AccessDenied.tsx` - Access denied page (observed tier) ✅ NEW
 - `frontend/src/lib/api.ts` - API client with TypeScript types
+- `frontend/src/lib/auth.tsx` - Auth context, hooks (useAuth, useCanWrite, useIsPrime) ✅ NEW
 - `frontend/src/lib/theme.ts` - Theme management (light/dark mode)
-- `frontend/src/lib/notifications.tsx` - Toast notification system (NEW)
+- `frontend/src/lib/notifications.tsx` - Toast notification system
 
 ### API Routes
 - `src/api/entanglements.ts` - Entanglement CRUD + matrix + attributes + sources
-- `src/api/zoku.ts` - Zoku CRUD
+- `src/api/zoku.ts` - Zoku CRUD + tier management
 - `src/api/qupts.ts` - Qupt CRUD + batch import
 - `src/api/sources.ts` - Source operations by ID
 - `src/api/dimensions.ts` - Taxonomy read-only
-- `src/api/jewels.ts` - Jewel store CRUD (NEW)
+- `src/api/jewels.ts` - Jewel store CRUD
+- `src/api/mcp-oauth.ts` - OAuth 2.1 endpoints + authorization UI ✅ NEW
+- `src/api/mcp-tokens.ts` - PAT management API ✅ NEW
+- `src/api/google-oauth.ts` - Google OAuth for jewels (separate from MCP auth)
 
 ### Source Handlers
 - `src/handlers/index.ts` - Handler registry
@@ -123,16 +140,64 @@ The Great Game is a project/initiative tracking system inspired by the Quantum T
 - `src/handlers/validate.ts` - Jewel validation (NEW)
 
 ### Database
-- `schema.sql` - Full schema with all tables
+- `schema.sql` - Full schema with all tables including auth fields
 - `seed.sql` - Initial taxonomy data
 - `migrations/002_add_jewels.sql` - Jewel store migration
-- `migrations/003_add_zoku_description.sql` - Zoku description field (NEW)
+- `migrations/003_add_zoku_description.sql` - Zoku description field
+- `migrations/004_add_source_error_tracking.sql` - Source error tracking
+- `migrations/005_add_authentication.sql` - Authentication system ✅ NEW
+
+## Authentication
+
+### Overview
+Four-tier access control (observed, coherent, entangled, prime) with dual MCP authentication:
+- **OAuth 2.1** (primary): Automatic browser-based flow for modern MCP clients
+- **PAT** (fallback): Manual tokens for scripts and legacy clients
+
+See [docs/authentication.md](docs/authentication.md) for complete documentation.
+
+### Quick Start (Local Dev)
+
+**1. Generate dev JWT for web UI:**
+```bash
+node scripts/generate-dev-jwt.js dev@reset.tech
+```
+
+**2. Add to browser (ModHeader extension):**
+```
+Header: cf-access-jwt-assertion
+Value: <generated-jwt>
+```
+
+**3. Configure MCP client (OAuth):**
+```json
+{
+  "mcpServers": {
+    "zoku_local": {
+      "url": "http://localhost:3000/mcp"
+    }
+  }
+}
+```
+
+Client auto-discovers OAuth, opens browser to authorize.
+
+**4. Or use PAT (fallback):**
+- Generate from Account page
+- Add to MCP config: `"headers": {"Authorization": "Bearer <token>"}`
+
+### Access Tiers
+
+- **observed**: No access (pre-created for PASCI)
+- **coherent**: Read-only + jewel management (default for new users)
+- **entangled**: Full CRUD operations (team members)
+- **prime**: Admin access + user management (system admins)
 
 ## Development Commands
 
 ```bash
 # Backend dev server
-npm run dev              # Starts on :8788
+npm run dev              # Starts on :8789 (fixed port)
 
 # Frontend dev server
 cd frontend && npm run dev  # Starts on :3000
@@ -404,6 +469,21 @@ add_source({
 ### MCP
 - `POST /mcp` - MCP server endpoint (tools/list, tools/call)
 
+### OAuth (MCP Authentication)
+- `GET /.well-known/oauth-authorization-server` - RFC 8414 metadata discovery
+- `GET /oauth/authorize` - Authorization UI (quantum-themed)
+- `POST /oauth/authorize` - User approval handler
+- `POST /oauth/token` - Token exchange & refresh
+- `POST /oauth/register` - Dynamic client registration (RFC 7591)
+- `POST /oauth/revoke` - Token revocation
+- `GET /oauth/sessions` - List active OAuth sessions
+- `DELETE /oauth/sessions/:id` - Revoke session
+
+### MCP Tokens (PAT)
+- `GET /api/mcp-tokens` - List user's tokens
+- `POST /api/mcp-tokens` - Generate new token (30/60/90/365 days)
+- `DELETE /api/mcp-tokens/:id` - Revoke token
+
 ## Next Steps
 
 1. **Phase 6** - Deploy to production at zoku.205.dev
@@ -428,7 +508,7 @@ add_source({
 - **Simplified Responses**: All tools support optional `detailed` parameter for verbose output
 - **Zammad**: Tag-based filtering required - `tag` field mandatory in config
 - **Response Size**: 60-80% reduction with default (non-detailed) responses
-- **Frontend Complete**: Full app with 8 pages (Dashboard, Entanglements, Zoku, Activity, Sources, Jewels, + detail pages)
+- **Frontend Complete**: Full app with 9 pages (Dashboard, Entanglements, Zoku, Activity, Sources, Jewels, Account, + detail pages)
 - **Theme**: Light/dark mode with localStorage persistence
 - **Activity Formatting**: Client-side dynamic formatting from metadata for all sources (instant format changes!)
 - **Type-specific Icons**: ← commits/edits, 💬 comments, ◆ issues/tickets, ⇄ PRs (consistent across sources)
@@ -440,8 +520,8 @@ add_source({
 - **Activity Filtering**: Filter by entanglement and source type
 - **Initial Sync**: New sources pull 30 days of history
 - **Error Lifecycle**: Detect → Store → Display → Clear on success
-- **Dev Setup**: Backend on :8788, frontend on :3000, run in separate terminals
-- **Vite Proxy**: Frontend proxies /api and /mcp to http://localhost:8788
+- **Dev Setup**: Backend on :8789 (fixed port), frontend on :3000, run in separate terminals
+- **Vite Proxy**: Frontend proxies /api, /mcp, /oauth, /.well-known to http://localhost:8789
 - **Zoku Metadata**: Description, GitHub username, email, role, org, timezone, deal_id (all editable)
 - **Responsibility Matrix**: Entanglements × PASCI roles grid view on Zoku page
 - **Navigation**: Clickable metrics, URL routing, direct links to any entity, clickable entanglements in matrix
@@ -449,6 +529,13 @@ add_source({
 - **Example Data**: 15 zoku + 7 entanglements with PASCI assignments
 - **Notifications**: Toast system with success/error/info types, auto-dismiss
 - **OAuth Callback**: 5-second success message before auto-close
+- **OAuth 2.1 MCP Auth**: Complete implementation with PKCE, refresh tokens, session management ✅ NEW
+- **PAT System**: JWT-based Personal Access Tokens with revocation ✅ NEW
+- **Session Management**: Track and revoke OAuth sessions from Account page ✅ NEW
+- **Four-Tier Access**: observed/coherent/entangled/prime with auto-promotion ✅ NEW
+- **Dev Auth**: Skip JWT validation in dev, use cf-access-jwt-assertion header ✅ NEW
+- **Account Page**: Profile + OAuth sessions + PAT management ✅ NEW
+- **Permission UI**: Show/hide based on user tier (useCanWrite, useIsPrime hooks) ✅ NEW
 - **Structured Logging**: Comprehensive JSON logs with request/session IDs, duration tracking ✅ NEW
 - **Log Middleware**: Automatic logging for all HTTP requests (info/warn/error/fatal levels)
 - **Session Tracking**: Frontend generates session IDs, propagates via X-Zoku-Session-ID header
@@ -458,3 +545,66 @@ add_source({
 - **Log Levels**: Configurable via LOG_LEVEL env var (default: info, supports: info/warn/error/fatal)
 - **Performance**: < 2ms overhead per request, no database writes
 - **Viewing Logs**: `wrangler tail` for production, console for local dev
+
+## Authentication System ✅ NEW
+
+### Overview
+Complete four-tier authentication with OAuth 2.1 and PAT support.
+
+**Access Tiers:**
+- `observed` (0): No access - pre-created for PASCI matrix
+- `coherent` (1): Read-only + jewel management - default for new users
+- `entangled` (2): Full CRUD operations - team members
+- `prime` (3): Admin access + user management - system admins
+
+**MCP Authentication (Dual Method):**
+- **OAuth 2.1** (Primary): Automatic browser-based authorization
+  - RFC 8414 metadata discovery
+  - Authorization code grant with PKCE (S256)
+  - Refresh tokens (30-day TTL)
+  - Dynamic client registration (RFC 7591)
+  - Session management with revocation
+- **PAT** (Fallback): Manual long-lived tokens
+  - Generate from Account page (30/60/90/365 days)
+  - JWT-based with KV revocation
+  - Session-aware caching (5-min TTL)
+
+**Web UI Authentication:**
+- Cloudflare Access (production)
+- Dev mode: Skip validation, decode JWT from `cf-access-jwt-assertion` header
+
+### Key Features
+- ✅ OAuth 2.1 compliant (RFC 8414, PKCE, dynamic registration)
+- ✅ Dual authentication (OAuth + PAT)
+- ✅ Session management (track and revoke OAuth sessions)
+- ✅ Tier-based permissions (4 levels)
+- ✅ Token revocation (immediate for both OAuth and PAT)
+- ✅ Audit logging (track sensitive operations)
+- ✅ Jewel ownership (user-owned credentials)
+- ✅ Beautiful UI (quantum-themed authorization pages)
+- ✅ Dev mode (skip validation for local testing)
+
+### Local Development
+```bash
+# Generate dev JWT for web UI
+node scripts/generate-dev-jwt.js dev@reset.tech
+
+# Add header via ModHeader extension:
+# cf-access-jwt-assertion: <jwt>
+
+# MCP clients use OAuth (no manual config needed):
+{
+  "mcpServers": {
+    "zoku_local": { "url": "http://localhost:3000/mcp" }
+  }
+}
+```
+
+### Documentation
+See [docs/authentication.md](docs/authentication.md) for:
+- Complete implementation details
+- OAuth flow diagrams
+- Token validation logic
+- Permission matrix
+- Production deployment guide
+- Troubleshooting
