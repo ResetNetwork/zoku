@@ -3,6 +3,7 @@ import { cors } from 'hono/cors';
 import type { HonoEnv, Bindings } from './types';
 import { loggingMiddleware } from './middleware/logging';
 import { authMiddleware } from './middleware/auth';
+import { securityHeadersMiddleware, oauthSecurityHeaders } from './middleware/security-headers';
 import { errorHandler } from './lib/errors';
 
 import entanglementsRoutes from './api/entanglements';
@@ -22,6 +23,9 @@ const app = new Hono<HonoEnv>();
 // Enable CORS for frontend
 app.use('/*', cors());
 
+// Enable security headers for all responses
+app.use('/*', securityHeadersMiddleware());
+
 // Enable logging for all requests
 app.use('/*', loggingMiddleware());
 
@@ -40,6 +44,9 @@ app.get('/health', (c) => {
 
 // MCP OAuth public endpoints (required for OAuth flow - client has no JWT yet)
 // Note: In production, configure Cloudflare Access to bypass these paths
+// Use relaxed security headers for OAuth endpoints (needs to communicate with OAuth providers)
+app.use('/oauth/*', oauthSecurityHeaders());
+app.use('/api/oauth/*', oauthSecurityHeaders());
 app.route('/', mcpOAuthPublicRoutes);  // /.well-known/oauth-authorization-server
 app.route('/oauth', mcpOAuthPublicRoutes);  // /oauth/token, /oauth/register, /oauth/revoke
 
