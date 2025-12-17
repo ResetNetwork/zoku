@@ -240,10 +240,14 @@ function AuthenticatedApp({ user }: { user: any }) {
             >
               <img 
                 src="/logo.png" 
-                alt="Zoku" 
-                className="h-10 w-10 object-contain"
+                alt={import.meta.env.VITE_APP_NAME || 'Zoku'} 
+                className="h-14 w-14 object-contain"
               />
-              <h1 className="text-2xl font-bold text-quantum-500 dark:text-quantum-400">Zoku</h1>
+              {import.meta.env.VITE_APP_NAME && (
+                <h1 className="text-2xl font-bold text-quantum-500 dark:text-quantum-400">
+                  {import.meta.env.VITE_APP_NAME}
+                </h1>
+              )}
             </button>
             <div className="flex items-center gap-3">
               {/* User Menu */}
