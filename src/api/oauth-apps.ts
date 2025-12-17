@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import type { HonoEnv, Zoku } from '../types';
 import { OAuthApplicationService } from '../services/oauth-apps';
 import { DB } from '../db';
@@ -6,11 +6,11 @@ import { Logger } from '../lib/logger';
 
 const app = new Hono<HonoEnv>();
 
-const getService = (c: any) => {
+const getService = (c: Context<HonoEnv>) => {
   const db = new DB(c.env.DB);
-  const user = c.get('user') as Zoku;
-  const logger = c.get('logger') as Logger;
-  const requestId = c.get('request_id') as string;
+  const user = c.get('user');
+  const logger = c.get('logger');
+  const requestId = c.get('request_id');
   return new OAuthApplicationService(db, user, logger, requestId, c.env);
 };
 

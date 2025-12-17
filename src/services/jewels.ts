@@ -8,7 +8,7 @@ import type { Jewel, Env } from '../types';
 export class JewelService extends BaseService {
   private env: Env;
 
-  constructor(db: any, user: any, logger: any, requestId: string | undefined, env: Env) {
+  constructor(db: DB, user: Zoku, logger: Logger, requestId: string | undefined, env: Env) {
     super(db, user, logger, requestId);
     this.env = env;
   }

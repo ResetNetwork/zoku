@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import type { HonoEnv, Bindings, Zoku } from '../types';
 import { DB } from '../db';
 import { Logger } from '../lib/logger';
@@ -6,11 +6,11 @@ import { JewelService } from '../services/jewels';
 
 const app = new Hono<HonoEnv>();
 
-const getService = (c: any) => {
+const getService = (c: Context<HonoEnv>) => {
   const db = new DB(c.env.DB);
-  const user = c.get('user') as Zoku;
-  const logger = c.get('logger') as Logger;
-  const requestId = c.get('request_id') as string;
+  const user = c.get('user');
+  const logger = c.get('logger');
+  const requestId = c.get('request_id');
   return new JewelService(db, user, logger, requestId, c.env);
 };
 

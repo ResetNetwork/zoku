@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import type { HonoEnv, Bindings, Zoku } from '../types';
 import { DB } from '../db';
 import { Logger } from '../lib/logger';
@@ -8,19 +8,19 @@ import { SourceService } from '../services/sources';
 const app = new Hono<HonoEnv>();
 
 // Helper to create service
-const getService = (c: any) => {
+const getService = (c: Context<HonoEnv>) => {
   const db = new DB(c.env.DB);
-  const user = c.get('user') as Zoku;
-  const logger = c.get('logger') as Logger;
-  const requestId = c.get('request_id') as string;
+  const user = c.get('user');
+  const logger = c.get('logger');
+  const requestId = c.get('request_id');
   return new EntanglementService(db, user, logger, requestId);
 };
 
-const getSourceService = (c: any) => {
+const getSourceService = (c: Context<HonoEnv>) => {
   const db = new DB(c.env.DB);
-  const user = c.get('user') as Zoku;
-  const logger = c.get('logger') as Logger;
-  const requestId = c.get('request_id') as string;
+  const user = c.get('user');
+  const logger = c.get('logger');
+  const requestId = c.get('request_id');
   return new SourceService(db, user, logger, requestId, c.env);
 };
 
