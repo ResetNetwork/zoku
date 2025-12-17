@@ -234,8 +234,16 @@ function AuthenticatedApp({ user }: { user: any }) {
       <header className="bg-gray-100 dark:bg-quantum-800 border-b border-gray-200 dark:border-quantum-700">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <button onClick={handleShowDashboard} className="text-left hover:opacity-80 transition-opacity">
-              <h1 className="text-2xl font-bold text-quantum-500 dark:text-quantum-400">The Great Game</h1>
+            <button 
+              onClick={handleShowDashboard} 
+              className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+            >
+              <img 
+                src="/logo.png" 
+                alt="Zoku" 
+                className="h-10 w-10 object-contain"
+              />
+              <h1 className="text-2xl font-bold text-quantum-500 dark:text-quantum-400">Zoku</h1>
             </button>
             <div className="flex items-center gap-3">
               {/* User Menu */}
