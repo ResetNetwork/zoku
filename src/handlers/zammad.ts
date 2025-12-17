@@ -55,6 +55,7 @@ export const zammadHandler: SourceHandler = {
 
       console.log(`Zammad search found ${ticketsArray.length} tickets`);
 
+      // Create ticket qupts
       for (const ticket of ticketsArray) {
         try {
           console.log(`Processing ticket #${ticket.number || ticket.id}: ${ticket.title}`);
@@ -86,9 +87,11 @@ export const zammadHandler: SourceHandler = {
         } catch (error) {
           console.error(`Error processing ticket:`, error, ticket);
         }
+      }
 
-        // Fetch articles (comments/replies) if configured
-        if (include_articles) {
+      // Fetch all articles in parallel if configured
+      if (include_articles) {
+        const articleFetches = ticketsArray.map(async (ticket) => {
           try {
             const articlesResponse = await fetch(
               `${url}/api/v1/ticket_articles/by_ticket/${ticket.id}`,
@@ -97,40 +100,47 @@ export const zammadHandler: SourceHandler = {
 
             if (articlesResponse.ok) {
               const articles = await articlesResponse.json() as any[];
-
-              for (const article of articles) {
-                const articleTime = new Date(article.created_at).getTime() / 1000;
-
-                // Skip articles before last sync
-                if (since && articleTime <= since) continue;
-
-                qupts.push({
-                  entanglement_id: source.entanglement_id,
-                  content: formatArticleContent(article, ticket),
-                  source: 'zammad',
-                  external_id: `zammad:article:${article.id}`,
-                  metadata: {
-                    type: 'article',
-                    article_id: article.id,
-                    ticket_id: ticket.id,
-                    ticket_number: ticket.number,
-                    ticket_title: ticket.title,
-                    from: article.from,
-                    to: article.to,
-                    subject: article.subject,
-                    body: article.body,
-                    article_type: article.type,
-                    internal: article.internal,
-                    sender: article.sender,
-                    url: `${url}/#ticket/zoom/${ticket.id}`
-                  },
-                  created_at: Math.floor(articleTime)
-                });
-              }
+              return { ticket, articles };
             }
           } catch (articleError) {
             console.error(`Error fetching articles for ticket ${ticket.id}:`, articleError);
-            // Continue with other tickets
+          }
+          return { ticket, articles: [] };
+        });
+
+        // Fetch all articles in parallel
+        const ticketsWithArticles = await Promise.all(articleFetches);
+
+        // Process articles and create qupts
+        for (const { ticket, articles } of ticketsWithArticles) {
+          for (const article of articles) {
+            const articleTime = new Date(article.created_at).getTime() / 1000;
+
+            // Skip articles before last sync
+            if (since && articleTime <= since) continue;
+
+            qupts.push({
+              entanglement_id: source.entanglement_id,
+              content: formatArticleContent(article, ticket),
+              source: 'zammad',
+              external_id: `zammad:article:${article.id}`,
+              metadata: {
+                type: 'article',
+                article_id: article.id,
+                ticket_id: ticket.id,
+                ticket_number: ticket.number,
+                ticket_title: ticket.title,
+                from: article.from,
+                to: article.to,
+                subject: article.subject,
+                body: article.body,
+                article_type: article.type,
+                internal: article.internal,
+                sender: article.sender,
+                url: `${url}/#ticket/zoom/${ticket.id}`
+              },
+              created_at: Math.floor(articleTime)
+            });
           }
         }
       }
