@@ -165,6 +165,39 @@ export class DB {
     return (await this.getEntanglement(id))!;
   }
 
+  async createEntanglementWithMatrix(
+    data: {
+      name: string;
+      description?: string;
+      parent_id?: string;
+    },
+    initialZoku?: Array<{ zoku_id: string; role: string }>
+  ): Promise<Entanglement> {
+    const id = crypto.randomUUID();
+    
+    // Build batch of statements (entanglement + all PASCI assignments)
+    const batch = [
+      this.d1
+        .prepare('INSERT INTO entanglements (id, name, description, parent_id) VALUES (?, ?, ?, ?)')
+        .bind(id, data.name, data.description || null, data.parent_id || null)
+    ];
+
+    if (initialZoku && initialZoku.length > 0) {
+      for (const assignment of initialZoku) {
+        batch.push(
+          this.d1
+            .prepare('INSERT OR IGNORE INTO entanglement_zoku (entanglement_id, zoku_id, role) VALUES (?, ?, ?)')
+            .bind(id, assignment.zoku_id, assignment.role)
+        );
+      }
+    }
+
+    // Execute all statements atomically
+    await this.d1.batch(batch);
+    
+    return (await this.getEntanglement(id))!;
+  }
+
   async updateEntanglement(
     id: string,
     data: { name?: string; description?: string; parent_id?: string | null }
@@ -344,6 +377,7 @@ export class DB {
       last_login?: number;
       cf_access_sub?: string | null;
       updated_by?: string | null;
+      access_tier?: string;
       metadata?: Record<string, any>;
     }
   ): Promise<void> {
@@ -373,6 +407,10 @@ export class DB {
     if (data.updated_by !== undefined) {
       updates.push('updated_by = ?');
       params.push(data.updated_by);
+    }
+    if (data.access_tier !== undefined) {
+      updates.push('access_tier = ?');
+      params.push(data.access_tier);
     }
     if (data.metadata !== undefined) {
       updates.push('metadata = ?');

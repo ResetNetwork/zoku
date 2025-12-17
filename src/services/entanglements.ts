@@ -140,31 +140,15 @@ export class EntanglementService extends BaseService {
       }
     }
 
-    // Create entanglement
-    const entanglement = await this.db.createEntanglement({
-      name: data.name,
-      description: data.description,
-      parent_id: data.parent_id
-    });
-
-    // Assign initial zoku if provided
-    if (data.initial_zoku) {
-      for (const assignment of data.initial_zoku) {
-        try {
-          await this.db.assignToMatrix(
-            entanglement.id,
-            assignment.zoku_id,
-            assignment.role
-          );
-        } catch (error) {
-          this.logger.warn('Failed to assign initial zoku', undefined, {
-            zoku_id: assignment.zoku_id,
-            role: assignment.role,
-            error: error instanceof Error ? error.message : String(error)
-          });
-        }
-      }
-    }
+    // Create entanglement with initial PASCI assignments atomically
+    const entanglement = await this.db.createEntanglementWithMatrix(
+      {
+        name: data.name,
+        description: data.description,
+        parent_id: data.parent_id
+      },
+      data.initial_zoku
+    );
 
     return entanglement;
   }

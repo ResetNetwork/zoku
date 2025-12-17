@@ -105,8 +105,11 @@ export class ZokuService extends BaseService {
     const oldTier = target.access_tier;
     const newTier = data.tier;
 
-    await this.db.updateZokuTier(targetId, newTier);
-    await this.db.updateZoku(targetId, { updated_by: this.user.id });
+    // Update tier and metadata atomically
+    await this.db.updateZoku(targetId, {
+      access_tier: newTier,
+      updated_by: this.user.id
+    });
 
     await this.audit('tier_change', 'zoku', targetId, { from: oldTier, to: newTier });
 
