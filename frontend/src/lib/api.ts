@@ -68,6 +68,19 @@ export const api = {
     return data.qupts as Qupt[]
   },
 
+  // Batch fetch qupts for multiple entanglements
+  async listQuptsBatch(entanglementIds: string[], params?: { source?: string; limit?: number }) {
+    const query = new URLSearchParams({ entanglement_ids: entanglementIds.join(',') })
+    if (params?.source) query.set('source', params.source)
+    if (params?.limit) query.set('limit', String(params.limit))
+
+    const res = await fetch(`${API_BASE}/qupts?${query}`, {
+      headers: getHeaders()
+    })
+    const data = await res.json()
+    return data.qupts as Qupt[]
+  },
+
   async createQupt(data: { entanglement_id: string; content: string; source?: string; metadata?: any }) {
     const res = await fetch(`${API_BASE}/qupts`, {
       method: 'POST',

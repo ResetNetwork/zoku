@@ -17,8 +17,14 @@ const getService = (c: any) => {
 // List qupts
 app.get('/', async (c) => {
   const service = getService(c);
+  
+  // Parse entanglement_ids query param (comma-separated)
+  const entanglementIdsParam = c.req.query('entanglement_ids');
+  const entanglementIds = entanglementIdsParam ? entanglementIdsParam.split(',') : undefined;
+  
   const qupts = await service.list({
     entanglement_id: c.req.query('entanglement_id'),
+    entanglement_ids: entanglementIds,
     recursive: c.req.query('recursive') !== 'false',
     zoku_id: c.req.query('zoku_id'),
     source: c.req.query('source'),

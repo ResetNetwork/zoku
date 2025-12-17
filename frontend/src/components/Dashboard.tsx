@@ -40,11 +40,11 @@ export default function Dashboard({
     queryKey: ['recent-qupts', entanglements.map(v => v.id).join(',')],
     queryFn: async () => {
       if (entanglements.length === 0) return []
-      const allQupts: Qupt[] = []
-      for (const vol of entanglements) {
-        const qupts = await api.listQupts(vol.id, { limit: 10, detailed: true })
-        allQupts.push(...qupts)
-      }
+      // Use batch endpoint to fetch qupts for all entanglements in one request
+      const allQupts = await api.listQuptsBatch(
+        entanglements.map(v => v.id),
+        { limit: 100 }  // Fetch more initially, sort and slice client-side
+      )
       return allQupts.sort((a, b) => b.created_at - a.created_at).slice(0, 10)
     },
     enabled: entanglements.length > 0

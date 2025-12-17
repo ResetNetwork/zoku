@@ -9,6 +9,7 @@ export class QuptService extends BaseService {
    */
   async list(filters: {
     entanglement_id?: string;
+    entanglement_ids?: string[];
     recursive?: boolean;
     zoku_id?: string;
     source?: string;
@@ -19,6 +20,7 @@ export class QuptService extends BaseService {
   } = {}) {
     const qupts = await this.db.listQupts({
       entanglement_id: filters.entanglement_id,
+      entanglement_ids: filters.entanglement_ids,
       recursive: filters.recursive ?? true,
       zoku_id: filters.zoku_id,
       source: filters.source,

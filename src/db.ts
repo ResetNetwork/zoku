@@ -498,6 +498,7 @@ export class DB {
 
   async listQupts(filters: {
     entanglement_id?: string;
+    entanglement_ids?: string[];
     recursive?: boolean;
     zoku_id?: string;
     source?: string;
@@ -527,17 +528,22 @@ export class DB {
       const conditions: string[] = [];
 
       if (filters.entanglement_id) {
-        conditions.push('entanglement_id = ?');
+        conditions.push('q.entanglement_id = ?');
         params.push(filters.entanglement_id);
+      } else if (filters.entanglement_ids && filters.entanglement_ids.length > 0) {
+        // Support batch query for multiple entanglements
+        const placeholders = filters.entanglement_ids.map(() => '?').join(', ');
+        conditions.push(`q.entanglement_id IN (${placeholders})`);
+        params.push(...filters.entanglement_ids);
       }
 
       if (filters.zoku_id) {
-        conditions.push('zoku_id = ?');
+        conditions.push('q.zoku_id = ?');
         params.push(filters.zoku_id);
       }
 
       if (filters.source) {
-        conditions.push('source = ?');
+        conditions.push('q.source = ?');
         params.push(filters.source);
       }
 
