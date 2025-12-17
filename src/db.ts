@@ -73,8 +73,13 @@ export class DB {
     function?: string;
     limit?: number;
     offset?: number;
-  } = {}): Promise<Array<Entanglement & { qupts_count: number; sources_count: number }>> {
-    // Build base query with subqueries for counts
+  } = {}): Promise<Array<Entanglement & { 
+    qupts_count: number; 
+    sources_count: number;
+    children_count: number;
+    zoku_count: number;
+  }>> {
+    // Build base query with subqueries for all counts
     let query = `
       SELECT
         e.*,
@@ -88,7 +93,9 @@ export class DB {
            )
            SELECT id FROM descendants
          )) as qupts_count,
-        (SELECT COUNT(*) FROM sources s WHERE s.entanglement_id = e.id) as sources_count
+        (SELECT COUNT(*) FROM sources s WHERE s.entanglement_id = e.id) as sources_count,
+        (SELECT COUNT(*) FROM entanglements c WHERE c.parent_id = e.id) as children_count,
+        (SELECT COUNT(DISTINCT zoku_id) FROM entanglement_zoku ez WHERE ez.entanglement_id = e.id) as zoku_count
       FROM entanglements e
     `;
     const conditions: string[] = [];
@@ -146,7 +153,12 @@ export class DB {
     }
 
     const stmt = this.d1.prepare(query).bind(...params);
-    const result = await stmt.all<Entanglement & { qupts_count: number; sources_count: number }>();
+    const result = await stmt.all<Entanglement & { 
+      qupts_count: number; 
+      sources_count: number;
+      children_count: number;
+      zoku_count: number;
+    }>();
     return result.results || [];
   }
 

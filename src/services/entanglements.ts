@@ -17,28 +17,23 @@ export class EntanglementService extends BaseService {
     limit?: number;
     offset?: number;
   } = {}) {
-    const entanglements = await this.db.listEntanglements({
+    // List entanglements with counts (optimized single query)
+    const entanglements = await this.db.listEntanglementsWithCounts({
       root_only: filters.root_only || false,
       parent_id: filters.parent_id,
       limit: filters.limit || 20,
       offset: filters.offset || 0
     });
 
-    // Enrich with counts and attributes
+    // Enrich with attributes (batched)
     const attributesMap = await this.db.getEntanglementsAttributes(
       entanglements.map(v => v.id)
     );
 
-    const enriched = await Promise.all(
-      entanglements.map(async (v) => ({
-        ...v,
-        children_count: await this.db.getEntanglementChildrenCount(v.id),
-        qupts_count: await this.db.getEntanglementQuptsCount(v.id, true),
-        sources_count: await this.db.getEntanglementSourcesCount(v.id),
-        zoku_count: await this.db.getEntanglementZokuCount(v.id),
-        attributes: attributesMap.get(v.id) || null
-      }))
-    );
+    const enriched = entanglements.map(v => ({
+      ...v,
+      attributes: attributesMap.get(v.id) || null
+    }));
 
     return { entanglements: enriched };
   }
