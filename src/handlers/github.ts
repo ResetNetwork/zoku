@@ -1,5 +1,13 @@
 import type { SourceHandler } from './index';
 import type { QuptInput } from '../types';
+import { 
+  GitHubEventsArraySchema, 
+  GitHubCommitDetailSchema, 
+  GitHubPRDetailSchema,
+  type GitHubEvent,
+  type GitHubCommit,
+  type GitHubPullRequest
+} from './schemas';
 
 export const githubHandler: SourceHandler = {
   async collect({ source, config, credentials, since }) {
@@ -27,7 +35,15 @@ export const githubHandler: SourceHandler = {
         throw new Error(`GitHub API error (${response.status}): ${errorText}`);
       }
 
-      const ghEvents = await response.json() as any[];
+      const responseData = await response.json();
+      const parseResult = GitHubEventsArraySchema.safeParse(responseData);
+      
+      if (!parseResult.success) {
+        console.error('GitHub API response validation failed:', parseResult.error);
+        throw new Error('Invalid GitHub API response format');
+      }
+      
+      const ghEvents = parseResult.data;
 
       // Filter events first
       const filteredEvents = ghEvents.filter(event => {
@@ -49,8 +65,8 @@ export const githubHandler: SourceHandler = {
           'X-GitHub-Api-Version': '2022-11-28'
         };
 
-        let commitMessage = undefined;
-        let prDetails = undefined;
+        let commitMessage: string | undefined = undefined;
+        let prDetails: GitHubPullRequest | undefined = undefined;
 
         try {
           if (event.type === 'PushEvent' && event.payload.head) {
@@ -59,8 +75,11 @@ export const githubHandler: SourceHandler = {
               { headers }
             );
             if (commitResponse.ok) {
-              const commit = await commitResponse.json();
-              commitMessage = commit.commit?.message;
+              const commitData = await commitResponse.json();
+              const commitParse = GitHubCommitDetailSchema.safeParse(commitData);
+              if (commitParse.success) {
+                commitMessage = commitParse.data.commit?.message;
+              }
             }
           } else if (event.type === 'PullRequestEvent' && event.payload.pull_request?.number) {
             const prResponse = await fetch(
@@ -68,7 +87,11 @@ export const githubHandler: SourceHandler = {
               { headers }
             );
             if (prResponse.ok) {
-              prDetails = await prResponse.json();
+              const prData = await prResponse.json();
+              const prParse = GitHubPRDetailSchema.safeParse(prData);
+              if (prParse.success) {
+                prDetails = prParse.data;
+              }
             }
           }
         } catch (error) {

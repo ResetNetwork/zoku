@@ -1,5 +1,11 @@
 import type { SourceHandler } from './index';
 import type { QuptInput } from '../types';
+import {
+  ZammadSearchResponseSchema,
+  ZammadArticlesArraySchema,
+  type ZammadTicket,
+  type ZammadArticle
+} from './schemas';
 
 export const zammadHandler: SourceHandler = {
   async collect({ source, config, credentials, since, cursor }) {
@@ -43,14 +49,20 @@ export const zammadHandler: SourceHandler = {
         throw new Error(`Zammad API error (${searchResponse.status}): ${errorText}`);
       }
 
-      const searchData = await searchResponse.json() as any;
+      const searchData = await searchResponse.json();
+      const parseResult = ZammadSearchResponseSchema.safeParse(searchData);
+      
+      if (!parseResult.success) {
+        console.error('Zammad API response validation failed:', parseResult.error);
+        throw new Error('Invalid Zammad API response format');
+      }
 
       // Handle both array response and assets response formats
-      let ticketsArray: any[] = [];
-      if (Array.isArray(searchData)) {
-        ticketsArray = searchData;
-      } else if (searchData.assets?.Ticket) {
-        ticketsArray = Object.values(searchData.assets.Ticket);
+      let ticketsArray: ZammadTicket[] = [];
+      if (Array.isArray(parseResult.data)) {
+        ticketsArray = parseResult.data;
+      } else if (parseResult.data.assets?.Ticket) {
+        ticketsArray = Object.values(parseResult.data.assets.Ticket);
       }
 
       console.log(`Zammad search found ${ticketsArray.length} tickets`);
@@ -99,8 +111,13 @@ export const zammadHandler: SourceHandler = {
             );
 
             if (articlesResponse.ok) {
-              const articles = await articlesResponse.json() as any[];
-              return { ticket, articles };
+              const articlesData = await articlesResponse.json();
+              const articlesParse = ZammadArticlesArraySchema.safeParse(articlesData);
+              if (articlesParse.success) {
+                return { ticket, articles: articlesParse.data };
+              } else {
+                console.error(`Invalid articles format for ticket ${ticket.id}`);
+              }
             }
           } catch (articleError) {
             console.error(`Error fetching articles for ticket ${ticket.id}:`, articleError);
