@@ -8,7 +8,11 @@ A project/initiative tracking system inspired by the Quantum Thief trilogy. Stat
 - **Database**: Cloudflare D1 (SQLite)
 - **Frontend**: React + Vite + Tailwind + TanStack Query ✅
 - **MCP Server**: HTTP-based at `/mcp` endpoint
-- **Domain**: `zoku.205.dev`
+- **Domain**: Custom domain support (e.g., `zoku.yourdomain.com`)
+
+## Name
+
+**Zoku** (族) - Japanese for "tribe" or "clan". Represents collaborative teams working together on entangled projects through quantum connections.
 
 ## Core Concepts
 
@@ -249,10 +253,11 @@ get_entanglement({ id: "...", detailed: true })  // Returns: { name, children: [
 
 1. **Cloudflare Account** with Workers and D1 enabled
 2. **Wrangler CLI** authenticated: `npx wrangler login`
+3. **Custom domain** (optional): zoku.yourdomain.com
 
 ### One-Command Deployment Script
 
-Save this as `deploy.sh`:
+Already included as `deploy.sh` in the repository:
 
 ```bash
 #!/bin/bash
@@ -305,9 +310,10 @@ curl -s "$WORKER_URL/health" | jq .
 
 echo ""
 echo "📋 Next steps:"
-echo "1. Configure custom domain (if needed): npx wrangler domains add zoku.205.dev"
+echo "1. Configure custom domain (if needed): npx wrangler domains add zoku.yourdomain.com"
 echo "2. Setup Cloudflare Access at: https://one.dash.cloudflare.com/"
-echo "3. Visit your app and login to create admin user"
+echo "3. (Optional) Customize branding: Set VITE_APP_NAME in frontend/.env"
+echo "4. Visit your app and login to create admin user"
 ```
 
 Make executable and run:
@@ -391,12 +397,29 @@ npx wrangler deployments list
 
 ```bash
 # Add custom domain via Wrangler
-npx wrangler domains add zoku.205.dev
+npx wrangler domains add zoku.yourdomain.com
 
 # Or manually add route to wrangler.toml and redeploy:
-# routes = [{ pattern = "zoku.205.dev/*", zone_name = "205.dev" }]
+# routes = [{ pattern = "zoku.yourdomain.com/*", zone_name = "yourdomain.com" }]
 npx wrangler deploy
 ```
+
+#### 5.5. Customize Branding (Optional)
+
+```bash
+# Set custom app name to show next to logo
+echo 'VITE_APP_NAME=Your Organization' > frontend/.env
+
+# Or leave empty for logo-only (default)
+
+# Rebuild frontend with branding
+cd frontend && npm run build && cd ..
+
+# Redeploy
+npx wrangler deploy
+```
+
+See `frontend/CUSTOMIZATION.md` for details.
 
 #### 6. Setup Cloudflare Access (Web UI Auth)
 
@@ -406,9 +429,9 @@ npx wrangler open
 
 # Navigate to: Zero Trust → Access → Applications → Add an application
 # - Type: Self-hosted
-# - Name: The Great Game  
-# - Domain: zoku.205.dev
-# - Policy: Allow emails @reset.tech (or your domain)
+# - Name: Zoku
+# - Domain: zoku.yourdomain.com
+# - Policy: Allow emails @yourdomain.com (or specific users)
 ```
 
 #### 7. Verify Deployment
@@ -418,10 +441,12 @@ npx wrangler open
 npx wrangler deployments list
 
 # Test health endpoint
-curl https://the-great-game.your-subdomain.workers.dev/health
+curl https://zoku.your-subdomain.workers.dev/health
+# Or with custom domain:
+curl https://zoku.yourdomain.com/health
 
 # Test OAuth metadata
-curl https://the-great-game.your-subdomain.workers.dev/.well-known/oauth-authorization-server | jq .
+curl https://zoku.yourdomain.com/.well-known/oauth-authorization-server | jq .
 
 # Tail logs
 npx wrangler tail --format pretty
@@ -519,7 +544,7 @@ npx wrangler secret put ENCRYPTION_KEY
 **MCP OAuth not working:**
 - Verify JWT_SECRET is set
 - Check AUTH_KV namespace is bound
-- Test metadata: `curl https://zoku.205.dev/.well-known/oauth-authorization-server`
+- Test metadata: `curl https://zoku.yourdomain.com/.well-known/oauth-authorization-server`
 
 **Cron not running:**
 - Check Workers dashboard → Triggers → Crons
