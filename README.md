@@ -8,7 +8,7 @@ A project/initiative tracking system inspired by the Quantum Thief trilogy. Stat
 - **Database**: Cloudflare D1 (SQLite)
 - **Frontend**: React + Vite + Tailwind + TanStack Query ✅
 - **MCP Server**: HTTP-based at `/mcp` endpoint
-- **Domain**: Custom domain support (e.g., `zoku.yourdomain.com`)
+- **Domain**: Custom domain support (e.g., `tgg.yourdomain.com`)
 
 ## Name
 
@@ -253,7 +253,7 @@ get_entanglement({ id: "...", detailed: true })  // Returns: { name, children: [
 
 1. **Cloudflare Account** with Workers and D1 enabled
 2. **Wrangler CLI** authenticated: `npx wrangler login`
-3. **Custom domain** (optional): zoku.yourdomain.com
+3. **Custom domain** (optional): tgg.yourdomain.com
 
 ### One-Command Deployment Script
 
@@ -310,7 +310,7 @@ curl -s "$WORKER_URL/health" | jq .
 
 echo ""
 echo "📋 Next steps:"
-echo "1. Configure custom domain (if needed): npx wrangler domains add zoku.yourdomain.com"
+echo "1. Configure custom domain (if needed): npx wrangler domains add tgg.yourdomain.com"
 echo "2. Setup Cloudflare Access at: https://one.dash.cloudflare.com/"
 echo "3. (Optional) Customize branding: Set VITE_APP_NAME in frontend/.env"
 echo "4. Visit your app and login to create admin user"
@@ -397,10 +397,10 @@ npx wrangler deployments list
 
 ```bash
 # Add custom domain via Wrangler
-npx wrangler domains add zoku.yourdomain.com
+npx wrangler domains add tgg.yourdomain.com
 
 # Or manually add route to wrangler.toml and redeploy:
-# routes = [{ pattern = "zoku.yourdomain.com/*", zone_name = "yourdomain.com" }]
+# routes = [{ pattern = "tgg.yourdomain.com/*", zone_name = "yourdomain.com" }]
 npx wrangler deploy
 ```
 
@@ -429,8 +429,8 @@ npx wrangler open
 
 # Navigate to: Zero Trust → Access → Applications → Add an application
 # - Type: Self-hosted
-# - Name: Zoku
-# - Domain: zoku.yourdomain.com
+# - Name: The Great Game (or Zoku)
+# - Domain: tgg.yourdomain.com
 # - Policy: Allow emails @yourdomain.com (or specific users)
 ```
 
@@ -441,12 +441,12 @@ npx wrangler open
 npx wrangler deployments list
 
 # Test health endpoint
-curl https://zoku.your-subdomain.workers.dev/health
+curl https://the-great-game.your-subdomain.workers.dev/health
 # Or with custom domain:
-curl https://zoku.yourdomain.com/health
+curl https://tgg.yourdomain.com/health
 
 # Test OAuth metadata
-curl https://zoku.yourdomain.com/.well-known/oauth-authorization-server | jq .
+curl https://tgg.yourdomain.com/.well-known/oauth-authorization-server | jq .
 
 # Tail logs
 npx wrangler tail --format pretty
@@ -544,7 +544,7 @@ npx wrangler secret put ENCRYPTION_KEY
 **MCP OAuth not working:**
 - Verify JWT_SECRET is set
 - Check AUTH_KV namespace is bound
-- Test metadata: `curl https://zoku.yourdomain.com/.well-known/oauth-authorization-server`
+- Test metadata: `curl https://tgg.yourdomain.com/.well-known/oauth-authorization-server`
 
 **Cron not running:**
 - Check Workers dashboard → Triggers → Crons
