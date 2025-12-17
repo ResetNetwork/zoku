@@ -29,75 +29,68 @@ export const githubHandler: SourceHandler = {
 
       const ghEvents = await response.json() as any[];
 
-      for (const event of ghEvents) {
+      // Filter events first
+      const filteredEvents = ghEvents.filter(event => {
         const eventTime = new Date(event.created_at).getTime() / 1000;
-
-        // Skip if before last sync
-        if (since && eventTime <= since) continue;
-
-        // Skip if not in configured events
+        if (since && eventTime <= since) return false;
+        
         const eventType = mapEventType(event.type);
-        if (events.length > 0 && !events.includes(eventType)) continue;
+        if (events.length > 0 && !events.includes(eventType)) return false;
+        
+        return true;
+      });
 
-        // Fetch additional details for specific event types
+      // Collect all API calls to parallelize
+      const detailFetches = filteredEvents.map(async (event) => {
+        const headers = {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/vnd.github+json',
+          'User-Agent': 'Zoku/1.0',
+          'X-GitHub-Api-Version': '2022-11-28'
+        };
+
         let commitMessage = undefined;
-        let issueBody = undefined;
-        let commentBody = undefined;
-        let prTitle = undefined;
-        let prBody = undefined;
-        let prUrl = undefined;
+        let prDetails = undefined;
 
-        if (event.type === 'PushEvent' && event.payload.head) {
-          try {
+        try {
+          if (event.type === 'PushEvent' && event.payload.head) {
             const commitResponse = await fetch(
               `https://api.github.com/repos/${owner}/${repo}/commits/${event.payload.head}`,
-              {
-                headers: {
-                  'Authorization': `Bearer ${token}`,
-                  'Accept': 'application/vnd.github+json',
-                  'User-Agent': 'Zoku/1.0',
-                  'X-GitHub-Api-Version': '2022-11-28'
-                }
-              }
+              { headers }
             );
             if (commitResponse.ok) {
               const commit = await commitResponse.json();
               commitMessage = commit.commit?.message;
             }
-          } catch (error) {
-            console.warn(`Failed to fetch commit message for ${event.payload.head}:`, error);
-          }
-        } else if (event.type === 'IssuesEvent') {
-          issueBody = event.payload.issue?.body;
-        } else if (event.type === 'IssueCommentEvent') {
-          commentBody = event.payload.comment?.body;
-        } else if (event.type === 'PullRequestEvent' && event.payload.pull_request?.number) {
-          // Fetch full PR details to get title and body
-          try {
+          } else if (event.type === 'PullRequestEvent' && event.payload.pull_request?.number) {
             const prResponse = await fetch(
               `https://api.github.com/repos/${owner}/${repo}/pulls/${event.payload.pull_request.number}`,
-              {
-                headers: {
-                  'Authorization': `Bearer ${token}`,
-                  'Accept': 'application/vnd.github+json',
-                  'User-Agent': 'Zoku/1.0',
-                  'X-GitHub-Api-Version': '2022-11-28'
-                }
-              }
+              { headers }
             );
             if (prResponse.ok) {
-              const pr = await prResponse.json();
-              prTitle = pr.title;
-              prBody = pr.body;
-              prUrl = pr.html_url;
+              prDetails = await prResponse.json();
             }
-          } catch (error) {
-            console.warn(`Failed to fetch PR details for #${event.payload.pull_request.number}:`, error);
-            // Fallback to payload data
-            prTitle = event.payload.pull_request?.title || 'Pull Request';
-            prBody = event.payload.pull_request?.body;
           }
+        } catch (error) {
+          console.warn(`Failed to fetch details for event ${event.id}:`, error);
         }
+
+        return { event, commitMessage, prDetails };
+      });
+
+      // Fetch all details in parallel
+      const eventsWithDetails = await Promise.all(detailFetches);
+
+      // Build qupts from enriched events
+      for (const { event, commitMessage, prDetails } of eventsWithDetails) {
+        const eventTime = new Date(event.created_at).getTime() / 1000;
+
+        // Extract details from event payload
+        const issueBody = event.payload.issue?.body;
+        const commentBody = event.payload.comment?.body;
+        const prTitle = prDetails?.title || event.payload.pull_request?.title;
+        const prBody = prDetails?.body || event.payload.pull_request?.body;
+        const prUrl = prDetails?.html_url;
 
         // Enhance content with fetched details
         let content = formatEventContent(event);
