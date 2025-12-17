@@ -67,7 +67,7 @@ export function authMiddleware() {
         logger.error('Failed to decode JWT in dev mode', error as Error, {
           error_message: error instanceof Error ? error.message : String(error)
         });
-        return c.json({ error: 'Invalid JWT format: ' + (error instanceof Error ? error.message : String(error)) }, 401);
+        return c.json({ error: 'Invalid authentication token format' }, 401);
       }
     } else {
       logger.info('Production mode - validating JWT with CF Access');

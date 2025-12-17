@@ -159,7 +159,7 @@ mcpOAuthProtectedRoutes.post('/authorize', authMiddleware(), async (c) => {
     console.error('Failed to generate authorization code:', error);
     const redirect = new URL(redirect_uri);
     redirect.searchParams.set('error', 'server_error');
-    redirect.searchParams.set('error_description', error instanceof Error ? error.message : 'Failed to generate code');
+    redirect.searchParams.set('error_description', 'Authorization failed. Please try again.');
     if (state) redirect.searchParams.set('state', state);
     return c.redirect(redirect.toString());
   }
@@ -212,7 +212,7 @@ mcpOAuthPublicRoutes.post('/token', async (c) => {
     console.error('Token endpoint error:', error);
     return c.json({
       error: 'invalid_grant',
-      error_description: error instanceof Error ? error.message : 'Token exchange failed'
+      error_description: 'The authorization code is invalid or has expired'
     }, 400);
   }
 });
@@ -241,7 +241,7 @@ mcpOAuthPublicRoutes.post('/register', async (c) => {
     console.error('Client registration failed:', error);
     return c.json({
       error: 'server_error',
-      error_description: error instanceof Error ? error.message : 'Registration failed'
+      error_description: 'Client registration failed. Please try again.'
     }, 500);
   }
 });
@@ -265,7 +265,7 @@ mcpOAuthPublicRoutes.post('/revoke', async (c) => {
     console.error('Token revocation failed:', error);
     return c.json({
       error: 'server_error',
-      error_description: error instanceof Error ? error.message : 'Revocation failed'
+      error_description: 'Token revocation failed. Please try again.'
     }, 500);
   }
 });
@@ -301,8 +301,9 @@ mcpOAuthProtectedRoutes.delete('/sessions/:id', authMiddleware(), async (c) => {
 
     return c.json({ success: true });
   } catch (error) {
+    console.error('Session revocation failed:', error);
     return c.json({
-      error: error instanceof Error ? error.message : 'Failed to revoke session'
+      error: 'Failed to revoke session. Please try again.'
     }, 400);
   }
 });

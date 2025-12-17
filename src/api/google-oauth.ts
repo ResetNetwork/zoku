@@ -340,7 +340,7 @@ app.get('/google/callback', async (c) => {
   } catch (error) {
     console.error('OAuth token exchange failed:', error);
     const errorUrl = new URL('/api/oauth/google/callback-page', new URL(c.req.url).origin);
-    errorUrl.hash = `error=${encodeURIComponent(error instanceof Error ? error.message : 'Token exchange failed')}`;
+    errorUrl.hash = 'error=oauth_failed';
     return c.redirect(errorUrl.toString());
   }
 });
