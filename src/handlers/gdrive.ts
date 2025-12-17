@@ -1,6 +1,12 @@
 import type { SourceHandler } from './index';
 import type { QuptInput } from '../types';
 import { refreshGoogleAccessToken } from './google-auth';
+import {
+  GoogleDriveFilesListSchema,
+  GoogleDriveFileSchema,
+  GoogleDriveRevisionsListSchema,
+  GoogleDriveCommentsListSchema
+} from './schemas';
 
 export const gdriveHandler: SourceHandler = {
   async collect({ source, config, credentials, since, cursor }) {

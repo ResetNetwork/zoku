@@ -1,6 +1,11 @@
 import type { SourceHandler } from './index';
 import type { QuptInput } from '../types';
 import { refreshGoogleAccessToken } from './google-auth';
+import {
+  GmailMessagesListSchema,
+  GmailMessageSchema,
+  type GmailMessage
+} from './schemas';
 
 export const gmailHandler: SourceHandler = {
   async collect({ source, config, credentials, since, cursor }) {
@@ -74,10 +79,15 @@ export const gmailHandler: SourceHandler = {
         throw new Error(`Gmail API error (${messagesResponse.status}): ${errorText}`);
       }
 
-      const messagesData = await messagesResponse.json() as { 
-        messages?: Array<{ id: string; threadId: string }>;
-        nextPageToken?: string;
-      };
+      const messagesResponseData = await messagesResponse.json();
+      const messagesParse = GmailMessagesListSchema.safeParse(messagesResponseData);
+      
+      if (!messagesParse.success) {
+        console.error('Gmail messages list validation failed:', messagesParse.error);
+        throw new Error('Invalid Gmail messages list response');
+      }
+      
+      const messagesData = messagesParse.data;
 
       if (!messagesData.messages || messagesData.messages.length === 0) {
         console.log('📭 No messages found');
@@ -99,20 +109,19 @@ export const gmailHandler: SourceHandler = {
             continue;
           }
 
-          const message = await detailResponse.json() as {
-            id: string;
-            threadId: string;
-            internalDate: string;
-            payload: {
-              headers: Array<{ name: string; value: string }>;
-              body?: { data?: string };
-              parts?: Array<{ mimeType: string; body?: { data?: string } }>;
-            };
-          };
+          const messageData = await detailResponse.json();
+          const messageParse = GmailMessageSchema.safeParse(messageData);
+          
+          if (!messageParse.success) {
+            console.error(`Gmail message ${msg.id} validation failed:`, messageParse.error);
+            continue;
+          }
+          
+          const message = messageParse.data;
 
           // Extract headers
           const headers_map = new Map(
-            message.payload.headers.map(h => [h.name.toLowerCase(), h.value])
+            (message.payload?.headers || []).map(h => [h.name.toLowerCase(), h.value])
           );
 
           const subject = headers_map.get('subject') || '(no subject)';
@@ -121,9 +130,9 @@ export const gmailHandler: SourceHandler = {
 
           // Extract body (full text + preview)
           let fullBody = '';
-          if (message.payload.body?.data) {
+          if (message.payload?.body?.data) {
             fullBody = Buffer.from(message.payload.body.data, 'base64').toString('utf-8');
-          } else if (message.payload.parts) {
+          } else if (message.payload?.parts) {
             const textPart = message.payload.parts.find(p => p.mimeType === 'text/plain');
             if (textPart?.body?.data) {
               fullBody = Buffer.from(textPart.body.data, 'base64').toString('utf-8');
