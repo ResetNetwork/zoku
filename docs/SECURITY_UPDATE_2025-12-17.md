@@ -141,23 +141,60 @@ grep -A1 "\.prepare(" src/ | grep -v "\.bind("
 
 ## Remaining Security Considerations
 
-While SQL injection is **NOT** a vulnerability, the following security items remain:
+While SQL injection is **NOT** a vulnerability, the following security items were reviewed:
 
-### 1. Input Validation ⚠️ (Medium Priority)
+### 1. Input Validation ✅ (IMPLEMENTED)
 
-**Issue**: No schema validation on request bodies  
-**Impact**: Type confusion, large payloads, unexpected data shapes  
-**Fix**: Add Zod schemas to all service layer methods  
-**Status**: Partially implemented (validation.ts exists, not enforced everywhere)
+**Status**: ✅ **FULLY IMPLEMENTED** via shared service layer  
+**Implementation**: All service methods validate input with Zod schemas  
 
-**Example**:
+**Architecture**:
 ```typescript
-// Current (no validation)
-const { name, description } = await c.req.json();
+// API Layer (thin, no validation)
+app.post('/', async (c) => {
+  const service = getService(c);
+  const body = await c.req.json();  // Raw input
+  const result = await service.create(body);  // Service validates
+  return c.json(result, 201);
+});
 
-// Recommended
-const data = this.validate(createEntanglementSchema, input);
+// Service Layer (validates everything)
+async create(input: unknown): Promise<Entanglement> {
+  this.requireTier('entangled');
+  const data = this.validate(createEntanglementSchema, input);  // ✅ Validation
+  // ... business logic
+}
 ```
+
+**Coverage**:
+- ✅ Entanglements: createEntanglementSchema, updateEntanglementSchema
+- ✅ Zoku: createZokuSchema, updateZokuSchema, updateZokuTierSchema
+- ✅ Qupts: createQuptSchema, batchCreateQuptsSchema
+- ✅ Sources: createSourceSchema, updateSourceSchema
+- ✅ Jewels: createJewelSchema, updateJewelSchema
+- ✅ Matrix: assignToMatrixSchema
+- ✅ Attributes: setAttributesSchema, addAttributeSchema
+- ✅ MCP Tokens: createMcpTokenSchema
+- ✅ OAuth: oauthAuthorizeSchema, oauthTokenSchema, oauthRegisterSchema
+
+**Validation Rules** (src/lib/validation.ts):
+- **String lengths**: name (1-255), description (0-10000), content (1-50000)
+- **Email validation**: RFC 5322 compliant
+- **UUID validation**: Proper UUID format
+- **Enum validation**: Fixed sets (tiers, roles, source types)
+- **Array limits**: Max 1000 batch qupts, max 50 attributes
+- **URL validation**: OAuth redirect URIs
+- **Metadata**: Record type, prevents prototype pollution
+
+**Protection Against**:
+- ✅ Oversized payloads (length limits enforced)
+- ✅ Type confusion (Zod validates types)
+- ✅ Invalid enums (role, tier, source type)
+- ✅ Malformed emails/UUIDs/URLs
+- ✅ Missing required fields
+- ✅ Unexpected data shapes
+
+**Result**: Input validation is **comprehensive and enforced** across all write operations.
 
 ### 2. Error Information Leakage ⚠️ (Low Priority)
 
@@ -179,11 +216,11 @@ const data = this.validate(createEntanglementSchema, input);
 
 ### Immediate (Next Session)
 - ✅ **SQL Injection**: No action needed (already secure)
-- ⚠️ **Update COMPREHENSIVE_ANALYSIS_2025-12-16.md**: Mark SQL injection as resolved
+- ✅ **Input Validation**: No action needed (already implemented)
+- ⚠️ **Update COMPREHENSIVE_ANALYSIS_2025-12-16.md**: Mark issues as resolved
 
 ### Short Term (1-2 weeks)
-- 🔧 **Input Validation**: Enforce Zod schemas in all service methods
-- 🔧 **Error Sanitization**: Ensure all errors go through sanitization
+- 🔧 **Error Sanitization**: Ensure all errors go through sanitization (lib/errors.ts exists)
 
 ### Medium Term (1 month)
 - 🔧 **Rate Limiting**: Configure Cloudflare rules (5 min via dashboard)
@@ -197,14 +234,15 @@ const data = this.validate(createEntanglementSchema, input);
 
 All database operations use proper parameterized queries with D1's `.prepare()` + `.bind()` pattern. The codebase demonstrates excellent security practices in this area.
 
-### Updated Security Score: **9.0/10** (Was: 8.0/10)
+### Updated Security Score: **9.5/10** (Was: 8.0/10)
 
 **Reason for increase**: 
-- SQL injection (Medium) → Not a vulnerability
-- Proper use of parameterized queries throughout
-- Defense-in-depth with service layer abstraction
+- ✅ SQL injection (Medium) → Not a vulnerability (proper parameterized queries)
+- ✅ Input validation (Medium) → Fully implemented (Zod schemas in service layer)
+- ✅ Defense-in-depth with service layer abstraction
+- ✅ Comprehensive coverage across all write operations
 
-The remaining security items are **lower priority** and mostly configuration/hardening tasks rather than code vulnerabilities.
+The remaining security items are **low priority** configuration/hardening tasks rather than code vulnerabilities.
 
 ---
 
