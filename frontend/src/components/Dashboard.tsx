@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../lib/api'
-import type { Qupt } from '../lib/types'
 import QuptItem from './QuptItem'
 import EntanglementCard from './EntanglementCard'
 
