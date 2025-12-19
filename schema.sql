@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS qupts (
   zoku_id TEXT REFERENCES zoku(id) ON DELETE SET NULL,
   content TEXT NOT NULL,
   source TEXT DEFAULT 'manual',  -- 'manual', 'github', 'gmail', 'zammad', 'gdrive', 'gdocs', 'webhook', 'mcp'
+  qupt_type TEXT,                -- Formal type: 'source:subtype' format (e.g., 'github:pull_request')
   external_id TEXT,              -- For deduplication: 'github:{id}', 'gmail:{id}', etc.
   metadata TEXT,                 -- JSON blob
   created_at INTEGER NOT NULL DEFAULT (unixepoch())
@@ -64,6 +65,7 @@ CREATE TABLE IF NOT EXISTS qupts (
 
 CREATE INDEX IF NOT EXISTS idx_qupts_entanglement ON qupts(entanglement_id);
 CREATE INDEX IF NOT EXISTS idx_qupts_created ON qupts(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_qupts_type ON qupts(qupt_type);
 CREATE INDEX IF NOT EXISTS idx_qupts_external ON qupts(source, external_id) WHERE external_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_qupts_unique_external ON qupts(source, external_id) WHERE external_id IS NOT NULL;
 

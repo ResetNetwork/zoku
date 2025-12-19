@@ -1,5 +1,5 @@
 import type { SourceHandler } from './index';
-import type { QuptInput } from '../types';
+import type { QuptInput, QuptType } from '../types';
 import { 
   GitHubEventsArraySchema, 
   GitHubCommitDetailSchema, 
@@ -132,6 +132,7 @@ export const githubHandler: SourceHandler = {
           entanglement_id: source.entanglement_id,
           content,
           source: 'github',
+          qupt_type: mapEventToQuptType(event.type),
           external_id: `github:${event.id}`,
           metadata: {
             event_type: event.type,
@@ -175,6 +176,18 @@ function mapEventType(ghType: string): string {
     'ReleaseEvent': 'release'
   };
   return map[ghType] || ghType.toLowerCase();
+}
+
+function mapEventToQuptType(ghType: string): QuptType {
+  const map: Record<string, QuptType> = {
+    'PushEvent': 'github:push',
+    'PullRequestEvent': 'github:pull_request',
+    'IssuesEvent': 'github:issue',
+    'IssueCommentEvent': 'github:issue_comment',
+    'PullRequestReviewCommentEvent': 'github:pr_comment',
+    'ReleaseEvent': 'github:release'
+  };
+  return map[ghType] || 'github:push';
 }
 
 function formatEventContent(event: any): string {

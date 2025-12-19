@@ -625,8 +625,8 @@ export class DB {
 
     await this.d1
       .prepare(`
-        INSERT INTO qupts (id, entanglement_id, zoku_id, content, source, external_id, metadata, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO qupts (id, entanglement_id, zoku_id, content, source, qupt_type, external_id, metadata, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
       .bind(
         id,
@@ -634,6 +634,7 @@ export class DB {
         data.zoku_id || null,
         data.content,
         data.source,
+        data.qupt_type || null,
         data.external_id || null,
         metadata,
         createdAt
@@ -651,8 +652,8 @@ export class DB {
 
       return this.d1
         .prepare(`
-          INSERT OR IGNORE INTO qupts (id, entanglement_id, zoku_id, content, source, external_id, metadata, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT OR IGNORE INTO qupts (id, entanglement_id, zoku_id, content, source, qupt_type, external_id, metadata, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `)
         .bind(
           id,
@@ -660,6 +661,7 @@ export class DB {
           q.zoku_id || null,
           q.content,
           q.source,
+          q.qupt_type || null,
           q.external_id || null,
           metadata,
           createdAt

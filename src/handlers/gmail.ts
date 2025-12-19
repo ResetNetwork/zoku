@@ -1,5 +1,5 @@
 import type { SourceHandler } from './index';
-import type { QuptInput } from '../types';
+import type { QuptInput, QuptType } from '../types';
 import { refreshGoogleAccessToken } from './google-auth';
 import {
   GmailMessagesListSchema,
@@ -153,6 +153,7 @@ export const gmailHandler: SourceHandler = {
             entanglement_id: source.entanglement_id,
             content: `${from}: ${subject}`,
             source: 'gmail',
+            qupt_type: 'gmail:message',
             external_id: `gmail:${message.id}`,
             metadata: {
               message_id: message.id,

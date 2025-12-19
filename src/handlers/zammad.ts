@@ -1,5 +1,5 @@
 import type { SourceHandler } from './index';
-import type { QuptInput } from '../types';
+import type { QuptInput, QuptType } from '../types';
 import {
   ZammadSearchResponseSchema,
   ZammadArticlesArraySchema,
@@ -78,6 +78,7 @@ export const zammadHandler: SourceHandler = {
             entanglement_id: source.entanglement_id,
             content: formatTicketContent(ticket),
             source: 'zammad',
+            qupt_type: 'zammad:ticket',
             external_id: `zammad:ticket:${ticket.id}:${ticket.updated_at}`,
             metadata: {
               type: 'ticket',
@@ -140,6 +141,7 @@ export const zammadHandler: SourceHandler = {
               entanglement_id: source.entanglement_id,
               content: formatArticleContent(article, ticket),
               source: 'zammad',
+              qupt_type: 'zammad:article',
               external_id: `zammad:article:${article.id}`,
               metadata: {
                 type: 'article',

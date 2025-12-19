@@ -1,5 +1,5 @@
 import type { SourceHandler } from './index';
-import type { QuptInput } from '../types';
+import type { QuptInput, QuptType } from '../types';
 import { refreshGoogleAccessToken } from './google-auth';
 import {
   GoogleDriveFilesListSchema,
@@ -129,9 +129,10 @@ async function collectFolderFiles(
       entanglement_id: source.entanglement_id,
       content: `New file: ${file.name}`,
       source: 'gdrive',
+      qupt_type: 'gdrive:file_created',
       external_id: `gdrive:folder:${folder_id}:file:${file.id}`,
       metadata: {
-        type: 'new_file',
+        type: 'file_created',
         folder_id,
         file_id: file.id,
         file_name: file.name,
@@ -181,9 +182,10 @@ async function collectDocumentActivity(
         entanglement_id: source.entanglement_id,
         content: `Renamed: "${lastTitle}" → "${docTitle}"`,
         source: 'gdrive',
+        qupt_type: 'gdrive:file_renamed',
         external_id: `gdrive:${document_id}:rename:${Date.now()}`,
         metadata: {
-          type: 'rename',
+          type: 'file_renamed',
           document_id,
           old_title: lastTitle,
           new_title: docTitle,
@@ -215,6 +217,7 @@ async function collectDocumentActivity(
           entanglement_id: source.entanglement_id,
           content: `${docTitle}: Edited by ${revision.lastModifyingUser?.displayName || 'Someone'}`,
           source: 'gdrive',
+          qupt_type: 'gdrive:revision',
           external_id: `gdrive:${document_id}:rev:${revision.id}`,
           metadata: {
             type: 'revision',
@@ -250,6 +253,7 @@ async function collectDocumentActivity(
           entanglement_id: source.entanglement_id,
           content: `${docTitle}: Comment by ${comment.author?.displayName || 'Someone'}`,
           source: 'gdrive',
+          qupt_type: 'gdrive:comment',
           external_id: `gdrive:${document_id}:comment:${comment.id}`,
           metadata: {
             type: 'comment',
@@ -378,6 +382,7 @@ async function collectFolderDocumentsActivity(
               entanglement_id: source.entanglement_id,
               content: `${docTitle}: Edited by ${revision.lastModifyingUser?.displayName || 'Someone'}`,
               source: 'gdrive',
+              qupt_type: 'gdrive:revision',
               external_id: `gdrive:${doc.id}:rev:${revision.id}`,
               metadata: {
                 type: 'revision',
@@ -414,6 +419,7 @@ async function collectFolderDocumentsActivity(
               entanglement_id: source.entanglement_id,
               content: `${docTitle}: Comment by ${comment.author?.displayName || 'Someone'}`,
               source: 'gdrive',
+              qupt_type: 'gdrive:comment',
               external_id: `gdrive:${doc.id}:comment:${comment.id}`,
               metadata: {
                 type: 'comment',
@@ -461,9 +467,10 @@ async function detectFolderRenames(
           entanglement_id: source.entanglement_id,
           content: `Renamed: "${oldName}" → "${newName}"`,
           source: 'gdrive',
+          qupt_type: 'gdrive:file_renamed',
           external_id: `gdrive:folder:${folder_id}:rename:${fileId}:${Date.now()}`,
           metadata: {
-            type: 'rename',
+            type: 'file_renamed',
             folder_id,
             file_id: fileId,
             old_name: oldName,
